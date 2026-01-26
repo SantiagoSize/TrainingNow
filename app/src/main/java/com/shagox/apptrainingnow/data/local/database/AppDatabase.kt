@@ -52,14 +52,15 @@ abstract class AppDatabase : RoomDatabase() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)
                             CoroutineScope(Dispatchers.IO).launch {
-                                // Solución al aviso amarillo: quitamos "AppDatabase."
                                 val database = getInstance(context)
+                                // 1. Creamos Usuarios
                                 prepopulateUsers(database.userDao())
-                                // prepopulateExercises(database.exerciseDao()) // Descomenta si tienes ejercicios listos
+                                // 2. Creamos Ejercicios (¡AHORA SÍ SE EJECUTA!)
+                                prepopulateExercises(database.exerciseDao())
                             }
                         }
                     })
-                    .fallbackToDestructiveMigration(true) // Solución al error de Deprecated
+                    .fallbackToDestructiveMigration(true)
                     .build()
 
                 INSTANCE = instance
@@ -68,20 +69,17 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         private suspend fun prepopulateUsers(dao: UserDao) {
-            // Verifica que hayas agregado la función count() en tu UserDao
             if (dao.count() == 0) {
                 val users = listOf(
-                    // ADMIN
                     UserEntity(
                         role = "ADMIN",
                         name = "Super",
                         lastName = "Admin",
                         email = "santiago@admin.tn",
                         phone = "000",
-                        password = "admin", // Ahora sí funciona porque existe en UserEntity
+                        password = "admin",
                         specializations = "Gestión Total"
                     ),
-                    // ENTRENADOR
                     UserEntity(
                         role = "TRAINER",
                         name = "Santiago",
@@ -91,7 +89,6 @@ abstract class AppDatabase : RoomDatabase() {
                         password = "coach",
                         specializations = "Hipertrofia"
                     ),
-                    // USUARIO
                     UserEntity(
                         role = "USER",
                         name = "Cliente",
@@ -105,6 +102,16 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 users.forEach { dao.insertUser(it) }
             }
+        }
+
+        private suspend fun prepopulateExercises(dao: ExerciseDao) {
+            val exercises = listOf(
+                ExerciseEntity(name = "Press Banca", category = "Pectorales", description = "Acostado en banco plano...", videoUrl = "youtube.com"),
+                ExerciseEntity(name = "Sentadilla", category = "Piernas", description = "Barra trasnuca...", videoUrl = "youtube.com"),
+                ExerciseEntity(name = "Dominadas", category = "Espalda", description = "Agarre prono...", videoUrl = "youtube.com"),
+                ExerciseEntity(name = "Curl de Bíceps", category = "Brazos", description = "Con mancuernas...", videoUrl = "youtube.com")
+            )
+            dao.insertExercises(exercises)
         }
     }
 }
