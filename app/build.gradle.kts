@@ -67,7 +67,8 @@ dependencies {
     implementation("androidx.room:room-ktx:2.8.4")
     ksp("androidx.room:room-compiler:2.8.4")
 
-    //cargar imagenes de la camara en nuestro proyecto
+    //cargar imagenes de la camara y Activar las notificaciones
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("androidx.work:work-runtime-ktx:2.11.0")
 
 }
