@@ -14,9 +14,14 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE id = :userId")
     suspend fun getUserById(userId: Int): UserEntity?
 
-    @Query("SELECT * FROM users")
-    fun getAllUsers(): Flow<List<UserEntity>>
+    //  ESTO FALTABA PARA EL LOGIN
+    @Query("SELECT * FROM users WHERE email = :email LIMIT 1")
+    suspend fun getUserByEmail(email: String): UserEntity?
 
+    // ESTO FALTABA PRE-CARGA DE DATOS
     @Query("SELECT COUNT(*) FROM users")
     suspend fun count(): Int
+
+    @Query("SELECT * FROM users")
+    fun getAllUsers(): Flow<List<UserEntity>>
 }

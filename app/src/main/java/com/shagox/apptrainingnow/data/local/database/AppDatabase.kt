@@ -27,11 +27,10 @@ import kotlinx.coroutines.launch
         MessageEntity::class
     ],
     version = 1,
-    exportSchema = false // Lo dejamos en false para evitar configurar rutas extras por ahora
+    exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
-    // 1. Exponer todos los DAOs de tu sistema
     abstract fun userDao(): UserDao
     abstract fun exerciseDao(): ExerciseDao
     abstract fun routineDao(): RoutineDao
@@ -49,19 +48,18 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DB_NAME
                 )
-                    // 2. Aquí está la magia del profe: Callback para datos iniciales
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)
-                            // Lanzamos una corutina para no bloquear la UI
                             CoroutineScope(Dispatchers.IO).launch {
+                                // Solución al aviso amarillo: quitamos "AppDatabase."
                                 val database = getInstance(context)
                                 prepopulateUsers(database.userDao())
-                                prepopulateExercises(database.exerciseDao())
+                                // prepopulateExercises(database.exerciseDao()) // Descomenta si tienes ejercicios listos
                             }
                         }
                     })
-                    .fallbackToDestructiveMigration(true)
+                    .fallbackToDestructiveMigration(true) // Solución al error de Deprecated
                     .build()
 
                 INSTANCE = instance
@@ -69,44 +67,44 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        // --- Funciones de llenado de datos (Seeding) ---
-
         private suspend fun prepopulateUsers(dao: UserDao) {
-            // Verificamos si ya hay usuarios usando count() (Debemos agregarlo al DAO)
+            // Verifica que hayas agregado la función count() en tu UserDao
             if (dao.count() == 0) {
                 val users = listOf(
+                    // ADMIN
+                    UserEntity(
+                        role = "ADMIN",
+                        name = "Super",
+                        lastName = "Admin",
+                        email = "santiago@admin.tn",
+                        phone = "000",
+                        password = "admin", // Ahora sí funciona porque existe en UserEntity
+                        specializations = "Gestión Total"
+                    ),
+                    // ENTRENADOR
                     UserEntity(
                         role = "TRAINER",
                         name = "Santiago",
-                        lastName = "Serrano",
-                        email = "admin@trainingnow.com",
+                        lastName = "Coach",
+                        email = "santiago@coach.tn",
                         phone = "+56912345678",
-                        specializations = "Hipertrofia, Fuerza"
+                        password = "coach",
+                        specializations = "Hipertrofia"
                     ),
+                    // USUARIO
                     UserEntity(
                         role = "USER",
                         name = "Cliente",
                         lastName = "Prueba",
                         email = "cliente@gmail.com",
                         phone = "+56987654321",
+                        password = "123",
                         height = 175f,
                         weight = 70f
                     )
                 )
                 users.forEach { dao.insertUser(it) }
             }
-        }
-
-        private suspend fun prepopulateExercises(dao: ExerciseDao) {
-            // Llenamos la biblioteca si está vacía
-            // Nota: Necesitarás agregar un método count() en ExerciseDao similar al de User
-            // Por ahora insertamos directo una lista pequeña
-            val exercises = listOf(
-                ExerciseEntity(name = "Press Banca", category = "Pectorales", description = "Acostado en banco plano...", videoUrl = "youtube.com/xyz"),
-                ExerciseEntity(name = "Sentadilla", category = "Piernas", description = "Barra en la espalda...", videoUrl = "youtube.com/abc"),
-                ExerciseEntity(name = "Dominadas", category = "Espalda", description = "Colgado de la barra...", videoUrl = "youtube.com/def")
-            )
-            dao.insertExercises(exercises)
         }
     }
 }
