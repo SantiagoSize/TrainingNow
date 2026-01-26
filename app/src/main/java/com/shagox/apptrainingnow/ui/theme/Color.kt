@@ -2,6 +2,12 @@ package com.shagox.apptrainingnow.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
+//Colores Personalizados
+val VerdeTN = Color(0xFF22FF5F)
+val NegroFondo = Color(0xFF000000)
+val GrisFondo = Color(0xFF121212)
+
+//Colores Predeterminados
 val Purple80 = Color(0xFFD0BCFF)
 val PurpleGrey80 = Color(0xFFCCC2DC)
 val Pink80 = Color(0xFFEFB8C8)
