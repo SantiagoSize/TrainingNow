@@ -1,13 +1,17 @@
 package com.shagox.apptrainingnow.ui.theme
 
 import android.os.Build
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
@@ -31,14 +35,11 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun AppTrainingNowTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Cámbialo a false para que se vean TUS colores y no los del fondo de pantalla
+    darkTheme: Boolean = true, // Forzamos dark theme para usar nuestros colores
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
-        // Si quieres que tus colores Verde y Negro sean obligatorios,
-        // puedes comentar la parte de dynamicColor
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -50,6 +51,14 @@ fun AppTrainingNowTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
-        content = content
+        content = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(colorScheme.background)
+            ) {
+                content()
+            }
+        }
     )
 }

@@ -4,7 +4,15 @@
         name="camera_cache"
         path="images/" />
 
+    <files-path
+        name="my_files"
+        path="images/" />
+
     <external-path
         name="my_images"
         path="." />
+
+    <external-files-path
+        name="external_files"
+        path="Pictures" />
 </paths>

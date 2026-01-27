@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.AppTrainingNow" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Base application theme compatible with Material3 and AppCompat -->
+    <style name="Theme.AppTrainingNow" parent="Theme.AppCompat.Light.NoActionBar" />
 </resources>
