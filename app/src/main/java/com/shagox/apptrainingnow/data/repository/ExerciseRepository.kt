@@ -5,25 +5,25 @@ import com.shagox.apptrainingnow.data.local.exercise.ExerciseDao
 import com.shagox.apptrainingnow.data.local.exercise.ExerciseEntity
 import kotlinx.coroutines.flow.Flow
 
-class ExerciseRepository(private val exerciseDao: ExerciseDao) {
+class ExerciseRepository(private val exerciseDao: ExerciseDao) : IExerciseRepository {
 
-    fun getAllExercises(): Flow<List<ExerciseEntity>> {
+    override fun getAllExercises(): Flow<List<ExerciseEntity>> {
         return exerciseDao.getAllExercises()
     }
 
-    fun getCategoryStats(): Flow<List<CategoryCount>> {
+    override fun getCategoryStats(): Flow<List<CategoryCount>> {
         return exerciseDao.getCategoryStats()
     }
 
-    fun getExercisesByCategory(category: String): Flow<List<ExerciseEntity>> {
+    override fun getExercisesByCategory(category: String): Flow<List<ExerciseEntity>> {
         return exerciseDao.getExercisesByCategory(category)
     }
 
-    fun observeExercise(id: Int): Flow<ExerciseEntity?> {
+    override fun observeExercise(id: Int): Flow<ExerciseEntity?> {
         return exerciseDao.observeExercise(id)
     }
 
-    suspend fun insertExercises(exercises: List<ExerciseEntity>) {
+    override suspend fun insertExercises(exercises: List<ExerciseEntity>) {
         exerciseDao.insertExercises(exercises)
     }
 }

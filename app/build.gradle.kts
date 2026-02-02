@@ -16,6 +16,10 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Host de los microservicios: 10.0.2.2=emulador, 192.168.x.x=dispositivo físico
+        val apiHost = project.findProperty("API_HOST") ?: "10.0.2.2"
+        buildConfigField("String", "API_HOST", "\"$apiHost\"")
     }
 
     buildTypes {
@@ -33,6 +37,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -100,6 +105,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation("io.mockk:mockk:1.14.9")
     testImplementation("org.robolectric:robolectric:4.16.1")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 
     //test UI
     androidTestImplementation(libs.androidx.junit)

@@ -217,6 +217,22 @@ interface UserDao {
     """)
     suspend fun updatePhysicalData(userId: Int, weight: Float?, height: Float?, gender: String?)
 
+    /** Suspender cuenta hasta una fecha (motivo obligatorio). */
+    @Query("UPDATE users SET suspendedUntil = :untilMillis, suspendReason = :reason WHERE id = :userId")
+    suspend fun suspendUser(userId: Int, untilMillis: Long, reason: String)
+
+    /** Levantar suspensión. */
+    @Query("UPDATE users SET suspendedUntil = NULL, suspendReason = NULL WHERE id = :userId")
+    suspend fun clearSuspension(userId: Int)
+
+    /** Banear cuenta (motivo obligatorio). */
+    @Query("UPDATE users SET isBanned = 1, banReason = :reason WHERE id = :userId")
+    suspend fun banUser(userId: Int, reason: String)
+
+    /** Desbanear. */
+    @Query("UPDATE users SET isBanned = 0, banReason = NULL WHERE id = :userId")
+    suspend fun unbanUser(userId: Int)
+
     // ==================== ESTADÍSTICAS ====================
 
     /**

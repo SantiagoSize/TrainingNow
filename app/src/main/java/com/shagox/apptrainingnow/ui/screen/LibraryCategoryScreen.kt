@@ -34,7 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shagox.apptrainingnow.data.local.exercise.ExerciseEntity
-import com.shagox.apptrainingnow.data.repository.ExerciseRepository
+import com.shagox.apptrainingnow.data.repository.IExerciseRepository
 import com.shagox.apptrainingnow.ui.components.BackButtonTN
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
@@ -44,7 +44,7 @@ import com.shagox.apptrainingnow.ui.theme.VerdeTN
 @Composable
 fun LibraryCategoryScreen(
     categoryName: String,
-    exerciseRepository: ExerciseRepository,
+    exerciseRepository: IExerciseRepository,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -114,7 +114,7 @@ fun LibraryCategoryScreen(
 @Composable
 private fun ExerciseDetailOverlay(
     exerciseId: Int,
-    exerciseRepository: ExerciseRepository,
+    exerciseRepository: IExerciseRepository,
     onClose: () -> Unit
 ) {
     val exercise by exerciseRepository.observeExercise(exerciseId).collectAsState(initial = null)

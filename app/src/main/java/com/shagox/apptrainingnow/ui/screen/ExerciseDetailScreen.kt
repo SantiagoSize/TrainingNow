@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.shagox.apptrainingnow.data.local.exercise.ExerciseEntity
-import com.shagox.apptrainingnow.data.repository.ExerciseRepository
+import com.shagox.apptrainingnow.data.repository.IExerciseRepository
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
@@ -43,7 +43,7 @@ import com.shagox.apptrainingnow.ui.theme.NegroFondo
 @Composable
 fun ExerciseDetailScreen(
     exerciseId: Int,
-    exerciseRepository: ExerciseRepository,
+    exerciseRepository: IExerciseRepository,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {

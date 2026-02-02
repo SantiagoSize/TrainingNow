@@ -8,10 +8,16 @@ import com.shagox.apptrainingnow.data.local.routine.RoutineEntity
 import com.shagox.apptrainingnow.data.local.trainer.TrainerClientStatus
 import com.shagox.apptrainingnow.data.local.trainer.TrainerStats
 import com.shagox.apptrainingnow.data.local.user.UserEntity
+import com.shagox.apptrainingnow.data.local.notification.NotificationAction
+import com.shagox.apptrainingnow.data.local.notification.NotificationEntity
+import com.shagox.apptrainingnow.data.local.notification.NotificationType
+import com.shagox.apptrainingnow.data.repository.INotificationRepository
 import com.shagox.apptrainingnow.data.repository.ProgressRepository
 import com.shagox.apptrainingnow.data.repository.TrainerRepository
-import com.shagox.apptrainingnow.data.repository.UserRepository
+import com.shagox.apptrainingnow.data.repository.IUserRepository
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
@@ -27,8 +33,9 @@ import kotlinx.coroutines.launch
 class CoachViewModel(
     private val trainerRepository: TrainerRepository,
     private val progressRepository: ProgressRepository,
-    private val userRepository: UserRepository,
-    private val trainerId: Int
+    private val userRepository: IUserRepository,
+    private val trainerId: Int,
+    private val notificationRepository: INotificationRepository? = null
 ) : ViewModel() {
 
     // ==================== UI STATE ====================
@@ -108,6 +115,23 @@ class CoachViewModel(
     fun selectClient(client: UserEntity) {
         _selectedClient.value = client
         loadClientDetails(client.id)
+    }
+
+    /**
+     * Carga un cliente por ID (para cuando se navega directo al detalle, p. ej. otra instancia del ViewModel).
+     */
+    fun loadClientById(clientId: Int) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, clientNotFound = false) }
+            val client = userRepository.getUserById(clientId)
+            _selectedClient.value = client
+            if (client != null) {
+                loadClientDetails(clientId)
+            } else {
+                _uiState.update { it.copy(clientNotFound = true) }
+            }
+            _uiState.update { it.copy(isLoading = false) }
+        }
     }
 
     /**
@@ -210,12 +234,32 @@ class CoachViewModel(
                 dayInfo = dayInfo,
                 exerciseIds = exerciseIds,
                 scheduledTime = scheduledTime
-            ).onSuccess {
+            ).onSuccess { routineId ->
                 _uiState.update { 
                     it.copy(
                         isLoading = false,
                         successMessage = "Rutina creada exitosamente"
                     )
+                }
+                // Notificar al cliente cuando le llega la rutina
+                notificationRepository?.let { repo ->
+                    viewModelScope.launch {
+                        withContext(Dispatchers.IO) {
+                            val trainer = userRepository.getUserById(trainerId)
+                            val trainerName = trainer?.name?.let { "$it ${trainer.lastName}" } ?: "Tu entrenador"
+                            repo.saveNotification(
+                                NotificationEntity(
+                                    userId = clientId,
+                                    title = "Nueva rutina asignada",
+                                    message = "$trainerName te ha asignado la rutina \"$name\".",
+                                    type = NotificationType.ROUTINE_ASSIGNED.name,
+                                    senderId = trainerId,
+                                    actionType = NotificationAction.OPEN_ROUTINE.name,
+                                    actionData = routineId.toString()
+                                )
+                            )
+                        }
+                    }
                 }
             }.onFailure { e ->
                 _uiState.update { it.copy(isLoading = false, error = e.message) }
@@ -418,6 +462,7 @@ data class CoachUiState(
     // Cliente seleccionado
     val selectedClientRoutines: List<RoutineEntity> = emptyList(),
     val selectedClientGoals: List<GoalEntity> = emptyList(),
+    val clientNotFound: Boolean = false,
     
     // Estadísticas
     val trainerStats: TrainerStats? = null,

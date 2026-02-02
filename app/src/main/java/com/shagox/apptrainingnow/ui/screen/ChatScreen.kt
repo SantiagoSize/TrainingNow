@@ -35,7 +35,7 @@ import coil.request.ImageRequest
 import com.shagox.apptrainingnow.data.local.chat.MessageEntity
 import com.shagox.apptrainingnow.data.local.user.UserEntity
 import com.shagox.apptrainingnow.data.repository.ChatRepository
-import com.shagox.apptrainingnow.data.repository.UserRepository
+import com.shagox.apptrainingnow.data.repository.IUserRepository
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
@@ -48,7 +48,7 @@ import java.util.*
 fun ChatScreen(
     currentUserId: Int,
     trainerId: Int,
-    userRepository: UserRepository,
+    userRepository: IUserRepository,
     chatRepository: ChatRepository,
     onBack: () -> Unit
 ) {

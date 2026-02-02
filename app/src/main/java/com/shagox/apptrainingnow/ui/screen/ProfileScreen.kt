@@ -185,14 +185,14 @@ fun ProfileScreen(
                         .padding(bottom = 16.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    // Usuario normal (cualquier otro correo)
+                    // Usuario normal (carlos@user.tn - usuario de la BD)
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .height(24.dp)
                             .alpha(0f)
                             .clickable {
-                                authViewModel.onLoginEmailChange("juan@gmail.com")
+                                authViewModel.onLoginEmailChange("carlos@user.tn")
                                 authViewModel.onLoginPassChange("user123")
                             }
                     )

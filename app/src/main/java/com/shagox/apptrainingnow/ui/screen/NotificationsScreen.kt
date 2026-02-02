@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shagox.apptrainingnow.data.local.notification.NotificationEntity
 import com.shagox.apptrainingnow.data.local.notification.NotificationType
-import com.shagox.apptrainingnow.data.repository.NotificationRepository
+import com.shagox.apptrainingnow.data.repository.INotificationRepository
 import com.shagox.apptrainingnow.ui.components.ScreenHeaderTN
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
@@ -48,7 +48,7 @@ import java.util.Locale
  */
 @Composable
 fun NotificationsScreen(
-    notificationRepository: NotificationRepository,
+    notificationRepository: INotificationRepository,
     userId: Int
 ) {
     val notifications by notificationRepository.getUserNotifications(userId).collectAsState(initial = emptyList())

@@ -47,7 +47,7 @@ import kotlinx.coroutines.launch
  * - Sesiones de entrenamiento con registro detallado
  * - Relaciones entrenador-cliente
  * 
- * @version 4 - Incluye entidades de progreso y tracking
+ * @version 5 - Usuarios: suspendedUntil, suspendReason, isBanned, banReason (sanciones admin)
  */
 @Database(
     entities = [
@@ -75,7 +75,7 @@ import kotlinx.coroutines.launch
         GoalEntity::class,
         PersonalRecordEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

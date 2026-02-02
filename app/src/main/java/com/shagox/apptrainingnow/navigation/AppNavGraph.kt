@@ -50,12 +50,12 @@ import com.shagox.apptrainingnow.data.local.notification.NotificationAction
 import com.shagox.apptrainingnow.data.local.notification.NotificationEntity
 import com.shagox.apptrainingnow.data.local.notification.NotificationType
 import com.shagox.apptrainingnow.data.repository.ChatRepository
-import com.shagox.apptrainingnow.data.repository.ExerciseRepository
-import com.shagox.apptrainingnow.data.repository.NotificationRepository
+import com.shagox.apptrainingnow.data.repository.IExerciseRepository
+import com.shagox.apptrainingnow.data.repository.INotificationRepository
 import com.shagox.apptrainingnow.data.repository.ProgressRepository
 import com.shagox.apptrainingnow.data.repository.RoutineRepository
 import com.shagox.apptrainingnow.data.repository.TrainerRepository
-import com.shagox.apptrainingnow.data.repository.UserRepository
+import com.shagox.apptrainingnow.data.repository.IUserRepository
 import com.shagox.apptrainingnow.ui.components.BottomNavigationBarTN
 import com.shagox.apptrainingnow.ui.screen.ChatScreen
 import com.shagox.apptrainingnow.ui.screen.CreateRoutineScreen
@@ -67,6 +67,14 @@ import com.shagox.apptrainingnow.ui.screen.ProfileScreen
 import com.shagox.apptrainingnow.ui.screen.RoutineActiveScreen
 import com.shagox.apptrainingnow.ui.screen.UserChatsScreen
 import com.shagox.apptrainingnow.ui.screen.UserRoutinesScreen
+import com.shagox.apptrainingnow.ui.screen.admin.AdminChatsScreen
+import com.shagox.apptrainingnow.ui.screen.admin.AdminCreateCategoryScreen
+import com.shagox.apptrainingnow.ui.screen.admin.AdminCreateUserScreen
+import com.shagox.apptrainingnow.ui.screen.admin.AdminPanelScreen
+import com.shagox.apptrainingnow.ui.screen.admin.AdminSanctionScreen
+import com.shagox.apptrainingnow.ui.screen.admin.AdminSendNotificationScreen
+import com.shagox.apptrainingnow.ui.screen.admin.AdminUserListScreen
+import com.shagox.apptrainingnow.ui.screen.admin.AdminUserManagementScreen
 import com.shagox.apptrainingnow.ui.screen.coach.ClientDetailScreen
 import com.shagox.apptrainingnow.ui.screen.coach.CoachClientsScreen
 import com.shagox.apptrainingnow.ui.screen.coach.CoachRoutinesScreen
@@ -87,13 +95,13 @@ fun AppNavGraph(
     navController: NavHostController,
     authViewModel: AuthViewModel,
     startDestination: String,
-    userRepository: UserRepository,
+    userRepository: IUserRepository,
     chatRepository: ChatRepository,
     routineRepository: RoutineRepository,
     trainerRepository: TrainerRepository? = null,
     progressRepository: ProgressRepository? = null,
-    notificationRepository: NotificationRepository? = null,
-    exerciseRepository: ExerciseRepository? = null
+    notificationRepository: INotificationRepository? = null,
+    exerciseRepository: IExerciseRepository? = null
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -106,8 +114,15 @@ fun AppNavGraph(
     val context = LocalContext.current
     val safeStartDestination = startDestination.ifBlank { Route.Welcome.path }
 
-    // Ocultar barra en Welcome y pantallas de detalle; RoutineActive muestra barra para cambiar de pantalla
-    val hideBottomBarRoutes = listOf(Route.Welcome.path)
+    // Ocultar barra en Welcome, detalle y subpantallas de admin
+    val hideBottomBarRoutes = listOf(
+        Route.Welcome.path,
+        Route.AdminCreateCategory.path,
+        Route.AdminSendNotification.path,
+        Route.AdminUserList.path,
+        Route.AdminCreateUser.path,
+        Route.AdminSanctions.path
+    )
     val shouldHideBottomBar = currentRoute in hideBottomBarRoutes ||
             currentRoute?.startsWith("chat_detail") == true ||
             currentRoute?.startsWith("client_detail") == true ||
@@ -172,12 +187,17 @@ fun AppNavGraph(
             }
 
             composable(Route.Library.path) {
-                LibraryScreen(
-                    onSearchClick = { /* TODO: búsqueda */ },
-                    onCategoryClick = { categoryName ->
-                        navController.navigate(Route.LibraryCategory.createRoute(categoryName))
-                    }
-                )
+                if (exerciseRepository != null) {
+                    LibraryScreen(
+                        exerciseRepository = exerciseRepository,
+                        onSearchClick = { /* TODO: búsqueda */ },
+                        onCategoryClick = { categoryName ->
+                            navController.navigate(Route.LibraryCategory.createRoute(categoryName))
+                        }
+                    )
+                } else {
+                    Text("Biblioteca no disponible", color = Color.White, modifier = Modifier.padding(16.dp))
+                }
             }
 
             composable(
@@ -265,7 +285,8 @@ fun AppNavGraph(
                             trainerRepository = trainerRepository,
                             progressRepository = progressRepository,
                             userRepository = userRepository,
-                            trainerId = currentUserId
+                            trainerId = currentUserId,
+                            notificationRepository = notificationRepository
                         )
                     )
                     
@@ -294,7 +315,8 @@ fun AppNavGraph(
                             trainerRepository = trainerRepository,
                             progressRepository = progressRepository,
                             userRepository = userRepository,
-                            trainerId = currentUserId
+                            trainerId = currentUserId,
+                            notificationRepository = notificationRepository
                         )
                     )
                     
@@ -324,6 +346,87 @@ fun AppNavGraph(
                 )
             }
 
+            // ==================== PANTALLAS DE ADMIN ====================
+
+            composable(Route.AdminChats.path) {
+                AdminChatsScreen(
+                    userRepository = userRepository,
+                    chatRepository = chatRepository,
+                    currentUserId = currentUserId,
+                    onNavigateToChat = { otherId ->
+                        navController.navigate(Route.ChatDetail.createRoute(otherId))
+                    }
+                )
+            }
+
+            composable(Route.AdminPanel.path) {
+                AdminPanelScreen(
+                    onBiblioteca = { navController.navigate(Route.Library.path) },
+                    onNuevaCategoria = { navController.navigate(Route.AdminCreateCategory.path) },
+                    onEntrenamientoGlobal = { navController.navigate(Route.CreateRoutine.createRoute()) },
+                    onEnviarNotificacion = { navController.navigate(Route.AdminSendNotification.path) },
+                    onGestionUsuarios = { navController.navigate(Route.AdminUserManagement.path) }
+                )
+            }
+
+            composable(Route.AdminUserManagement.path) {
+                AdminUserManagementScreen(
+                    onBack = { navController.popBackStack() },
+                    onVerUsuarios = { navController.navigate(Route.AdminUserList.path) },
+                    onCrearUsuario = { navController.navigate(Route.AdminCreateUser.path) },
+                    onSuspenderBanearEliminar = { navController.navigate(Route.AdminSanctions.path) }
+                )
+            }
+
+            composable(Route.AdminCreateCategory.path) {
+                if (exerciseRepository != null) {
+                    AdminCreateCategoryScreen(
+                        exerciseRepository = exerciseRepository,
+                        onBack = { navController.popBackStack() },
+                        onSuccess = { navController.popBackStack() }
+                    )
+                } else {
+                    Text("Biblioteca no disponible", color = Color.White, modifier = Modifier.padding(16.dp))
+                }
+            }
+
+            composable(Route.AdminSendNotification.path) {
+                if (notificationRepository != null) {
+                    AdminSendNotificationScreen(
+                        userRepository = userRepository,
+                        notificationRepository = notificationRepository,
+                        adminId = currentUserId,
+                        onBack = { navController.popBackStack() },
+                        onSuccess = { navController.popBackStack() }
+                    )
+                } else {
+                    Text("Notificaciones no disponibles", color = Color.White, modifier = Modifier.padding(16.dp))
+                }
+            }
+
+            composable(Route.AdminUserList.path) {
+                AdminUserListScreen(
+                    userRepository = userRepository,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Route.AdminCreateUser.path) {
+                AdminCreateUserScreen(
+                    userRepository = userRepository,
+                    onBack = { navController.popBackStack() },
+                    onSuccess = { navController.popBackStack() }
+                )
+            }
+
+            composable(Route.AdminSanctions.path) {
+                AdminSanctionScreen(
+                    userRepository = userRepository,
+                    onBack = { navController.popBackStack() },
+                    onSuccess = { navController.popBackStack() }
+                )
+            }
+
             // Detalle del cliente (para entrenadores)
             composable(
                 route = Route.ClientDetail.path,
@@ -337,7 +440,8 @@ fun AppNavGraph(
                             trainerRepository = trainerRepository,
                             progressRepository = progressRepository,
                             userRepository = userRepository,
-                            trainerId = currentUserId
+                            trainerId = currentUserId,
+                            notificationRepository = notificationRepository
                         )
                     )
                     
@@ -347,12 +451,6 @@ fun AppNavGraph(
                         onBack = { navController.popBackStack() },
                         onChatClick = {
                             navController.navigate(Route.ChatDetail.createRoute(clientId))
-                        },
-                        onCreateRoutine = {
-                            navController.navigate(Route.CreateRoutine.createRoute(clientId))
-                        },
-                        onCreateGoal = {
-                            navController.navigate(Route.CreateGoal.createRoute(clientId))
                         }
                     )
                 } else {

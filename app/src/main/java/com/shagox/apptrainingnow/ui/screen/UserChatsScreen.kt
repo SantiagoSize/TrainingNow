@@ -30,7 +30,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.shagox.apptrainingnow.data.local.user.UserEntity
 import com.shagox.apptrainingnow.data.repository.ChatRepository
-import com.shagox.apptrainingnow.data.repository.UserRepository
+import com.shagox.apptrainingnow.data.repository.IUserRepository
 import com.shagox.apptrainingnow.ui.components.ScreenHeaderTN
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
@@ -44,7 +44,7 @@ import java.util.Calendar
 
 @Composable
 fun UserChatsScreen(
-    userRepository: UserRepository,
+    userRepository: IUserRepository,
     chatRepository: ChatRepository,
     currentUserId: Int,
     onNavigateToChat: (Int) -> Unit // trainerId

@@ -25,5 +25,11 @@ data class UserEntity(
     val gender: String? = null,
 
     // Específicos de Entrenador
-    val specializations: String? = null
+    val specializations: String? = null,
+
+    // Sanciones (admin): motivo y tiempo de suspensión / baneo
+    val suspendedUntil: Long? = null,
+    val suspendReason: String? = null,
+    val isBanned: Boolean = false,
+    val banReason: String? = null
 )

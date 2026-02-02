@@ -3,12 +3,15 @@ package com.shagox.apptrainingnow.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -39,6 +42,21 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
 
     /** Panel de administración - icono 6x3 puntitos (posición 3 en barra) */
     data object AdminPanel : Route("admin_panel", "Panel", Icons.Filled.Apps)
+
+    /** Crear categoría de ejercicios (admin) */
+    data object AdminCreateCategory : Route("admin_create_category", "Nueva Categoría", Icons.AutoMirrored.Filled.Label)
+
+    /** Enviar notificación segmentada (admin) */
+    data object AdminSendNotification : Route("admin_send_notification", "Enviar Notificación", Icons.Filled.Notifications)
+
+    /** Lista de todos los usuarios (admin) */
+    data object AdminUserList : Route("admin_user_list", "Usuarios", Icons.Filled.People)
+
+    /** Crear usuario (admin) */
+    data object AdminCreateUser : Route("admin_create_user", "Crear Usuario", Icons.Filled.PersonAdd)
+
+    /** Suspender / Banear / Eliminar cuenta (admin) */
+    data object AdminSanctions : Route("admin_sanctions", "Sanciones", Icons.Filled.Block)
 
     // ==================== PANTALLAS DE COACH ====================
     

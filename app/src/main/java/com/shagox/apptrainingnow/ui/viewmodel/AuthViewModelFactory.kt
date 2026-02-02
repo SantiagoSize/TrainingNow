@@ -2,10 +2,10 @@ package com.shagox.apptrainingnow.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.shagox.apptrainingnow.data.repository.UserRepository
+import com.shagox.apptrainingnow.data.repository.IUserRepository
 
 class AuthViewModelFactory(
-    private val repository: UserRepository
+    private val repository: IUserRepository
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {

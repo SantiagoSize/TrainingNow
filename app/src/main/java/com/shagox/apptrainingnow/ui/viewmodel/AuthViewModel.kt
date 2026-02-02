@@ -3,7 +3,7 @@ package com.shagox.apptrainingnow.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shagox.apptrainingnow.data.local.user.UserEntity
-import com.shagox.apptrainingnow.data.repository.UserRepository
+import com.shagox.apptrainingnow.data.repository.IUserRepository
 import com.shagox.apptrainingnow.domain.validation.validateConfirm
 import com.shagox.apptrainingnow.domain.validation.validateEmail
 import com.shagox.apptrainingnow.domain.validation.validateNameLettersOnly
@@ -57,7 +57,7 @@ data class RegisterUiState(
  * - Validación de formularios
  */
 class AuthViewModel(
-    private val repository: UserRepository
+    private val repository: IUserRepository
 ) : ViewModel() {
 
     // ---------- LOGIN ----------
