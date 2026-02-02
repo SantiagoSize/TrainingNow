@@ -6,6 +6,10 @@ import androidx.compose.ui.graphics.Color
 val VerdeTN = Color(0xFF22FF5F)
 val NegroFondo = Color(0xFF000000)
 val GrisFondo = Color(0xFF121212)
+/** Gris para texto secundario y superficies; distingue del fondo negro. */
+val GrisTexto = Color(0xFF9E9E9E)
+/** Gris algo más claro para bordes y separadores. */
+val GrisBorde = Color(0xFF2C2C2C)
 
 //Colores Predeterminados
 val Purple80 = Color(0xFFD0BCFF)

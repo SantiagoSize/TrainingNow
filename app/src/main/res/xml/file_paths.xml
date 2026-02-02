@@ -1,18 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
+    <!-- Directorio interno de guardado de las fotos -->
     <cache-path
         name="camera_cache"
         path="images/" />
-
-    <files-path
-        name="my_files"
-        path="images/" />
-
-    <external-path
-        name="my_images"
-        path="." />
-
-    <external-files-path
-        name="external_files"
-        path="Pictures" />
 </paths>
