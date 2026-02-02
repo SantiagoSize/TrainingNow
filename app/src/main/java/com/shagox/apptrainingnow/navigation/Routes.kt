@@ -101,6 +101,16 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
         fun createRoute(routineId: Int): String = "routine_active/$routineId"
     }
 
+    /** Ejercicios de una categoría (ej. Pectorales -> lista Press de banca, etc.) */
+    data object LibraryCategory : Route("library_category/{categoryName}", "Ejercicios", Icons.Filled.FitnessCenter) {
+        fun createRoute(categoryName: String): String = "library_category/$categoryName"
+    }
+
+    /** Detalle de un ejercicio: video, descripción, CERRAR */
+    data object ExerciseDetail : Route("exercise_detail/{exerciseId}", "Ejercicio", Icons.Filled.FitnessCenter) {
+        fun createRoute(exerciseId: Int): String = "exercise_detail/$exerciseId"
+    }
+
     companion object {
         /**
          * Rutas de la barra de navegación inferior para usuarios.

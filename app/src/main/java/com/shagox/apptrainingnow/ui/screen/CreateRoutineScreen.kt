@@ -55,12 +55,15 @@ private data class DayData(val activityName: String, val exerciseNames: List<Str
 /**
  * Pantalla para crear una nueva rutina.
  * Una rutina tiene nombre y 7 días (cajas); cada día tiene actividad y 0–10 ejercicios.
- * Al guardar se persiste en BD y solo la ve el usuario que la creó.
+ * - Si [clientDisplayName] es null: rutina propia (usuario); al guardar se usa onSaveRoutine.
+ * - Si [clientDisplayName] no es null: el entrenador crea una rutina para ese cliente; al guardar
+ *   la rutina se asigna al cliente (ownerId = cliente) y el usuario la ve en "Mis Rutinas".
  */
 @Composable
 fun CreateRoutineScreen(
     onBack: () -> Unit,
-    onSaveRoutine: (name: String, days: List<DayRoutineInput>) -> Unit = { _, _ -> }
+    onSaveRoutine: (name: String, days: List<DayRoutineInput>) -> Unit = { _, _ -> },
+    clientDisplayName: String? = null
 ) {
     var routineName by remember { mutableStateOf("") }
     var selectedDayIndex by remember { mutableIntStateOf(0) }
@@ -88,7 +91,7 @@ fun CreateRoutineScreen(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
         ) {
             ScreenHeaderTN(
-                subtitle = "Nueva",
+                subtitle = if (clientDisplayName != null) "Para $clientDisplayName" else "Nueva",
                 title = "RUTINA",
                 actionIcon = Icons.AutoMirrored.Filled.ArrowBack,
                 onActionClick = onBack,

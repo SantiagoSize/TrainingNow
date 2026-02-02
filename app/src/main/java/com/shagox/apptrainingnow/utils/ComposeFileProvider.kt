@@ -30,4 +30,15 @@ object ComposeFileProvider {
         val file = createTempImageFile(context)
         return getImageUriForFile(context, file)
     }
+
+    /** Archivo de foto de perfil del usuario (persistente en filesDir). */
+    fun getProfilePhotoFile(context: Context, userId: Int): File {
+        val dir = File(context.filesDir, "profile_photos").apply { if (!exists()) mkdirs() }
+        return File(dir, "user_$userId.jpg")
+    }
+
+    /** Uri de la foto de perfil para TakePicture (FileProvider). */
+    fun getProfilePhotoUri(context: Context, userId: Int): Uri {
+        return getImageUriForFile(context, getProfilePhotoFile(context, userId))
+    }
 }

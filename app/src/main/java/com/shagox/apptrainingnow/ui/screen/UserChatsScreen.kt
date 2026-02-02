@@ -1,20 +1,25 @@
 package com.shagox.apptrainingnow.ui.screen
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -28,10 +33,14 @@ import com.shagox.apptrainingnow.data.repository.ChatRepository
 import com.shagox.apptrainingnow.data.repository.UserRepository
 import com.shagox.apptrainingnow.ui.components.ScreenHeaderTN
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
+import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Calendar
 
 @Composable
 fun UserChatsScreen(
@@ -43,6 +52,7 @@ fun UserChatsScreen(
     var searchQuery by remember { mutableStateOf("") }
     var trainers by remember { mutableStateOf<List<UserEntity>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
+    var trainerDetailDialog by remember { mutableStateOf<UserEntity?>(null) }
     val scope = rememberCoroutineScope()
 
     // Cargar todos los entrenadores al inicio
@@ -91,17 +101,17 @@ fun UserChatsScreen(
         ScreenHeaderTN(
             subtitle = "Mis",
             title = "CHATS",
-            actionIcon = Icons.Default.Search,
-            onActionClick = { /* búsqueda */ }
+            actionIcon = Icons.AutoMirrored.Filled.Chat,
+            onActionClick = { /* nuevo chat / acción */ }
         )
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Barra de búsqueda
+        // Barra de búsqueda (estilo app: GrisFondo, borde VerdeTN al foco)
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it.trim() },
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Buscar por nombre, ID o especialidad...", color = Color.Gray) },
+            placeholder = { Text("Buscar por nombre, ID o especialidad...", color = GrisTexto) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Search,
@@ -113,7 +123,8 @@ fun UserChatsScreen(
                 focusedTextColor = Color.White,
                 unfocusedTextColor = Color.White,
                 focusedBorderColor = VerdeTN,
-                unfocusedBorderColor = Color.Gray,
+                unfocusedBorderColor = GrisTexto,
+                cursorColor = VerdeTN,
                 focusedContainerColor = GrisFondo,
                 unfocusedContainerColor = GrisFondo
             ),
@@ -138,7 +149,7 @@ fun UserChatsScreen(
             ) {
                 Text(
                     text = if (searchQuery.isBlank()) "No hay entrenadores disponibles" else "No se encontraron resultados",
-                    color = Color.Gray,
+                    color = GrisTexto,
                     fontSize = 16.sp
                 )
             }
@@ -149,40 +160,117 @@ fun UserChatsScreen(
                 items(trainers) { trainer ->
                     TrainerCard(
                         trainer = trainer,
-                        onMessageClick = { onNavigateToChat(trainer.id) }
+                        onMessageClick = { onNavigateToChat(trainer.id) },
+                        onLongPress = { trainerDetailDialog = trainer }
                     )
                 }
             }
         }
     }
+
+    // Diálogo con datos del entrenador (al mantener 3 s en la tarjeta)
+    trainerDetailDialog?.let { trainer ->
+        TrainerDetailDialog(
+            trainer = trainer,
+            onDismiss = { trainerDetailDialog = null }
+        )
+    }
+}
+
+private fun ageFromBirthDate(birthDate: Long?): String {
+    if (birthDate == null) return "No registrado"
+    val cal = Calendar.getInstance()
+    val now = cal.get(Calendar.YEAR)
+    cal.timeInMillis = birthDate
+    val year = cal.get(Calendar.YEAR)
+    return (now - year).toString()
+}
+
+@Composable
+private fun TrainerDetailDialog(
+    trainer: UserEntity,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "${trainer.name} ${trainer.lastName}",
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("ID: ${trainer.id}", color = GrisTexto)
+                Text("Edad: ${ageFromBirthDate(trainer.birthDate)} años", color = GrisTexto)
+                Text(
+                    "Peso: ${trainer.weight?.toInt()?.toString()?.plus(" kg") ?: "No registrado"}",
+                    color = GrisTexto
+                )
+                Text(
+                    "Altura: ${trainer.height?.toInt()?.toString()?.plus(" cm") ?: "No registrado"}",
+                    color = GrisTexto
+                )
+                if (trainer.role == "TRAINER" && !trainer.specializations.isNullOrBlank()) {
+                    Text("Especialización: ${trainer.specializations}", color = VerdeTN)
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text("Cerrar", color = VerdeTN)
+            }
+        },
+        containerColor = GrisFondo
+    )
 }
 
 @Composable
 fun TrainerCard(
     trainer: UserEntity,
-    onMessageClick: () -> Unit
+    onMessageClick: () -> Unit,
+    onLongPress: () -> Unit = {}
 ) {
-    Card(
+    val scope = rememberCoroutineScope()
+    var didLongPress by remember { mutableStateOf(false) }
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onMessageClick() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = GrisFondo
-        )
+            .clip(RoundedCornerShape(16.dp))
+            .background(GrisFondo)
+            .border(1.dp, VerdeTN, RoundedCornerShape(16.dp))
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        didLongPress = false
+                        val job = scope.launch {
+                            delay(3000)
+                            didLongPress = true
+                            onLongPress()
+                        }
+                        try {
+                            awaitRelease()
+                        } finally {
+                            job.cancel()
+                            if (!didLongPress) onMessageClick()
+                        }
+                    }
+                )
+            }
+            .padding(18.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // Foto de perfil
             Box(
                 modifier = Modifier
-                    .size(60.dp)
+                    .size(56.dp)
                     .clip(CircleShape)
-                    .background(Color.Gray),
+                    .background(GrisTexto.copy(alpha = 0.3f)),
                 contentAlignment = Alignment.Center
             ) {
                 if (trainer.profilePhotoUrl != null && trainer.profilePhotoUrl.isNotBlank()) {
@@ -195,32 +283,27 @@ fun TrainerCard(
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    // Placeholder si no hay foto
                     Text(
                         text = "${trainer.name.firstOrNull() ?: 'U'}",
                         color = Color.White,
-                        fontSize = 24.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
-
             // Información del entrenador
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "${trainer.name} ${trainer.lastName}",
                     color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "ID: ${trainer.id}",
-                    color = Color.Gray,
+                    color = GrisTexto,
                     fontSize = 12.sp
                 )
                 if (trainer.specializations != null && trainer.specializations.isNotBlank()) {
@@ -228,26 +311,23 @@ fun TrainerCard(
                     Text(
                         text = trainer.specializations,
                         color = VerdeTN,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
+                        fontSize = 13.sp
                     )
                 }
             }
 
-            // Botón de mensaje
-            IconButton(
-                onClick = onMessageClick,
+            // Botón de mensaje (círculo verde, icono avión)
+            Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .background(
-                        color = VerdeTN.copy(alpha = 0.2f),
-                        shape = CircleShape
-                    )
+                    .clip(CircleShape)
+                    .background(VerdeTN),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = "Enviar mensaje",
-                    tint = VerdeTN,
+                    tint = NegroFondo,
                     modifier = Modifier.size(24.dp)
                 )
             }

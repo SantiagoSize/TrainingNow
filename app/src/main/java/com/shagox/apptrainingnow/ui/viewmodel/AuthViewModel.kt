@@ -154,6 +154,28 @@ class AuthViewModel(
      */
     fun isLoggedIn(): Boolean = _login.value.loggedUser != null
 
+    /**
+     * Actualiza la foto de perfil del usuario en la BD y refresca el usuario logueado.
+     */
+    fun updateProfilePhoto(userId: Int, photoUrl: String?) {
+        viewModelScope.launch {
+            val updated = repository.updateProfilePhoto(userId, photoUrl)
+            if (updated != null) {
+                _login.update { it.copy(loggedUser = updated) }
+            }
+        }
+    }
+
+    /**
+     * Actualiza los datos del usuario en la BD y refresca el usuario logueado.
+     */
+    fun updateUser(user: UserEntity) {
+        viewModelScope.launch {
+            repository.updateUser(user)
+            _login.update { it.copy(loggedUser = user) }
+        }
+    }
+
     // ================= REGISTER LOGIC =================
 
     fun onNameChange(value: String) {

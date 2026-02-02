@@ -179,12 +179,12 @@ abstract class AppDatabase : RoomDatabase() {
             if (dao.count() > 0) return
             
             val users = listOf(
-                // Administrador del sistema
+                // Administrador del sistema (@admin.tn para rol ADMIN al iniciar sesión)
                 UserEntity(
                     role = "ADMIN",
                     name = "Super",
                     lastName = "Admin",
-                    email = "admin@trainingnow.com",
+                    email = "admin@admin.tn",
                     phone = "+56900000000",
                     password = "admin123",
                     specializations = "Gestión del Sistema"

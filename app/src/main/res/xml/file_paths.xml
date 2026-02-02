@@ -4,4 +4,8 @@
     <cache-path
         name="camera_cache"
         path="images/" />
+    <!-- Fotos de perfil (persistentes en filesDir) -->
+    <files-path
+        name="profile_photos"
+        path="profile_photos/" />
 </paths>

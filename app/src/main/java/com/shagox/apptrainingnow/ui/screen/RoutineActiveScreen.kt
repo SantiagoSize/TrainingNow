@@ -72,11 +72,8 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
-/** Verde oscuro/muted para tab Notificaciones seleccionado. */
-private val VerdeMuted = Color(0xFF1B8F4A)
-
-/** Verde brillante del bloque de actividad (#26AB4E). */
-private val VerdeActividad = Color(0xFF26AB4E)
+/** Variante TN verde más suave para tab Notificaciones seleccionado (mismo tono TN). */
+private val VerdeTNMuted = VerdeTN.copy(alpha = 0.85f)
 
 /** Nombres de días en español para coincidir con el día actual. */
 private val DIAS_SEMANA_ES = listOf("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
@@ -159,7 +156,7 @@ fun RoutineActiveScreen(
                 actionIcon = Icons.AutoMirrored.Filled.ArrowBack,
                 onActionClick = { showExitDialog = true },
                 actionTint = Color.White,
-                actionBackgroundColor = Color(0xFFE53935)
+                actionBackgroundColor = VerdeTN
             )
 
             Column(
@@ -173,7 +170,7 @@ fun RoutineActiveScreen(
                 // 1) Bloque de actividad: fondo verde #26AB4E, texto negro (efecto recortado). Izq: fecha grande | línea | der: "Actividad de hoy:" + "-"
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = VerdeActividad),
+                    colors = CardDefaults.cardColors(containerColor = VerdeTN),
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Row(
@@ -266,7 +263,7 @@ fun RoutineActiveScreen(
                                         .weight(1f)
                                         .height(72.dp)
                                         .then(
-                                            if (notificationsEnabled) Modifier.background(VerdeMuted)
+                                            if (notificationsEnabled) Modifier.background(VerdeTNMuted)
                                             else Modifier
                                         )
                                         .pointerInput(Unit) {
@@ -335,7 +332,7 @@ fun RoutineActiveScreen(
                                     .weight(1f)
                                     .fillMaxWidth()
                                     .background(
-                                        if (seguimientoStatus == "Terminado") VerdeTN else Color(0xFFFFC107)
+                                        VerdeTN
                                     )
                                     .padding(vertical = 14.dp, horizontal = 16.dp),
                                 contentAlignment = Alignment.Center
@@ -387,7 +384,7 @@ fun RoutineActiveScreen(
                         onBack()
                     }
                 ) {
-                    Text("Salir", color = Color(0xFFE53935))
+                    Text("Salir", color = VerdeTN)
                 }
             },
             dismissButton = {
@@ -577,7 +574,7 @@ private fun CalendarWeekDialog(
                     }
                     val (bgColor, textColor) = when (status) {
                         "Completado" -> VerdeTN to Color.Black
-                        "Pendiente" -> Color(0xFFFFC107) to Color.Black
+                        "Pendiente" -> VerdeTN to Color.Black
                         else -> Color(0xFF555555) to Color.White
                     }
                     Row(
@@ -626,7 +623,7 @@ private fun TabChipFullBody(
     Surface(
         modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        color = if (isSelected) VerdeMuted else Color(0xFF2C2C2C)
+        color = if (isSelected) VerdeTNMuted else Color(0xFF2C2C2C)
     ) {
         Column(
             modifier = Modifier

@@ -1,5 +1,11 @@
 package com.shagox.apptrainingnow.ui.screen
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,6 +14,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.shagox.apptrainingnow.data.local.chat.MessageEntity
@@ -29,6 +39,7 @@ import com.shagox.apptrainingnow.data.repository.UserRepository
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.utils.ComposeFileProvider
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -44,8 +55,83 @@ fun ChatScreen(
     var messages by remember { mutableStateOf<List<MessageEntity>>(emptyList()) }
     var trainer by remember { mutableStateOf<UserEntity?>(null) }
     var messageText by remember { mutableStateOf("") }
+    var lastCameraUri by remember { mutableStateOf<Uri?>(null) }
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+    val context = LocalContext.current
+
+    // Permisos para cámara y galería (sin remember para que se actualicen al volver del diálogo)
+    val hasCameraPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
+        ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+    val hasGalleryPermission = when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ->
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        else -> true
+    }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { }
+    val galleryPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { }
+
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            lastCameraUri?.let { uri ->
+                scope.launch {
+                    chatRepository.sendMessage(
+                        MessageEntity(
+                            senderId = currentUserId,
+                            receiverId = trainerId,
+                            content = uri.toString()
+                        )
+                    )
+                }
+                lastCameraUri = null
+            }
+        }
+    }
+    val getContentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            scope.launch {
+                chatRepository.sendMessage(
+                    MessageEntity(
+                        senderId = currentUserId,
+                        receiverId = trainerId,
+                        content = it.toString()
+                    )
+                )
+            }
+        }
+    }
+
+    fun sendImageFromCamera() {
+        if (!hasCameraPermission) {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            return
+        }
+        val uri = ComposeFileProvider.getImageUri(context)
+        lastCameraUri = uri
+        takePictureLauncher.launch(uri)
+    }
+    fun sendImageFromGallery() {
+        if (!hasGalleryPermission) {
+            val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                Manifest.permission.READ_MEDIA_IMAGES
+            } else {
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            }
+            galleryPermissionLauncher.launch(perm)
+            return
+        }
+        getContentLauncher.launch("image/*")
+    }
 
     // Cargar información del entrenador
     LaunchedEffect(trainerId) {
@@ -84,7 +170,7 @@ fun ChatScreen(
             .fillMaxSize()
             .background(NegroFondo)
     ) {
-        // Header con información del entrenador
+        // Header con información del entrenador y botón para salir del chat
         Surface(
             color = GrisFondo,
             modifier = Modifier.fillMaxWidth()
@@ -95,6 +181,17 @@ fun ChatScreen(
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Salir del chat",
+                        tint = Color.White
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
                 // Foto del entrenador
                 Box(
                     modifier = Modifier
@@ -176,6 +273,31 @@ fun ChatScreen(
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Cámara
+                IconButton(
+                    onClick = { sendImageFromCamera() },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CameraAlt,
+                        contentDescription = "Tomar foto",
+                        tint = VerdeTN,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+                // Galería / biblioteca
+                IconButton(
+                    onClick = { sendImageFromGallery() },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PhotoLibrary,
+                        contentDescription = "Elegir de galería",
+                        tint = VerdeTN,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(4.dp))
                 OutlinedTextField(
                     value = messageText,
                     onValueChange = { messageText = it },
@@ -263,6 +385,7 @@ fun MessageBubble(
             modifier = Modifier.widthIn(max = 280.dp),
             horizontalAlignment = if (isFromCurrentUser) Alignment.End else Alignment.Start
         ) {
+            val isImageMessage = message.content.startsWith("content://") || message.content.startsWith("file://")
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(
@@ -275,12 +398,28 @@ fun MessageBubble(
                     containerColor = if (isFromCurrentUser) VerdeTN else GrisFondo
                 )
             ) {
-                Text(
-                    text = message.content,
-                    color = if (isFromCurrentUser) NegroFondo else Color.White,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(12.dp)
-                )
+                if (isImageMessage) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(message.content)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "Imagen enviada",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 280.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .padding(8.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                } else {
+                    Text(
+                        text = message.content,
+                        color = if (isFromCurrentUser) NegroFondo else Color.White,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(4.dp))

@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,7 +42,8 @@ fun ScreenHeaderTN(
     actionIcon: ImageVector = Icons.Filled.FitnessCenter,
     onActionClick: (() -> Unit)? = null,
     actionTint: Color = Color.White,
-    actionBackgroundColor: Color = VerdeTN
+    actionBackgroundColor: Color = VerdeTN,
+    actionBadgeCount: Int? = null
 ) {
     Row(
         modifier = modifier
@@ -68,21 +71,41 @@ fun ScreenHeaderTN(
             }
         }
         if (onActionClick != null) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .shadow(6.dp, RoundedCornerShape(12.dp))
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(actionBackgroundColor)
-                    .clickable(onClick = onActionClick),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = actionIcon,
-                    contentDescription = null,
-                    tint = actionTint,
-                    modifier = Modifier.size(24.dp)
-                )
+            val count = actionBadgeCount ?: 0
+            val boxModifier = Modifier
+                .size(48.dp)
+                .shadow(6.dp, RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .background(actionBackgroundColor)
+                .clickable(onClick = onActionClick)
+            if (count > 0) {
+                BadgedBox(
+                    badge = { Badge { Text(count.toString()) } }
+                ) {
+                    Box(
+                        modifier = boxModifier,
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = actionIcon,
+                            contentDescription = null,
+                            tint = actionTint,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            } else {
+                Box(
+                    modifier = boxModifier,
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = actionIcon,
+                        contentDescription = null,
+                        tint = actionTint,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         }
     }

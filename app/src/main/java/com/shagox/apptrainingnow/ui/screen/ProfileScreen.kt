@@ -1,5 +1,11 @@
 package com.shagox.apptrainingnow.ui.screen
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,11 +17,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -26,12 +39,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
@@ -45,7 +63,16 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import androidx.core.content.ContextCompat
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.shagox.apptrainingnow.ui.viewmodel.AuthViewModel
+import com.shagox.apptrainingnow.data.local.user.UserEntity
+import com.shagox.apptrainingnow.utils.ComposeFileProvider
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Pantalla Perfil: pestaña para iniciar sesión y registrarse en la misma página.
@@ -75,10 +102,10 @@ fun ProfileScreen(
         )
 
         if (loggedUser != null) {
-            // Usuario logueado: mostrar datos y Cerrar sesión
             ProfileLoggedContent(
-                userName = loggedUser.name,
-                userEmail = loggedUser.email,
+                user = loggedUser,
+                authViewModel = authViewModel,
+                onEdit = { /* TODO: navegar a edición de perfil */ },
                 onLogout = { authViewModel.logout() }
             )
         } else {
@@ -147,8 +174,106 @@ fun ProfileScreen(
                 fontSize = 12.sp,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
+                    .padding(bottom = 8.dp),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            // 3 botones invisibles: Usuario normal | Entrenador (@coach.tn) | Admin (@admin.tn)
+            if (selectedTab == 0) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    // Usuario normal (cualquier otro correo)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(24.dp)
+                            .alpha(0f)
+                            .clickable {
+                                authViewModel.onLoginEmailChange("juan@gmail.com")
+                                authViewModel.onLoginPassChange("user123")
+                            }
+                    )
+                    // Entrenador (@coach.tn)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(24.dp)
+                            .alpha(0f)
+                            .clickable {
+                                authViewModel.onLoginEmailChange("santiago@coach.tn")
+                                authViewModel.onLoginPassChange("coach123")
+                            }
+                    )
+                    // Admin (@admin.tn)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(24.dp)
+                            .alpha(0f)
+                            .clickable {
+                                authViewModel.onLoginEmailChange("admin@admin.tn")
+                                authViewModel.onLoginPassChange("admin123")
+                            }
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+private fun formatBirthDate(birthDate: Long?): String {
+    if (birthDate == null) return "No registrado"
+    return try {
+        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(birthDate))
+    } catch (_: Exception) {
+        "No registrado"
+    }
+}
+
+private fun formatGender(gender: String?): String {
+    if (gender.isNullOrBlank()) return "No registrado"
+    return when (gender.uppercase()) {
+        "M" -> "Masculino"
+        "F" -> "Femenino"
+        "MALE" -> "Masculino"
+        "FEMALE" -> "Femenino"
+        else -> gender
+    }
+}
+
+@Composable
+private fun ProfileDataRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(GrisFondo)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = VerdeTN,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.size(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, color = GrisTexto, fontSize = 12.sp)
+            Text(
+                value,
+                color = androidx.compose.ui.graphics.Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold
             )
         }
     }
@@ -156,39 +281,360 @@ fun ProfileScreen(
 
 @Composable
 private fun ProfileLoggedContent(
-    userName: String,
-    userEmail: String,
+    user: UserEntity,
+    authViewModel: AuthViewModel,
+    onEdit: () -> Unit,
     onLogout: () -> Unit
 ) {
+    val context = LocalContext.current
+    var showPhotoOptions by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+    val hasCameraPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
+        ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+    val hasGalleryPermission = when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ->
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        else -> true
+    }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+    val galleryPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            val path = ComposeFileProvider.getProfilePhotoFile(context, user.id).absolutePath
+            authViewModel.updateProfilePhoto(user.id, path)
+        }
+    }
+    val getContentLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    val file = ComposeFileProvider.getProfilePhotoFile(context, user.id)
+                    file.outputStream().use { output -> input.copyTo(output) }
+                    authViewModel.updateProfilePhoto(user.id, file.absolutePath)
+                }
+            } catch (_: Exception) { }
+        }
+    }
+
+    if (showPhotoOptions) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showPhotoOptions = false },
+            title = { Text("Foto de perfil", color = androidx.compose.ui.graphics.Color.White) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Elige una opción", color = GrisTexto)
+                    androidx.compose.material3.TextButton(
+                        onClick = {
+                            showPhotoOptions = false
+                            if (!hasCameraPermission) {
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            } else {
+                                takePictureLauncher.launch(ComposeFileProvider.getProfilePhotoUri(context, user.id))
+                            }
+                        }
+                    ) { Text("Cámara", color = VerdeTN) }
+                    androidx.compose.material3.TextButton(
+                        onClick = {
+                            showPhotoOptions = false
+                            if (!hasGalleryPermission) {
+                                val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                                    Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE
+                                galleryPermissionLauncher.launch(perm)
+                            } else {
+                                getContentLauncher.launch("image/*")
+                            }
+                        }
+                    ) { Text("Galería", color = VerdeTN) }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showPhotoOptions = false }) {
+                    Text("Cancelar", color = GrisTexto)
+                }
+            },
+            containerColor = GrisFondo
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(top = 24.dp)
+            .padding(top = 16.dp)
     ) {
+        // Foto de perfil (circular, tappable para cambiar)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(GrisFondo)
-                .padding(20.dp)
+                .padding(bottom = 16.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Column {
-                Text("Nombre", color = GrisTexto, fontSize = 12.sp)
-                Text(userName, color = androidx.compose.ui.graphics.Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Correo", color = GrisTexto, fontSize = 12.sp)
-                Text(userEmail, color = androidx.compose.ui.graphics.Color.White, fontSize = 16.sp)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clickable { showPhotoOptions = true }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(GrisFondo)
+                    ) {
+                        val photoUrl = user.profilePhotoUrl
+                        if (!photoUrl.isNullOrBlank()) {
+                            val path = if (photoUrl.startsWith("/")) File(photoUrl) else photoUrl
+                            AsyncImage(
+                                model = ImageRequest.Builder(context).data(path).build(),
+                                contentDescription = "Foto de perfil",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "${user.name.firstOrNull()?.uppercaseChar() ?: '?'}",
+                                    color = VerdeTN,
+                                    fontSize = 36.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                    // Icono de cámara (overlay) para indicar que se puede cambiar
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(VerdeTN),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.CameraAlt,
+                            contentDescription = "Cambiar foto",
+                            tint = NegroFondo,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Toca para cambiar foto",
+                    color = GrisTexto,
+                    fontSize = 12.sp
+                )
             }
         }
-        Spacer(modifier = Modifier.height(24.dp))
+
+        // Header: DATOS PERSONALES + EDITAR
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "DATOS PERSONALES",
+                color = VerdeTN,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(GrisFondo)
+                    .clickable(onClick = { showEditDialog = true })
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = null,
+                    tint = VerdeTN,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.size(6.dp))
+                Text("EDITAR", color = VerdeTN, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+        Spacer(modifier = Modifier.height(20.dp))
+
+        ProfileDataRow(
+            icon = Icons.Filled.Person,
+            label = "Nombre",
+            value = "${user.name} ${user.lastName}".trim().ifBlank { user.name }
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        ProfileDataRow(
+            icon = Icons.Filled.Email,
+            label = "Email",
+            value = user.email
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        ProfileDataRow(
+            icon = Icons.Filled.Phone,
+            label = "Teléfono",
+            value = user.phone.ifBlank { "No registrado" }
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        ProfileDataRow(
+            icon = Icons.Filled.CalendarToday,
+            label = "Fecha de nacimiento",
+            value = formatBirthDate(user.birthDate)
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        ProfileDataRow(
+            icon = Icons.Filled.Person,
+            label = "Género",
+            value = formatGender(user.gender)
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        ProfileDataRow(
+            icon = Icons.Filled.Person,
+            label = "Altura",
+            value = user.height?.let { "${it.toInt()} cm" } ?: "No registrado"
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        ProfileDataRow(
+            icon = Icons.Filled.Person,
+            label = "Peso",
+            value = user.weight?.let { "${it.toInt()} kg" } ?: "No registrado"
+        )
+
+        Spacer(modifier = Modifier.height(28.dp))
         Button(
             onClick = onLogout,
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFFE53935)),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Text("Cerrar sesión", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.SemiBold)
+            Text("CERRAR SESIÓN", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+
+    if (showEditDialog) {
+        EditProfileDialog(
+            user = user,
+            onDismiss = { showEditDialog = false },
+            onSave = { updated ->
+                authViewModel.updateUser(updated)
+                showEditDialog = false
+            }
+        )
+    }
+}
+
+private fun parseBirthDateToMillis(str: String?): Long? {
+    if (str.isNullOrBlank()) return null
+    return try {
+        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(str.trim())?.time
+    } catch (_: Exception) { null }
+}
+
+@Composable
+private fun EditProfileDialog(
+    user: UserEntity,
+    onDismiss: () -> Unit,
+    onSave: (UserEntity) -> Unit
+) {
+    var name by remember(user) { mutableStateOf(user.name) }
+    var lastName by remember(user) { mutableStateOf(user.lastName) }
+    var email by remember(user) { mutableStateOf(user.email) }
+    var phone by remember(user) { mutableStateOf(user.phone) }
+    var birthDateStr by remember(user) {
+        mutableStateOf(user.birthDate?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(it)) } ?: "")
+    }
+    var gender by remember(user) { mutableStateOf(user.gender ?: "") }
+    var heightStr by remember(user) { mutableStateOf(user.height?.toString() ?: "") }
+    var weightStr by remember(user) { mutableStateOf(user.weight?.toString() ?: "") }
+    var specializations by remember(user) { mutableStateOf(user.specializations ?: "") }
+    val textFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = androidx.compose.ui.graphics.Color.White,
+        unfocusedTextColor = androidx.compose.ui.graphics.Color.White,
+        focusedBorderColor = VerdeTN,
+        unfocusedBorderColor = GrisTexto,
+        cursorColor = VerdeTN,
+        focusedLabelColor = VerdeTN,
+        unfocusedLabelColor = GrisTexto,
+        focusedContainerColor = GrisFondo,
+        unfocusedContainerColor = GrisFondo
+    )
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .background(NegroFondo)
+                .padding(20.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Text("Editar perfil", color = VerdeTN, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nombre", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(value = lastName, onValueChange = { lastName = it }, label = { Text("Apellido", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("Teléfono", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(value = birthDateStr, onValueChange = { birthDateStr = it }, label = { Text("Fecha nacimiento (dd/MM/yyyy)", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(value = gender, onValueChange = { gender = it }, label = { Text("Género (M/F)", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(value = heightStr, onValueChange = { heightStr = it }, label = { Text("Altura (cm)", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(value = weightStr, onValueChange = { weightStr = it }, label = { Text("Peso (kg)", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
+            if (user.role == "TRAINER") {
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(value = specializations, onValueChange = { specializations = it }, label = { Text("Especializaciones", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = GrisFondo),
+                    shape = RoundedCornerShape(12.dp)
+                ) { Text("Cancelar", color = androidx.compose.ui.graphics.Color.White) }
+                Button(
+                    onClick = {
+                        val updated = user.copy(
+                            name = name.trim(),
+                            lastName = lastName.trim(),
+                            email = email.trim(),
+                            phone = phone.trim(),
+                            birthDate = parseBirthDateToMillis(birthDateStr),
+                            gender = gender.trim().takeIf { it.isNotBlank() },
+                            height = heightStr.toFloatOrNull(),
+                            weight = weightStr.toFloatOrNull(),
+                            specializations = specializations.trim().takeIf { it.isNotBlank() }
+                        )
+                        onSave(updated)
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = VerdeTN),
+                    shape = RoundedCornerShape(12.dp)
+                ) { Text("Guardar", color = NegroFondo) }
+            }
         }
     }
 }

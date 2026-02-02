@@ -30,6 +30,10 @@ class UserRepository(private val userDao: UserDao) {
         userDao.insertUser(user)
     }
 
+    suspend fun updateUser(user: UserEntity) {
+        userDao.updateUser(user)
+    }
+
     // Helper para roles
     fun determineRoleByEmail(email: String): String {
         return when {
@@ -49,6 +53,12 @@ class UserRepository(private val userDao: UserDao) {
 
     // Obtener usuario por ID
     suspend fun getUserById(userId: Int): UserEntity? {
+        return userDao.getUserById(userId)
+    }
+
+    /** Actualiza la foto de perfil y devuelve el usuario actualizado, o null si no existe. */
+    suspend fun updateProfilePhoto(userId: Int, photoUrl: String?): UserEntity? {
+        userDao.updateProfilePhoto(userId, photoUrl)
         return userDao.getUserById(userId)
     }
 }

@@ -211,4 +211,58 @@ class RoutineRepository(
             }
         }
     }
+
+    /**
+     * Guarda una rutina creada por el entrenador para un cliente.
+     * ownerId = clientId (la ve el usuario como "su" rutina), creatorId = trainerId.
+     * @return ID del primer día de la rutina (para notificación / abrir detalle).
+     */
+    suspend fun saveRoutineForClient(
+        trainerId: Int,
+        clientId: Int,
+        routineName: String,
+        days: List<DayRoutineInput>
+    ): Long {
+        require(days.size == 7) { "Se requieren exactamente 7 días" }
+        val now = System.currentTimeMillis()
+        var firstRoutineId = 0L
+        for (day in days) {
+            val dayInfo = if (day.activityName.isNotBlank()) "${day.dayLabel} - ${day.activityName}" else day.dayLabel
+            val routine = RoutineEntity(
+                ownerId = clientId,
+                creatorId = trainerId,
+                name = routineName,
+                dayInfo = dayInfo,
+                creationDate = now,
+                scheduledTime = now
+            )
+            val routineId = routineDao.insertRoutine(routine)
+            if (firstRoutineId == 0L) firstRoutineId = routineId
+            val exerciseIds = mutableListOf<Int>()
+            val names = day.exerciseNames.map { it.trim() }.filter { it.isNotBlank() }.take(MAX_EXERCISES_PER_DAY)
+            for (name in names) {
+                val exercise = exerciseDao.getExerciseByName(name)
+                val id = if (exercise != null) {
+                    exercise.id
+                } else {
+                    val newExercise = ExerciseEntity(
+                        name = name,
+                        category = "Personalizado",
+                        description = "",
+                        videoUrl = "",
+                        isSystemDefault = false
+                    )
+                    exerciseDao.insertExercise(newExercise).toInt()
+                }
+                exerciseIds.add(id)
+            }
+            val crossRefs = exerciseIds.mapIndexed { index, exerciseId ->
+                RoutineExerciseEntity(routineId = routineId.toInt(), exerciseId = exerciseId, order = index + 1)
+            }
+            if (crossRefs.isNotEmpty()) {
+                routineDao.insertRoutineExercises(crossRefs)
+            }
+        }
+        return firstRoutineId
+    }
 }

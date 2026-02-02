@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import com.shagox.apptrainingnow.data.local.database.AppDatabase
 import com.shagox.apptrainingnow.data.repository.ChatRepository
+import com.shagox.apptrainingnow.data.repository.ExerciseRepository
 import com.shagox.apptrainingnow.data.repository.NotificationRepository
 import com.shagox.apptrainingnow.data.repository.ProgressRepository
 import com.shagox.apptrainingnow.data.repository.RoutineRepository
@@ -22,6 +23,7 @@ class TrainingNowApplication : Application() {
     private var _trainerRepository: TrainerRepository? = null
     private var _progressRepository: ProgressRepository? = null
     private var _notificationRepository: NotificationRepository? = null
+    private var _exerciseRepository: ExerciseRepository? = null
 
     val database: AppDatabase
         get() = _database ?: run {
@@ -43,6 +45,8 @@ class TrainingNowApplication : Application() {
         get() = _progressRepository ?: ProgressRepository(database.progressDao()).also { _progressRepository = it }
     val notificationRepository: NotificationRepository
         get() = _notificationRepository ?: NotificationRepository(database.notificationDao()).also { _notificationRepository = it }
+    val exerciseRepository: ExerciseRepository
+        get() = _exerciseRepository ?: ExerciseRepository(database.exerciseDao()).also { _exerciseRepository = it }
 
     override fun onCreate() {
         super.onCreate()
