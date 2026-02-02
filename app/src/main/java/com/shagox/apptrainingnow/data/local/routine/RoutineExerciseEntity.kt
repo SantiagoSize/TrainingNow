@@ -11,7 +11,6 @@ import com.shagox.apptrainingnow.data.local.exercise.ExerciseEntity
         ForeignKey(entity = RoutineEntity::class, parentColumns = ["id"], childColumns = ["routineId"], onDelete = ForeignKey.CASCADE),
         ForeignKey(entity = ExerciseEntity::class, parentColumns = ["id"], childColumns = ["exerciseId"], onDelete = ForeignKey.CASCADE)
     ],
-    // 👇 AGREGA ESTO
     indices = [androidx.room.Index("exerciseId")]
 )
 data class RoutineExerciseEntity(

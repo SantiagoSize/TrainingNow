@@ -11,11 +11,9 @@ import com.shagox.apptrainingnow.data.local.user.UserEntity
         ForeignKey(entity = UserEntity::class, parentColumns = ["id"], childColumns = ["ownerId"], onDelete = ForeignKey.CASCADE),
         ForeignKey(entity = UserEntity::class, parentColumns = ["id"], childColumns = ["creatorId"], onDelete = ForeignKey.CASCADE)
     ],
-    // 👇 AGREGA ESTA LÍNEA PARA ELIMINAR LOS WARNINGS AMARILLOS
     indices = [androidx.room.Index("ownerId"), androidx.room.Index("creatorId")]
 )
 data class RoutineEntity(
-    // ... el resto de tu clase sigue igual ...
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val ownerId: Int? = null,
     val creatorId: Int,

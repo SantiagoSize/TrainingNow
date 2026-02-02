@@ -173,6 +173,12 @@ interface ExerciseDao {
      */
     @Query("SELECT EXISTS(SELECT 1 FROM exercises WHERE LOWER(name) = LOWER(:name))")
     suspend fun exerciseNameExists(name: String): Boolean
+
+    /**
+     * Obtiene un ejercicio por nombre exacto (para crear rutinas).
+     */
+    @Query("SELECT * FROM exercises WHERE LOWER(name) = LOWER(:name) LIMIT 1")
+    suspend fun getExerciseByName(name: String): ExerciseEntity?
 }
 
 /**

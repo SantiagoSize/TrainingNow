@@ -2,6 +2,8 @@ package com.shagox.apptrainingnow.navigation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
@@ -9,11 +11,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.shagox.apptrainingnow.ui.screen.WelcomeScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -21,15 +25,24 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.shagox.apptrainingnow.data.repository.ChatRepository
+import com.shagox.apptrainingnow.data.repository.NotificationRepository
 import com.shagox.apptrainingnow.data.repository.ProgressRepository
+import com.shagox.apptrainingnow.data.repository.RoutineRepository
 import com.shagox.apptrainingnow.data.repository.TrainerRepository
 import com.shagox.apptrainingnow.data.repository.UserRepository
 import com.shagox.apptrainingnow.ui.components.BottomNavigationBarTN
 import com.shagox.apptrainingnow.ui.screen.ChatScreen
-import com.shagox.apptrainingnow.ui.screen.LoginScreenVm
-import com.shagox.apptrainingnow.ui.screen.RegisterScreen
+import com.shagox.apptrainingnow.ui.screen.CreateRoutineScreen
+import com.shagox.apptrainingnow.ui.screen.NotificationsScreen
+import com.shagox.apptrainingnow.ui.screen.ProfileScreen
+import com.shagox.apptrainingnow.ui.screen.RoutineActiveScreen
 import com.shagox.apptrainingnow.ui.screen.UserChatsScreen
+import com.shagox.apptrainingnow.ui.screen.UserRoutinesScreen
 import com.shagox.apptrainingnow.ui.screen.coach.ClientDetailScreen
 import com.shagox.apptrainingnow.ui.screen.coach.CoachClientsScreen
 import com.shagox.apptrainingnow.ui.screen.coach.CoachRoutinesScreen
@@ -49,36 +62,43 @@ import com.shagox.apptrainingnow.ui.viewmodel.CoachViewModelFactory
 fun AppNavGraph(
     navController: NavHostController,
     authViewModel: AuthViewModel,
+    startDestination: String,
     userRepository: UserRepository,
     chatRepository: ChatRepository,
+    routineRepository: RoutineRepository,
     trainerRepository: TrainerRepository? = null,
-    progressRepository: ProgressRepository? = null
+    progressRepository: ProgressRepository? = null,
+    notificationRepository: NotificationRepository? = null
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     
-    // Obtener usuario logueado del AuthViewModel
     val loginState by authViewModel.loginState.collectAsState()
     val loggedUser = loginState.loggedUser
     val userRole = loggedUser?.role ?: "USER"
     val currentUserId = loggedUser?.id ?: 0
 
-    // Rutas donde NO mostrar la barra de navegación
-    val hideBottomBarRoutes = listOf(
-        Route.Login.path,
-        Route.Register.path
-    )
+    val context = LocalContext.current
+    val safeStartDestination = startDestination.ifBlank { Route.Welcome.path }
+
+    // Ocultar barra en Welcome y pantallas de detalle; RoutineActive muestra barra para cambiar de pantalla
+    val hideBottomBarRoutes = listOf(Route.Welcome.path)
     val shouldHideBottomBar = currentRoute in hideBottomBarRoutes ||
             currentRoute?.startsWith("chat_detail") == true ||
             currentRoute?.startsWith("client_detail") == true ||
-            currentRoute?.startsWith("create_") == true
+            currentRoute?.startsWith("create_goal") == true
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            if (!shouldHideBottomBar && loggedUser != null) {
+            // Siempre emitir algo para evitar restricciones indefinidas en measure
+            if (shouldHideBottomBar) {
+                Box(modifier = Modifier.fillMaxWidth().height(0.dp))
+            } else {
                 BottomNavigationBarTN(
                     navController = navController,
-                    userRole = userRole
+                    userRole = userRole,
+                    startDestinationRoute = safeStartDestination
                 )
             }
         }
@@ -86,39 +106,22 @@ fun AppNavGraph(
 
         NavHost(
             navController = navController,
-            startDestination = Route.Login.path,
+            startDestination = safeStartDestination,
             modifier = Modifier.padding(padding)
         ) {
 
-            // ==================== AUTENTICACIÓN ====================
+            // ==================== BIENVENIDA (solo primera vez) ====================
 
-            composable(Route.Login.path) {
-                LoginScreenVm(
-                    vm = authViewModel,
-                    onLoginOkNavigateHome = {
-                        // Navegar según el rol del usuario
-                        val destination = when (loggedUser?.role?.uppercase()) {
-                            "TRAINER", "ADMIN" -> Route.CoachClients.path
-                            else -> Route.UserChats.path
+            composable(Route.Welcome.path) {
+                WelcomeScreen(
+                    onComenzar = {
+                        context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+                            .edit()
+                            .putBoolean("has_seen_welcome", true)
+                            .apply()
+                        navController.navigate(Route.UserRoutines.path) {
+                            popUpTo(Route.Welcome.path) { inclusive = true }
                         }
-                        navController.navigate(destination) {
-                            popUpTo(Route.Login.path) { inclusive = true }
-                        }
-                    },
-                    onGoRegister = {
-                        navController.navigate(Route.Register.path)
-                    }
-                )
-            }
-
-            composable(Route.Register.path) {
-                RegisterScreen(
-                    vm = authViewModel,
-                    onRegistered = {
-                        navController.popBackStack()
-                    },
-                    onGoLogin = {
-                        navController.popBackStack()
                     }
                 )
             }
@@ -145,10 +148,46 @@ fun AppNavGraph(
             }
 
             composable(Route.UserRoutines.path) {
-                Text(
-                    text = "Mis Rutinas",
-                    color = Color.White,
-                    modifier = Modifier.padding(16.dp)
+                UserRoutinesScreen(
+                    routineRepository = routineRepository,
+                    userId = currentUserId,
+                    onCreateRoutine = {
+                        navController.navigate(Route.CreateRoutine.createRoute())
+                    },
+                    onRoutineClick = { routineId ->
+                        val route = Route.RoutineActive.createRoute(routineId)
+                        context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+                            .edit()
+                            .putString("active_routine_route", route)
+                            .apply()
+                        navController.navigate(route)
+                    }
+                )
+            }
+
+            // Pantalla de rutina activa: Lista de días → Vista de detalle de ejercicios
+            composable(
+                route = Route.RoutineActive.path,
+                arguments = listOf(navArgument("routineId") { type = NavType.IntType })
+            ) { backStackEntry ->
+                val routineId = backStackEntry.arguments?.getInt("routineId") ?: 0
+                val routine by routineRepository.observeRoutine(routineId).collectAsState(initial = null)
+                val routineName = routine?.name ?: "Rutina"
+                val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+                RoutineActiveScreen(
+                    routineRepository = routineRepository,
+                    userId = currentUserId,
+                    routineId = routineId,
+                    initialRoutineName = routineName,
+                    onBack = {
+                        prefs.edit().remove("active_routine_route").apply()
+                        navController.popBackStack()
+                        if (navController.currentBackStackEntry == null) {
+                            navController.navigate(Route.UserRoutines.path) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    }
                 )
             }
 
@@ -273,19 +312,22 @@ fun AppNavGraph(
             }
 
             composable(Route.Notifications.path) {
-                Text(
-                    text = "Notificaciones",
-                    color = Color.White,
-                    modifier = Modifier.padding(16.dp)
-                )
+                if (notificationRepository != null) {
+                    NotificationsScreen(
+                        notificationRepository = notificationRepository,
+                        userId = currentUserId
+                    )
+                } else {
+                    Text(
+                        text = "Notificaciones",
+                        color = Color.White,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
             }
 
             composable(Route.Profile.path) {
-                Text(
-                    text = "Perfil de ${loggedUser?.name ?: "Usuario"}",
-                    color = Color.White,
-                    modifier = Modifier.padding(16.dp)
-                )
+                ProfileScreen(authViewModel = authViewModel)
             }
 
             // ==================== CREACIÓN (Para entrenadores) ====================
@@ -302,14 +344,16 @@ fun AppNavGraph(
             ) { backStackEntry ->
                 val clientIdStr = backStackEntry.arguments?.getString("clientId")
                 val clientId = clientIdStr?.toIntOrNull()
-                
-                Text(
-                    text = if (clientId != null) 
-                        "Crear Rutina para Cliente #$clientId" 
-                    else 
-                        "Crear Rutina Global",
-                    color = Color.White,
-                    modifier = Modifier.padding(16.dp)
+                val ownerId = clientId ?: currentUserId
+
+                CreateRoutineScreen(
+                    onBack = { navController.popBackStack() },
+                    onSaveRoutine = { name, days ->
+                        CoroutineScope(Dispatchers.IO).launch {
+                            routineRepository.savePersonalRoutine(ownerId, name, days)
+                            withContext(Dispatchers.Main) { navController.popBackStack() }
+                        }
+                    }
                 )
             }
 

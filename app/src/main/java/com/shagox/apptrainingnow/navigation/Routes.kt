@@ -2,6 +2,7 @@ package com.shagox.apptrainingnow.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FitnessCenter
@@ -25,8 +26,19 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
     /** Biblioteca de ejercicios */
     data object Library : Route("library", "Biblioteca", Icons.Filled.Search)
     
-    /** Mis rutinas (para usuarios) */
+    /** Mis rutinas (para usuarios) — DateRange (calendario) del set base para que siempre se dibuje */
     data object UserRoutines : Route("user_routines", "Rutinas", Icons.Filled.DateRange)
+
+    // ==================== PANTALLAS DE ADMIN ====================
+
+    /** Chat del admin (posición 1 en barra) */
+    data object AdminChats : Route("admin_chats", "Chat", Icons.AutoMirrored.Filled.Chat)
+
+    /** Gestión de usuarios (posición 2 en barra) */
+    data object AdminUserManagement : Route("admin_users", "Usuarios", Icons.Filled.People)
+
+    /** Panel de administración - icono 6x3 puntitos (posición 3 en barra) */
+    data object AdminPanel : Route("admin_panel", "Panel", Icons.Filled.Apps)
 
     // ==================== PANTALLAS DE COACH ====================
     
@@ -64,6 +76,9 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
     data object Profile : Route("profile", "Perfil", Icons.Filled.Person)
 
     // ==================== AUTENTICACIÓN ====================
+
+    /** Pantalla de bienvenida (solo primera vez que se abre la app) */
+    data object Welcome : Route("welcome", "Bienvenida", Icons.Filled.Person)
     
     /** Pantalla de login */
     data object Login : Route("login", "Login", Icons.Filled.Person)
@@ -79,6 +94,11 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
     /** Chat individual */
     data object ChatDetail : Route("chat_detail/{otherId}", "Chat", Icons.AutoMirrored.Filled.Chat) {
         fun createRoute(otherId: Int): String = "chat_detail/$otherId"
+    }
+
+    /** Pantalla de rutina activa (encima, con botón rojo para salir) */
+    data object RoutineActive : Route("routine_active/{routineId}", "Rutina activa", Icons.Filled.DateRange) {
+        fun createRoute(routineId: Int): String = "routine_active/$routineId"
     }
 
     companion object {
@@ -105,13 +125,44 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
         )
 
         /**
+         * Barra admin: 1=Chat, 2=Usuarios, 3=Panel, 4=Notificaciones, 5=Perfil.
+         */
+        val adminBottomNavRoutes = listOf(
+            AdminChats,           // 1 - Chat
+            AdminUserManagement, // 2 - Gestión usuarios
+            AdminPanel,          // 3 - Panel administración (cuadrícula puntitos)
+            Notifications,       // 4 - Notificaciones
+            Profile              // 5 - Perfil
+        )
+
+        /**
          * Obtiene las rutas de navegación según el rol.
+         * Se construye una lista nueva en cada llamada para evitar referencias
+         * nulas por inicialización diferida del companion object.
          */
         fun getBottomNavRoutes(role: String): List<Route> {
             return when (role.uppercase()) {
-                "TRAINER", "COACH" -> coachBottomNavRoutes
-                "ADMIN" -> coachBottomNavRoutes // Admin ve la misma interfaz que coach
-                else -> userBottomNavRoutes
+                "ADMIN" -> listOf(
+                    AdminChats,
+                    AdminUserManagement,
+                    AdminPanel,
+                    Notifications,
+                    Profile
+                )
+                "TRAINER", "COACH" -> listOf(
+                    CoachClients,
+                    CoachRoutines,
+                    CoachChats,
+                    Notifications,
+                    Profile
+                )
+                else -> listOf(
+                    UserChats,
+                    Library,
+                    UserRoutines,
+                    Notifications,
+                    Profile
+                )
             }
         }
     }

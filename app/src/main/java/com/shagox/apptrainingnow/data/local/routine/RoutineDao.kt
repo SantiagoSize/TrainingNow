@@ -126,6 +126,28 @@ interface RoutineDao {
     // ==================== RUTINAS - PROGRAMACIÓN/CALENDARIO ====================
 
     /**
+     * Obtiene todos los "días" de una rutina por su nombre (misma cabecera).
+     * Cada fila es un día con su dayInfo (ej. "Lunes - Empuje").
+     * Usado para: Lista de días → Vista de detalle de ejercicios.
+     */
+    @Query("""
+        SELECT * FROM routines 
+        WHERE name = :routineName AND (ownerId = :userId OR ownerId IS NULL)
+        ORDER BY id ASC
+    """)
+    fun getDaysForRoutineName(routineName: String, userId: Int): Flow<List<RoutineEntity>>
+
+    /**
+     * Versión síncrona para construir RoutineWithDays.
+     */
+    @Query("""
+        SELECT * FROM routines 
+        WHERE name = :routineName AND (ownerId = :userId OR ownerId IS NULL)
+        ORDER BY id ASC
+    """)
+    suspend fun getDaysForRoutineNameSync(routineName: String, userId: Int): List<RoutineEntity>
+
+    /**
      * Obtiene rutinas programadas para hoy.
      */
     @Query("""

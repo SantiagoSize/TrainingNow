@@ -26,9 +26,11 @@ import coil.request.ImageRequest
 import com.shagox.apptrainingnow.data.local.user.UserEntity
 import com.shagox.apptrainingnow.data.repository.ChatRepository
 import com.shagox.apptrainingnow.data.repository.UserRepository
+import com.shagox.apptrainingnow.ui.components.ScreenHeaderTN
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @Composable
@@ -49,6 +51,8 @@ fun UserChatsScreen(
             userRepository.getAllTrainers().collect { trainerList ->
                 trainers = if (searchQuery.isBlank()) trainerList else trainers
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             android.util.Log.e("UserChatsScreen", "Error al cargar entrenadores", e)
             trainers = emptyList()
@@ -66,6 +70,8 @@ fun UserChatsScreen(
             scope.launch {
                 try {
                     trainers = userRepository.searchTrainers(trimmedQuery)
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     android.util.Log.e("UserChatsScreen", "Error al buscar entrenadores", e)
                     trainers = emptyList()
@@ -80,16 +86,15 @@ fun UserChatsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(NegroFondo)
-            .padding(16.dp)
+            .padding(horizontal = 16.dp)
     ) {
-        // Título
-        Text(
-            text = "Buscar Entrenadores",
-            style = MaterialTheme.typography.headlineMedium,
-            color = VerdeTN,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
+        ScreenHeaderTN(
+            subtitle = "Mis",
+            title = "CHATS",
+            actionIcon = Icons.Default.Search,
+            onActionClick = { /* búsqueda */ }
         )
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Barra de búsqueda
         OutlinedTextField(

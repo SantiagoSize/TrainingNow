@@ -1,9 +1,13 @@
 package com.shagox.apptrainingnow.data.local.user
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "users")
+@Entity(
+    tableName = "users",
+    indices = [Index(value = ["email"], unique = true)]
+)
 data class UserEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val role: String, // "ADMIN", "TRAINER", "USER"
@@ -11,7 +15,7 @@ data class UserEntity(
     val lastName: String,
     val email: String,
     val phone: String,
-    val password: String, // <--- ESTO ES LO QUE FALTABA
+    val password: String,
     val profilePhotoUrl: String? = null,
 
     // Específicos de Usuario
