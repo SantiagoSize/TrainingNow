@@ -481,6 +481,10 @@ fun AppNavGraph(
                 arguments = listOf(navArgument("otherId") { type = NavType.IntType })
             ) { backStackEntry ->
                 val otherId = backStackEntry.arguments?.getInt("otherId") ?: 0
+                // Sincronizar la conversación desde TrainNow-Comunicaciones al abrir el chat
+                androidx.compose.runtime.LaunchedEffect(currentUserId, otherId) {
+                    chatRepository.syncConversation(currentUserId, otherId)
+                }
                 ChatScreen(
                     currentUserId = currentUserId,
                     trainerId = otherId,

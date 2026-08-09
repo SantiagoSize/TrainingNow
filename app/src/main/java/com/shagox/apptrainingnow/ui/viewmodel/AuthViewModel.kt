@@ -133,7 +133,8 @@ class AuthViewModel(
                 } else {
                     it.copy(
                         isSubmitting = false,
-                        errorMsg = "Credenciales incorrectas"
+                        // Mensaje real del backend (baneo/suspensión) o genérico
+                        errorMsg = result.exceptionOrNull()?.message ?: "Credenciales incorrectas"
                     )
                 }
             }

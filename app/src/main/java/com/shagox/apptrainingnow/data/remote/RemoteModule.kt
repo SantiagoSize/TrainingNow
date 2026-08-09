@@ -70,6 +70,7 @@ object RemoteModule {
     fun routineApi(): RoutineApi = routineRetrofit.create(RoutineApi::class.java)
     fun workoutApi(): WorkoutApi = workoutRetrofit.create(WorkoutApi::class.java)
     fun notificationApi(): NotificationApi = notificationRetrofit.create(NotificationApi::class.java)
+    fun chatApi(): ChatApi = notificationRetrofit.create(ChatApi::class.java)
 
     /** Genérico por si se necesita otro servicio sobre alguna base URL. */
     fun <T> create(baseUrl: String, service: Class<T>): T = retrofit(baseUrl).create(service)

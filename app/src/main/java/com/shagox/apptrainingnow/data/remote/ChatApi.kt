@@ -1,0 +1,23 @@
+package com.shagox.apptrainingnow.data.remote
+
+import com.shagox.apptrainingnow.data.remote.dto.MessageDto
+import retrofit2.Response
+import retrofit2.http.*
+
+/**
+ * API del chat — microservicio TrainNow-Comunicaciones (puerto 8084).
+ */
+interface ChatApi {
+
+    @GET("api/messages/conversation/{userA}/{userB}")
+    suspend fun getConversation(@Path("userA") userA: Int, @Path("userB") userB: Int): List<MessageDto>
+
+    @GET("api/messages/user/{userId}")
+    suspend fun getMessagesByUser(@Path("userId") userId: Int): List<MessageDto>
+
+    @POST("api/messages")
+    suspend fun sendMessage(@Body message: MessageDto): Response<MessageDto>
+
+    @PATCH("api/messages/{id}/read")
+    suspend fun markAsRead(@Path("id") id: Int): Response<MessageDto>
+}
