@@ -190,7 +190,9 @@ fun AppNavGraph(
                 if (exerciseRepository != null) {
                     LibraryScreen(
                         exerciseRepository = exerciseRepository,
-                        onSearchClick = { /* TODO: búsqueda */ },
+                        onExerciseClick = { exerciseId ->
+                            navController.navigate(Route.ExerciseDetail.createRoute(exerciseId))
+                        },
                         onCategoryClick = { categoryName ->
                             navController.navigate(Route.LibraryCategory.createRoute(categoryName))
                         }
@@ -233,6 +235,10 @@ fun AppNavGraph(
             }
 
             composable(Route.UserRoutines.path) {
+                // Sincronizar rutinas asignadas por el entrenador desde el backend
+                androidx.compose.runtime.LaunchedEffect(currentUserId) {
+                    routineRepository.syncRoutinesFromBackend(currentUserId)
+                }
                 UserRoutinesScreen(
                     routineRepository = routineRepository,
                     userId = currentUserId,
@@ -261,6 +267,7 @@ fun AppNavGraph(
                 val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
                 RoutineActiveScreen(
                     routineRepository = routineRepository,
+                    exerciseRepository = exerciseRepository,
                     userId = currentUserId,
                     routineId = routineId,
                     initialRoutineName = routineName,
@@ -292,6 +299,7 @@ fun AppNavGraph(
                     
                     CoachClientsScreen(
                         viewModel = coachViewModel,
+                        onVerUsuarios = { navController.navigate(Route.CoachUsers.path) },
                         onClientClick = { clientId ->
                             coachViewModel.selectClient(
                                 coachViewModel.activeClients.value.find { it.id == clientId }
@@ -326,7 +334,7 @@ fun AppNavGraph(
                             navController.navigate(Route.CreateRoutine.createRoute())
                         },
                         onRoutineClick = { routineId ->
-                            // TODO: Navegar a detalle de rutina
+                            navController.navigate(Route.RoutineActive.createRoute(routineId))
                         }
                     )
                 } else {
@@ -411,9 +419,17 @@ fun AppNavGraph(
                 )
             }
 
+            composable(Route.CoachUsers.path) {
+                com.shagox.apptrainingnow.ui.screen.coach.CoachUsersScreen(
+                    userRepository = userRepository,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
             composable(Route.AdminCreateUser.path) {
                 AdminCreateUserScreen(
                     userRepository = userRepository,
+                    adminId = currentUserId,
                     onBack = { navController.popBackStack() },
                     onSuccess = { navController.popBackStack() }
                 )

@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.shagox.apptrainingnow.data.local.user.UserEntity
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
@@ -20,16 +21,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Código requerido para crear cuentas de Admin o Entrenador. */
-private const val ADMIN_TRAINER_CODE = "TN_ADMIN"
 
 /**
  * Crear usuario (admin): usuarios, entrenadores o admins.
- * Para Admin/Entrenador se requiere el código. Para Entrenador, la especialidad es obligatoria.
+ * La autorización real la valida el backend (X-Admin-Id debe ser un ADMIN activo).
+ * Reglas: staff (ADMIN/TRAINER) requiere correo @trainingnow.com; entrenador exige especialidad.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminCreateUserScreen(
     userRepository: com.shagox.apptrainingnow.data.repository.IUserRepository,
+    adminId: Int,
     onBack: () -> Unit,
     onSuccess: () -> Unit
 ) {
@@ -39,7 +41,6 @@ fun AdminCreateUserScreen(
     var phone by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("USER") }
-    var adminCode by remember { mutableStateOf("") }
     var specialty by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
@@ -160,16 +161,11 @@ fun AdminCreateUserScreen(
                 )
             }
             if (role == "ADMIN" || role == "TRAINER") {
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = adminCode,
-                    onValueChange = { adminCode = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Código (requerido para Admin/Entrenador)") },
-                    placeholder = { Text("Introduce el código") },
-                    singleLine = true,
-                    colors = textFieldColors,
-                    shape = textFieldShape
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "El personal (Admin/Entrenador) debe usar correo @trainingnow.com",
+                    color = GrisTexto,
+                    fontSize = 12.sp
                 )
             }
             if (role == "TRAINER") {
@@ -193,13 +189,16 @@ fun AdminCreateUserScreen(
                         message = "Nombre, apellido, email y contraseña obligatorios"
                         return@Button
                     }
-                    val roleFromEmail = userRepository.determineRoleByEmail(email)
-                    val finalRole = if (roleFromEmail != "USER") roleFromEmail else role
-                    if (finalRole == "ADMIN" || finalRole == "TRAINER") {
-                        if (adminCode.trim() != ADMIN_TRAINER_CODE) {
-                            message = "Código incorrecto para crear Admin o Entrenador"
-                            return@Button
-                        }
+                    val finalRole = role
+                    if ((finalRole == "ADMIN" || finalRole == "TRAINER") &&
+                        !email.trim().lowercase().endsWith("@trainingnow.com")
+                    ) {
+                        message = "El personal debe usar correo @trainingnow.com"
+                        return@Button
+                    }
+                    if (finalRole == "USER" && email.trim().lowercase().endsWith("@trainingnow.com")) {
+                        message = "El dominio @trainingnow.com es exclusivo del personal"
+                        return@Button
                     }
                     if (finalRole == "TRAINER" && specialty.isBlank()) {
                         message = "La especialidad es obligatoria para entrenadores"
@@ -210,7 +209,8 @@ fun AdminCreateUserScreen(
                     scope.launch {
                         withContext(Dispatchers.IO) {
                             try {
-                                userRepository.insertUser(
+                                userRepository.insertUserByAdmin(
+                                    adminId,
                                     UserEntity(
                                         role = finalRole,
                                         name = name.trim(),

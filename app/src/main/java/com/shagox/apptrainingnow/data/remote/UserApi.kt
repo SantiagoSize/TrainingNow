@@ -1,6 +1,5 @@
 package com.shagox.apptrainingnow.data.remote
 
-import com.shagox.apptrainingnow.data.remote.dto.NotificationDto
 import com.shagox.apptrainingnow.data.remote.dto.TrainerClientDto
 import com.shagox.apptrainingnow.data.remote.dto.UserDto
 import retrofit2.Response
@@ -33,6 +32,24 @@ interface UserApi {
 
     @POST("api/users")
     suspend fun createUser(@Body user: UserDto): Response<UserDto>
+
+    /** Creación de usuarios con privilegios: requiere token JWT de admin (interceptor lo agrega). */
+    @POST("api/users/admin-create")
+    suspend fun createUserByAdmin(@Body user: UserDto): Response<UserDto>
+
+    // ==================== Sanciones (token de admin vía interceptor) ====================
+
+    @PATCH("api/users/{id}/ban")
+    suspend fun banUser(@Path("id") id: Int, @Body body: Map<String, String>): Response<UserDto>
+
+    @PATCH("api/users/{id}/unban")
+    suspend fun unbanUser(@Path("id") id: Int): Response<UserDto>
+
+    @PATCH("api/users/{id}/suspend")
+    suspend fun suspendUser(@Path("id") id: Int, @Body body: Map<String, Any>): Response<UserDto>
+
+    @PATCH("api/users/{id}/unsuspend")
+    suspend fun unsuspendUser(@Path("id") id: Int): Response<UserDto>
 
     @PUT("api/users/{id}")
     suspend fun updateUser(@Path("id") id: Int, @Body user: UserDto): Response<UserDto>
@@ -68,22 +85,15 @@ interface UserApi {
     @POST("api/trainer-clients")
     suspend fun createTrainerClient(@Body body: TrainerClientDto): Response<TrainerClientDto>
 
-    // Notifications (mismo microservicio 8081)
-    @GET("api/notifications/{id}")
-    suspend fun getNotificationById(@Path("id") id: Int): NotificationDto
 
-    @GET("api/notifications/user/{userId}")
-    suspend fun getNotificationsByUser(@Path("userId") userId: Int): List<NotificationDto>
+    // ==================== Recuperación de contraseña ====================
 
-    @POST("api/notifications")
-    suspend fun createNotification(@Body notification: NotificationDto): Response<NotificationDto>
+    @POST("api/users/password-reset/request")
+    suspend fun requestPasswordReset(@Body body: Map<String, String>): Response<Map<String, String>>
 
-    @PUT("api/notifications/{id}")
-    suspend fun updateNotification(@Path("id") id: Int, @Body notification: NotificationDto): Response<NotificationDto>
+    @POST("api/users/password-reset/verify")
+    suspend fun verifyPasswordReset(@Body body: Map<String, String>): Response<Map<String, String>>
 
-    @PATCH("api/notifications/{id}/read")
-    suspend fun markNotificationAsRead(@Path("id") id: Int): Response<NotificationDto>
-
-    @DELETE("api/notifications/{id}")
-    suspend fun deleteNotification(@Path("id") id: Int): Response<Unit>
+    @POST("api/users/password-reset/confirm")
+    suspend fun confirmPasswordReset(@Body body: Map<String, String>): Response<Map<String, String>>
 }

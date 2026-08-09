@@ -69,6 +69,9 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
     /** Chats del entrenador con clientes */
     data object CoachChats : Route("coach_chats", "Mensajes", Icons.AutoMirrored.Filled.Chat)
     
+    /** Lista de todos los usuarios normales (solo lectura, para el entrenador) */
+    data object CoachUsers : Route("coach_users", "Usuarios", Icons.Filled.People)
+
     /** Detalle de un cliente */
     data object ClientDetail : Route("client_detail/{clientId}", "Cliente", Icons.Filled.Person) {
         fun createRoute(clientId: Int): String = "client_detail/$clientId"

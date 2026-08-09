@@ -27,7 +27,7 @@ import kotlinx.coroutines.withContext
 import java.util.*
 
 /** Acción de sanción. */
-enum class SanctionAction { SUSPEND, BAN, DELETE }
+enum class SanctionAction { SUSPEND, BAN, DELETE, LIFT }
 
 /**
  * Suspender / Banear / Eliminar: obligatorio motivo y tiempo de suspensión.
@@ -140,7 +140,8 @@ fun AdminSanctionScreen(
                 listOf(
                     SanctionAction.SUSPEND to "Suspender",
                     SanctionAction.BAN to "Banear",
-                    SanctionAction.DELETE to "Eliminar"
+                    SanctionAction.DELETE to "Eliminar",
+                    SanctionAction.LIFT to "Levantar"
                 ).forEach { (a, label) ->
                     FilterChip(
                         selected = action == a,
@@ -194,7 +195,7 @@ fun AdminSanctionScreen(
                         message = "Busca un usuario por ID primero"
                         return@Button
                     }
-                    if (reason.isBlank()) {
+                    if (reason.isBlank() && action != SanctionAction.LIFT) {
                         message = "El motivo es obligatorio"
                         return@Button
                     }
@@ -288,6 +289,11 @@ private fun applySanction(
                     }
                     SanctionAction.BAN -> userRepository.banUser(user.id, reason)
                     SanctionAction.DELETE -> userRepository.deleteUserById(user.id)
+                    SanctionAction.LIFT -> {
+                        // Levanta ambas restricciones: baneo y suspensión
+                        userRepository.unbanUser(user.id)
+                        userRepository.clearSuspension(user.id)
+                    }
                 }
                 withContext(Dispatchers.Main) { onSuccess() }
             } catch (e: Exception) {

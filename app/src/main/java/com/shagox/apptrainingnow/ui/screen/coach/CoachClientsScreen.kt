@@ -71,6 +71,7 @@ import com.shagox.apptrainingnow.ui.viewmodel.CoachViewModel
  */
 @Composable
 fun CoachClientsScreen(
+    onVerUsuarios: () -> Unit = {},
     viewModel: CoachViewModel,
     onClientClick: (Int) -> Unit,
     onChatClick: (Int) -> Unit
@@ -89,6 +90,9 @@ fun CoachClientsScreen(
             .background(NegroFondo)
             .padding(horizontal = 16.dp)
     ) {
+        androidx.compose.material3.TextButton(onClick = onVerUsuarios) {
+            Text("Ver todos los usuarios →", color = VerdeTN, fontSize = 13.sp)
+        }
         ScreenHeaderTN(
             subtitle = "Mis",
             title = "CLIENTES",

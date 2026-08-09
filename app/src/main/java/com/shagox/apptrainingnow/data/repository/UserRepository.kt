@@ -47,13 +47,7 @@ class UserRepository(private val userDao: UserDao) : IUserRepository {
     }
 
     // Helper para roles
-    override fun determineRoleByEmail(email: String): String {
-        return when {
-            email.endsWith("@admin.tn") -> "ADMIN"
-            email.endsWith("@coach.tn") -> "TRAINER"
-            else -> "USER"
-        }
-    }
+    override fun determineRoleByEmail(email: String): String = "USER" 
 
     // Buscar entrenadores
     override suspend fun searchTrainers(query: String): List<UserEntity> {

@@ -24,7 +24,11 @@ data class UserDto(
     @SerializedName("suspendedUntil") val suspendedUntil: Long? = null,
     @SerializedName("suspendReason") val suspendReason: String? = null,
     @SerializedName("isBanned") val isBanned: Boolean = false,
-    @SerializedName("banReason") val banReason: String? = null
+    @SerializedName("banReason") val banReason: String? = null,
+    @SerializedName("createdAt") val createdAt: Long? = null,
+    @SerializedName("updatedAt") val updatedAt: Long? = null,
+    /** Token JWT: solo viene en la respuesta del login. */
+    val token: String? = null
 ) {
     /** Convierte el DTO a la entidad usada en la app (Room/UI). */
     fun toEntity(): UserEntity = UserEntity(

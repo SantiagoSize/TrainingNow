@@ -88,6 +88,10 @@ interface RoutineDao {
     @Query("SELECT * FROM routines WHERE ownerId = :userId ORDER BY scheduledTime DESC")
     fun getUserOwnRoutines(userId: Int): Flow<List<RoutineEntity>>
 
+    /** Rutinas del usuario (consulta puntual, para sincronización con el backend). */
+    @Query("SELECT * FROM routines WHERE ownerId = :userId")
+    suspend fun getRoutinesByOwnerOnce(userId: Int): List<RoutineEntity>
+
     /**
      * Obtiene solo las rutinas globales (públicas).
      */

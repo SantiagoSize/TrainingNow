@@ -43,10 +43,15 @@ class UserApiRepository(
                 )
             )
             when {
-                response.isSuccessful && response.body() != null ->
+                response.isSuccessful && response.body() != null -> {
+                    RemoteModule.authToken = response.body()!!.token
                     Result.success(response.body()!!.toEntity())
+                }
                 response.code() == 401 ->
                     Result.failure(Exception("Credenciales incorrectas"))
+                response.code() == 403 ->
+                    Result.failure(Exception(extractErrorMessage(response.errorBody()?.string())
+                        ?: "Tu cuenta tiene una restricción activa"))
                 else ->
                     Result.failure(Exception(response.message() ?: "Error de login"))
             }
@@ -73,10 +78,20 @@ class UserApiRepository(
         if (!response.isSuccessful) throw HttpException(response)
     }
 
-    override fun determineRoleByEmail(email: String): String = when {
-        email.endsWith("@admin.tn") -> "ADMIN"
-        email.endsWith("@coach.tn") -> "TRAINER"
-        else -> "USER"
+    /** El registro público siempre crea USER; los roles de staff los asigna el backend vía admin. */
+    override fun determineRoleByEmail(email: String): String = "USER"
+
+    /** Crear usuario con privilegios: POST /api/users/admin-create (validado por el backend). */
+    override suspend fun insertUserByAdmin(adminId: Int, user: UserEntity) {
+        val response = api.createUserByAdmin(user.toDto()) // el token JWT identifica al admin
+        if (!response.isSuccessful) {
+            when (response.code()) {
+                403 -> throw Exception("Solo un administrador puede crear este usuario")
+                409 -> throw Exception("El email ya existe")
+                400 -> throw Exception("Datos inválidos: revisa rol, dominio del correo y especialidad")
+                else -> throw HttpException(response)
+            }
+        }
     }
 
     override suspend fun searchTrainers(query: String): List<UserEntity> =
@@ -103,39 +118,53 @@ class UserApiRepository(
         return getUserById(userId)
     }
 
-    /** Suspender usuario. La API actual puede no tener este endpoint; se lanza si no está soportado. */
+    /** Suspender: PATCH /api/users/{id}/suspend (token de admin). */
     override suspend fun suspendUser(userId: Int, untilMillis: Long, reason: String) {
-        val user = getUserById(userId) ?: throw Exception("Usuario no encontrado")
-        // Si la API añade campos suspendedUntil/suspendReason, actualizar usuario:
-        val updated = user.copy(
-            suspendedUntil = untilMillis,
-            suspendReason = reason
-        )
-        updateUser(updated)
+        val response = api.suspendUser(userId, mapOf("untilMillis" to untilMillis, "reason" to reason))
+        if (!response.isSuccessful) throw Exception(sanctionError(response.code()))
     }
 
+    /** Levantar suspensión: PATCH /api/users/{id}/unsuspend (token de admin). */
     override suspend fun clearSuspension(userId: Int) {
-        val user = getUserById(userId) ?: return
-        val updated = user.copy(suspendedUntil = null, suspendReason = null)
-        updateUser(updated)
+        val response = api.unsuspendUser(userId)
+        if (!response.isSuccessful) throw Exception(sanctionError(response.code()))
     }
 
+    /** Banear: PATCH /api/users/{id}/ban (token de admin). Bloquea el login del usuario. */
     override suspend fun banUser(userId: Int, reason: String) {
-        val user = getUserById(userId) ?: throw Exception("Usuario no encontrado")
-        val updated = user.copy(isBanned = true, banReason = reason)
-        updateUser(updated)
+        val response = api.banUser(userId, mapOf("reason" to reason))
+        if (!response.isSuccessful) throw Exception(sanctionError(response.code()))
     }
 
+    /** Levantar baneo: PATCH /api/users/{id}/unban (token de admin). */
     override suspend fun unbanUser(userId: Int) {
-        val user = getUserById(userId) ?: return
-        val updated = user.copy(isBanned = false, banReason = null)
-        updateUser(updated)
+        val response = api.unbanUser(userId)
+        if (!response.isSuccessful) throw Exception(sanctionError(response.code()))
     }
 
     /** Eliminar usuario: DELETE /api/users/{id}. */
     override suspend fun deleteUserById(userId: Int) {
         val response = api.deleteUser(userId)
         if (!response.isSuccessful) throw HttpException(response)
+    }
+
+    /** Usuarios normales con toda su información (incluye createdAt). */
+    override suspend fun getAllClientsInfo(): List<UserDto> = try {
+        api.getClients()
+    } catch (e: Exception) {
+        throw translateException(e)
+    }
+
+    private fun sanctionError(code: Int): String = when (code) {
+        403 -> "Solo un administrador con sesión activa puede aplicar sanciones"
+        404 -> "Usuario no encontrado"
+        else -> "Error del servidor ($code)"
+    }
+
+    /** Extrae "error" del cuerpo JSON {"error": "..."}. */
+    private fun extractErrorMessage(body: String?): String? {
+        if (body == null) return null
+        return Regex("\"error\"\s*:\s*\"([^\"]+)\"").find(body)?.groupValues?.get(1)
     }
 
     private fun translateException(e: Exception): Exception = when (e) {

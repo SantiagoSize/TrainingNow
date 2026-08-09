@@ -2,14 +2,14 @@ package com.shagox.apptrainingnow.data.repository
 
 import com.shagox.apptrainingnow.data.local.notification.NotificationEntity
 import com.shagox.apptrainingnow.data.remote.RemoteModule
-import com.shagox.apptrainingnow.data.remote.UserApi
+import com.shagox.apptrainingnow.data.remote.NotificationApi
 import com.shagox.apptrainingnow.data.remote.dto.NotificationDto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import retrofit2.HttpException
 
 class NotificationApiRepository(
-    private val api: UserApi = RemoteModule.userApi()
+    private val api: NotificationApi = RemoteModule.notificationApi()
 ) : INotificationRepository {
 
     override suspend fun saveNotification(notification: NotificationEntity) {

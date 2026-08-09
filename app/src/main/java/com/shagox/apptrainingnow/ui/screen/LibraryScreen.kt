@@ -14,6 +14,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items as listItems
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -34,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -70,10 +78,19 @@ fun LibraryScreen(
     exerciseRepository: IExerciseRepository,
     modifier: Modifier = Modifier,
     onSearchClick: () -> Unit = {},
-    onCategoryClick: (String) -> Unit = {}
+    onCategoryClick: (String) -> Unit = {},
+    onExerciseClick: (Int) -> Unit = {}
 ) {
     val categoryStats by exerciseRepository.getCategoryStats().collectAsState(initial = emptyList())
     val categories = categoryStats.map { LibraryCategory(it.category, it.count, iconForCategory(it.category)) }
+    val allExercises by exerciseRepository.getAllExercises().collectAsState(initial = emptyList())
+    var searchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val searchResults = if (searchQuery.isBlank()) emptyList()
+    else allExercises.filter {
+        it.name.contains(searchQuery, ignoreCase = true) ||
+                it.category.contains(searchQuery, ignoreCase = true)
+    }
 
     Column(
         modifier = modifier
@@ -85,8 +102,56 @@ fun LibraryScreen(
             subtitle = "Explora la",
             title = "BIBLIOTECA",
             actionIcon = Icons.Filled.Search,
-            onActionClick = onSearchClick
+            onActionClick = {
+                searchActive = !searchActive
+                if (!searchActive) searchQuery = ""
+                onSearchClick()
+            }
         )
+
+        if (searchActive) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Buscar ejercicio...", color = GrisTexto) },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = VerdeTN,
+                    unfocusedBorderColor = GrisTexto,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    cursorColor = VerdeTN
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            )
+            LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                listItems(searchResults) { exercise ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onExerciseClick(exercise.id) }
+                            .padding(vertical = 12.dp, horizontal = 4.dp)
+                    ) {
+                        Column {
+                            Text(exercise.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text(exercise.category, color = GrisTexto, fontSize = 12.sp)
+                        }
+                    }
+                }
+                if (searchQuery.isNotBlank() && searchResults.isEmpty()) {
+                    listItems(listOf("empty")) {
+                        Text(
+                            "Sin resultados para \"$searchQuery\"",
+                            color = GrisTexto,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        )
+                    }
+                }
+            }
+        }
 
         Text(
             text = "CATEGORÍAS",

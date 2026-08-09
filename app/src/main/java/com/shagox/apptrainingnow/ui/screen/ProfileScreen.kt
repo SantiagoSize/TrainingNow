@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,12 +38,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,7 +62,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shagox.apptrainingnow.R
+import com.shagox.apptrainingnow.data.repository.PasswordResetRepository
+import kotlinx.coroutines.launch
 import com.shagox.apptrainingnow.ui.components.ScreenHeaderTN
+import com.shagox.apptrainingnow.ui.theme.GrisBorde
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
@@ -87,6 +94,8 @@ fun ProfileScreen(
     val registerState by authViewModel.register.collectAsState()
     val loggedUser = loginState.loggedUser
     var selectedTab by remember { mutableIntStateOf(0) } // 0 = Iniciar sesión, 1 = Registrarse
+    var showEditProfile by remember { mutableStateOf(false) }
+    var showForgotPassword by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -105,10 +114,35 @@ fun ProfileScreen(
             ProfileLoggedContent(
                 user = loggedUser,
                 authViewModel = authViewModel,
-                onEdit = { /* TODO: navegar a edición de perfil */ },
+                onEdit = { showEditProfile = true },
                 onLogout = { authViewModel.logout() }
             )
+
+            if (showEditProfile) {
+                EditProfileDialog(
+                    user = loggedUser,
+                    onDismiss = { showEditProfile = false },
+                    onSave = { updated ->
+                        authViewModel.updateUser(updated)
+                        showEditProfile = false
+                    }
+                )
+            }
         } else {
+            // Logo Training Now! en la zona superior (pantalla de login/registro)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, bottom = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.logo_2),
+                    contentDescription = "Training Now!",
+                    modifier = Modifier.fillMaxWidth(0.62f)
+                )
+            }
+
             // No logueado: control segmentado (bordes redondeados en los extremos, integrado con fondo)
             Row(
                 modifier = Modifier
@@ -154,8 +188,16 @@ fun ProfileScreen(
                     loginState = loginState,
                     onEmailChange = { authViewModel.onLoginEmailChange(it) },
                     onPassChange = { authViewModel.onLoginPassChange(it) },
-                    onSubmit = { authViewModel.submitLogin() }
+                    onSubmit = { authViewModel.submitLogin() },
+                    onForgotPassword = { showForgotPassword = true }
                 )
+
+                if (showForgotPassword) {
+                    ForgotPasswordDialog(
+                        initialEmail = loginState.email,
+                        onDismiss = { showForgotPassword = false }
+                    )
+                }
             } else {
                 RegisterTabContent(
                     registerState = registerState,
@@ -185,36 +227,36 @@ fun ProfileScreen(
                         .padding(bottom = 16.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    // Usuario normal (carlos@user.tn - usuario de la BD)
+                    // Usuario normal (usuario@gmail.com - seed de la BD)
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .height(24.dp)
                             .alpha(0f)
                             .clickable {
-                                authViewModel.onLoginEmailChange("carlos@user.tn")
+                                authViewModel.onLoginEmailChange("usuario@gmail.com")
                                 authViewModel.onLoginPassChange("user123")
                             }
                     )
-                    // Entrenador (@coach.tn)
+                    // Entrenador (@trainingnow.com)
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .height(24.dp)
                             .alpha(0f)
                             .clickable {
-                                authViewModel.onLoginEmailChange("santiago@coach.tn")
-                                authViewModel.onLoginPassChange("coach123")
+                                authViewModel.onLoginEmailChange("entrenador@trainingnow.com")
+                                authViewModel.onLoginPassChange("entrenador123")
                             }
                     )
-                    // Admin (@admin.tn)
+                    // Admin (@trainingnow.com)
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .height(24.dp)
                             .alpha(0f)
                             .clickable {
-                                authViewModel.onLoginEmailChange("admin@admin.tn")
+                                authViewModel.onLoginEmailChange("admin@trainingnow.com")
                                 authViewModel.onLoginPassChange("admin123")
                             }
                     )
@@ -645,6 +687,8 @@ private fun LoginTabContent(
     onEmailChange: (String) -> Unit,
     onPassChange: (String) -> Unit,
     onSubmit: () -> Unit
+,
+    onForgotPassword: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -728,6 +772,12 @@ private fun LoginTabContent(
             } else {
                 Text("INICIAR SESIÓN", fontWeight = FontWeight.SemiBold)
             }
+        }
+        TextButton(
+            onClick = onForgotPassword,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("¿Olvidaste tu contraseña?", color = VerdeTN, fontSize = 13.sp)
         }
         if (loginState.errorMsg != null) {
             Spacer(modifier = Modifier.height(12.dp))
@@ -876,4 +926,247 @@ private fun RegisterTabContent(
             Text("Registro exitoso. Inicia sesión.", color = VerdeTN, fontSize = 14.sp)
         }
     }
+}
+
+
+/**
+ * Diálogo de edición de perfil: nombre, apellidos, teléfono, altura y peso.
+ * Guarda vía AuthViewModel.updateUser (sincroniza con tn-usuarios).
+ */
+@Composable
+private fun EditProfileDialog(
+    user: com.shagox.apptrainingnow.data.local.user.UserEntity,
+    onDismiss: () -> Unit,
+    onSave: (com.shagox.apptrainingnow.data.local.user.UserEntity) -> Unit
+) {
+    var name by remember { mutableStateOf(user.name) }
+    var lastName by remember { mutableStateOf(user.lastName) }
+    var phone by remember { mutableStateOf(user.phone) }
+    var height by remember { mutableStateOf(user.height?.toString() ?: "") }
+    var weight by remember { mutableStateOf(user.weight?.toString() ?: "") }
+
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = VerdeTN,
+        unfocusedBorderColor = GrisTexto,
+        focusedTextColor = androidx.compose.ui.graphics.Color.White,
+        unfocusedTextColor = androidx.compose.ui.graphics.Color.White,
+        cursorColor = VerdeTN,
+        focusedLabelColor = VerdeTN,
+        unfocusedLabelColor = GrisTexto
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = GrisFondo,
+        title = { Text("Editar perfil", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = name, onValueChange = { name = it },
+                    label = { Text("Nombre") }, singleLine = true, colors = fieldColors)
+                OutlinedTextField(value = lastName, onValueChange = { lastName = it },
+                    label = { Text("Apellidos") }, singleLine = true, colors = fieldColors)
+                OutlinedTextField(value = phone, onValueChange = { phone = it },
+                    label = { Text("Teléfono") }, singleLine = true, colors = fieldColors)
+                OutlinedTextField(value = height, onValueChange = { height = it },
+                    label = { Text("Altura (cm)") }, singleLine = true, colors = fieldColors)
+                OutlinedTextField(value = weight, onValueChange = { weight = it },
+                    label = { Text("Peso (kg)") }, singleLine = true, colors = fieldColors)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onSave(
+                        user.copy(
+                            name = name.trim(),
+                            lastName = lastName.trim(),
+                            phone = phone.trim(),
+                            height = height.toFloatOrNull(),
+                            weight = weight.toFloatOrNull()
+                        )
+                    )
+                },
+                enabled = name.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = NegroFondo)
+            ) { Text("Guardar", fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = GrisBorde, contentColor = androidx.compose.ui.graphics.Color.White)
+            ) { Text("Cancelar") }
+        }
+    )
+}
+
+/**
+ * Diálogo "Olvidé mi contraseña" en 3 pasos:
+ * 1. Email → envía código (EmailJS vía TrainNow-Usuarios)
+ * 2. Código de 6 dígitos recibido por correo
+ * 3. Nueva contraseña
+ */
+@Composable
+private fun ForgotPasswordDialog(
+    initialEmail: String,
+    onDismiss: () -> Unit
+) {
+    val repository = remember { PasswordResetRepository() }
+    val scope = rememberCoroutineScope()
+
+    var step by remember { mutableIntStateOf(1) }
+    var email by remember { mutableStateOf(initialEmail) }
+    var code by remember { mutableStateOf("") }
+    var newPass by remember { mutableStateOf("") }
+    var confirmPass by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var success by remember { mutableStateOf(false) }
+
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = VerdeTN,
+        unfocusedBorderColor = GrisTexto,
+        focusedTextColor = androidx.compose.ui.graphics.Color.White,
+        unfocusedTextColor = androidx.compose.ui.graphics.Color.White,
+        cursorColor = VerdeTN,
+        focusedLabelColor = VerdeTN,
+        unfocusedLabelColor = GrisTexto,
+        focusedContainerColor = GrisFondo,
+        unfocusedContainerColor = GrisFondo
+    )
+
+    fun run(block: suspend () -> Result<Unit>, onOk: () -> Unit) {
+        loading = true
+        error = null
+        scope.launch {
+            block().fold(
+                onSuccess = {
+                    loading = false
+                    onOk()
+                },
+                onFailure = {
+                    loading = false
+                    error = it.message
+                }
+            )
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!loading) onDismiss() },
+        containerColor = GrisFondo,
+        title = {
+            Text(
+                text = when {
+                    success -> "¡Listo!"
+                    step == 1 -> "Recuperar cuenta"
+                    step == 2 -> "Revisa tu correo"
+                    else -> "Nueva contraseña"
+                },
+                color = VerdeTN,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                when {
+                    success -> {
+                        Text(
+                            "Tu contraseña fue actualizada. Ya puedes iniciar sesión.",
+                            color = androidx.compose.ui.graphics.Color.White
+                        )
+                    }
+                    step == 1 -> {
+                        Text(
+                            "Te enviaremos un código de 6 dígitos a tu correo.",
+                            color = GrisTexto, fontSize = 13.sp
+                        )
+                        OutlinedTextField(
+                            value = email, onValueChange = { email = it },
+                            label = { Text("Email") }, singleLine = true,
+                            colors = fieldColors, modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    step == 2 -> {
+                        Text(
+                            "Ingresa el código enviado a $email (expira en 10 minutos).",
+                            color = GrisTexto, fontSize = 13.sp
+                        )
+                        OutlinedTextField(
+                            value = code,
+                            onValueChange = { if (it.length <= 6) code = it.filter { c -> c.isDigit() } },
+                            label = { Text("Código de 6 dígitos") }, singleLine = true,
+                            colors = fieldColors, modifier = Modifier.fillMaxWidth()
+                        )
+                        TextButton(onClick = {
+                            run({ repository.requestCode(email) }) { error = null }
+                        }, enabled = !loading) {
+                            Text("Reenviar código", color = VerdeTN, fontSize = 12.sp)
+                        }
+                    }
+                    else -> {
+                        OutlinedTextField(
+                            value = newPass, onValueChange = { newPass = it },
+                            label = { Text("Nueva contraseña") }, singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            colors = fieldColors, modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = confirmPass, onValueChange = { confirmPass = it },
+                            label = { Text("Confirmar contraseña") }, singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            colors = fieldColors, modifier = Modifier.fillMaxWidth()
+                        )
+                        if (confirmPass.isNotEmpty() && newPass != confirmPass) {
+                            Text("Las contraseñas no coinciden",
+                                color = androidx.compose.ui.graphics.Color(0xFFE53935), fontSize = 12.sp)
+                        }
+                    }
+                }
+                if (error != null) {
+                    Text(error!!, color = androidx.compose.ui.graphics.Color(0xFFE53935), fontSize = 13.sp)
+                }
+                if (loading) {
+                    CircularProgressIndicator(color = VerdeTN, modifier = Modifier.size(24.dp))
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    when {
+                        success -> onDismiss()
+                        step == 1 -> run({ repository.requestCode(email) }) { step = 2 }
+                        step == 2 -> run({ repository.verifyCode(email, code) }) { step = 3 }
+                        else -> run({ repository.confirmReset(email, code, newPass) }) { success = true }
+                    }
+                },
+                enabled = !loading && when {
+                    success -> true
+                    step == 1 -> email.contains("@")
+                    step == 2 -> code.length == 6
+                    else -> newPass.length >= 6 && newPass == confirmPass
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = NegroFondo)
+            ) {
+                Text(
+                    when {
+                        success -> "ENTENDIDO"
+                        step == 1 -> "ENVIAR CÓDIGO"
+                        step == 2 -> "VERIFICAR"
+                        else -> "CAMBIAR CONTRASEÑA"
+                    },
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        dismissButton = {
+            if (!success) {
+                Button(
+                    onClick = onDismiss,
+                    enabled = !loading,
+                    colors = ButtonDefaults.buttonColors(containerColor = GrisBorde, contentColor = androidx.compose.ui.graphics.Color.White)
+                ) { Text("Cancelar") }
+            }
+        }
+    )
 }

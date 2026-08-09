@@ -144,6 +144,7 @@ class AuthViewModel(
      * Cierra la sesión del usuario actual.
      */
     fun logout() {
+        com.shagox.apptrainingnow.data.remote.RemoteModule.authToken = null
         _login.update { 
             LoginUiState() // Reset completo del estado
         }
@@ -272,6 +273,16 @@ class AuthViewModel(
             val trimmedEmail = s.email.trim()
             val trimmedPhone = s.phone.trim()
             val trimmedPass = s.pass.trim()
+
+            if (trimmedEmail.lowercase().endsWith("@trainingnow.com")) {
+                _register.update {
+                    it.copy(
+                        isSubmitting = false,
+                        errorMsg = "El dominio @trainingnow.com es exclusivo del personal. Usa tu correo personal."
+                    )
+                }
+                return@launch
+            }
 
             val role = repository.determineRoleByEmail(trimmedEmail)
 

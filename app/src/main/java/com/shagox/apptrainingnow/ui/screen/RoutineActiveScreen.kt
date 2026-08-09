@@ -23,6 +23,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.flowOf
+import com.shagox.apptrainingnow.data.repository.IExerciseRepository
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
@@ -65,6 +69,9 @@ import com.shagox.apptrainingnow.data.domain.RoutineWithDays
 import com.shagox.apptrainingnow.data.local.exercise.ExerciseEntity
 import com.shagox.apptrainingnow.data.repository.RoutineRepository
 import com.shagox.apptrainingnow.ui.components.ScreenHeaderTN
+import com.shagox.apptrainingnow.ui.theme.GrisBorde
+import com.shagox.apptrainingnow.ui.theme.GrisFondo
+import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
 import com.shagox.apptrainingnow.utils.ReminderHelper
@@ -95,6 +102,7 @@ private fun indiceDiaHoy(): Int {
 @Composable
 fun RoutineActiveScreen(
     routineRepository: RoutineRepository,
+    exerciseRepository: IExerciseRepository? = null,
     userId: Int,
     routineId: Int,
     initialRoutineName: String,
@@ -108,6 +116,10 @@ fun RoutineActiveScreen(
     val todayDayName = nombreDiaHoy()
     val todayDayIndex = indiceDiaHoy()
     var selectedDayRoutineId by remember(routineId) { mutableStateOf<Int?>(null) }
+    var showAddExerciseDialog by remember { mutableStateOf(false) }
+    val addExerciseScope = rememberCoroutineScope()
+    val allExercisesForPicker by (exerciseRepository?.getAllExercises() ?: flowOf(emptyList()))
+        .collectAsState(initial = emptyList())
 
     LaunchedEffect(days, todayDayName, todayDayIndex) {
         if (days.isEmpty()) return@LaunchedEffect
@@ -364,12 +376,62 @@ fun RoutineActiveScreen(
                                 checkedExerciseIds = if (checked) checkedExerciseIds + id
                                 else checkedExerciseIds - id
                             },
-                            onAddClick = { /* TODO */ }
+                            onAddClick = { showAddExerciseDialog = true }
                         )
                     }
                 } ?: ExerciseListPlaceholder()
             }
         }
+    }
+
+    if (showAddExerciseDialog) {
+        val currentDay = selectedDay
+        val existingIds = currentDay?.exercises?.map { it.id }?.toSet() ?: emptySet()
+        val available = allExercisesForPicker.filter { it.id !in existingIds }
+        AlertDialog(
+            onDismissRequest = { showAddExerciseDialog = false },
+            containerColor = GrisFondo,
+            title = { Text("Agregar ejercicio", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                if (available.isEmpty()) {
+                    Text("No hay más ejercicios disponibles.", color = GrisTexto)
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .heightIn(max = 400.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        available.forEach { exercise ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        currentDay?.let { day ->
+                                            addExerciseScope.launch {
+                                                routineRepository.addExerciseToDay(day.routineId, exercise.id)
+                                            }
+                                        }
+                                        showAddExerciseDialog = false
+                                    }
+                                    .padding(vertical = 10.dp, horizontal = 4.dp)
+                            ) {
+                                Column {
+                                    Text(exercise.name, color = Color.White, fontSize = 15.sp)
+                                    Text(exercise.category, color = GrisTexto, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                Button(
+                    onClick = { showAddExerciseDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = GrisBorde, contentColor = Color.White)
+                ) { Text("Cerrar") }
+            }
+        )
     }
 
     if (showExitDialog) {

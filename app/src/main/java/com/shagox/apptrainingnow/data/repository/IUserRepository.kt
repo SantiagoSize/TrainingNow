@@ -14,6 +14,12 @@ interface IUserRepository {
     suspend fun getUserIdsByRole(role: String): List<Int>
     suspend fun login(email: String, passwordInput: String): Result<UserEntity>
     suspend fun insertUser(user: UserEntity)
+
+    /** Creación por administrador (roles ADMIN/TRAINER). Por defecto delega en insertUser (modo local). */
+    suspend fun insertUserByAdmin(adminId: Int, user: UserEntity) = insertUser(user)
+
+    /** Info completa (DTO) de los usuarios normales, para la vista del entrenador. */
+    suspend fun getAllClientsInfo(): List<com.shagox.apptrainingnow.data.remote.dto.UserDto> = emptyList()
     suspend fun updateUser(user: UserEntity)
     fun determineRoleByEmail(email: String): String
     suspend fun searchTrainers(query: String): List<UserEntity>

@@ -8,6 +8,10 @@ import com.shagox.apptrainingnow.data.local.exercise.ExerciseEntity
 import com.shagox.apptrainingnow.data.local.exercise.ExerciseDao
 import com.shagox.apptrainingnow.data.local.routine.RoutineDao
 import com.shagox.apptrainingnow.data.local.routine.RoutineEntity
+import com.shagox.apptrainingnow.data.remote.RemoteModule
+import com.shagox.apptrainingnow.data.remote.dto.NotificationDto
+import com.shagox.apptrainingnow.data.remote.dto.RoutineDto
+import com.shagox.apptrainingnow.data.remote.dto.RoutineExerciseDto
 import com.shagox.apptrainingnow.data.local.routine.RoutineExerciseEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -263,6 +267,129 @@ class RoutineRepository(
                 routineDao.insertRoutineExercises(crossRefs)
             }
         }
+        // Enviar al backend (TrainNow-Rutinas) y notificar al cliente (TrainNow-Comunicaciones).
+        // Best-effort: si no hay conexión, la rutina queda local y se puede reintentar.
+        try {
+            pushRoutineDaysToBackend(trainerId, clientId, routineName, days, now)
+            RemoteModule.notificationApi().createNotification(
+                NotificationDto(
+                    userId = clientId,
+                    title = "Nueva rutina asignada",
+                    message = "Tu entrenador te asignó la rutina \"$routineName\". ¡A entrenar!",
+                    type = "ROUTINE",
+                    priority = "HIGH",
+                    senderId = trainerId
+                )
+            )
+        } catch (_: Exception) {
+            // Sin conexión con los microservicios: la rutina queda guardada localmente.
+        }
+
         return firstRoutineId
+    }
+
+    /** Publica cada día de la rutina en TrainNow-Rutinas, resolviendo ejercicios por nombre. */
+    private suspend fun pushRoutineDaysToBackend(
+        trainerId: Int,
+        clientId: Int,
+        routineName: String,
+        days: List<DayRoutineInput>,
+        creationDate: Long
+    ) {
+        val routineApi = RemoteModule.routineApi()
+        val exerciseApi = RemoteModule.exerciseApi()
+        // Catálogo backend por nombre (crea los que falten)
+        val backendByName = exerciseApi.getExercises().associateBy { it.name.lowercase() }.toMutableMap()
+
+        for (day in days) {
+            val dayInfo = if (day.activityName.isNotBlank()) "${day.dayLabel} - ${day.activityName}" else day.dayLabel
+            val created = routineApi.createRoutine(
+                RoutineDto(
+                    ownerId = clientId,
+                    creatorId = trainerId,
+                    name = routineName,
+                    dayInfo = dayInfo,
+                    creationDate = creationDate,
+                    scheduledTime = creationDate
+                )
+            ).body() ?: continue
+
+            val names = day.exerciseNames.map { it.trim() }.filter { it.isNotBlank() }.take(MAX_EXERCISES_PER_DAY)
+            val refs = mutableListOf<RoutineExerciseDto>()
+            names.forEachIndexed { index, name ->
+                val backendExercise = backendByName[name.lowercase()] ?: run {
+                    val nuevo = exerciseApi.createExercise(
+                        com.shagox.apptrainingnow.data.remote.dto.ExerciseDto(
+                            name = name, category = "Personalizado", isSystemDefault = false
+                        )
+                    ).body()
+                    if (nuevo != null) backendByName[name.lowercase()] = nuevo
+                    nuevo
+                }
+                if (backendExercise != null) {
+                    refs.add(RoutineExerciseDto(routineId = created.id, exerciseId = backendExercise.id, order = index + 1))
+                }
+            }
+            if (refs.isNotEmpty()) {
+                routineApi.setRoutineExercises(created.id, refs)
+            }
+        }
+    }
+
+    /**
+     * Sincroniza las rutinas asignadas al usuario desde el backend hacia Room.
+     * Identidad: (name + dayInfo + creationDate). Best-effort, tolerante a estar offline.
+     */
+    suspend fun syncRoutinesFromBackend(userId: Int) {
+        try {
+            val routineApi = RemoteModule.routineApi()
+            val exerciseApi = RemoteModule.exerciseApi()
+            val remote = routineApi.getRoutinesByOwner(userId)
+            if (remote.isEmpty()) return
+
+            val locales = routineDao.getRoutinesByOwnerOnce(userId)
+            val existentes = locales.map { Triple(it.name, it.dayInfo, it.creationDate) }.toHashSet()
+            val backendCatalog = exerciseApi.getExercises().associateBy { it.id }
+
+            for (r in remote) {
+                val key = Triple(r.name, r.dayInfo, r.creationDate)
+                if (key in existentes) continue
+
+                val localId = routineDao.insertRoutine(
+                    RoutineEntity(
+                        ownerId = r.ownerId,
+                        creatorId = r.creatorId,
+                        name = r.name,
+                        dayInfo = r.dayInfo,
+                        creationDate = r.creationDate ?: System.currentTimeMillis(),
+                        scheduledTime = r.scheduledTime ?: System.currentTimeMillis()
+                    )
+                ).toInt()
+
+                val refs = routineApi.getRoutineExercises(r.id)
+                val crossRefs = mutableListOf<RoutineExerciseEntity>()
+                refs.forEach { ref ->
+                    val nombre = backendCatalog[ref.exerciseId]?.name ?: return@forEach
+                    val local = exerciseDao.getExerciseByName(nombre) ?: run {
+                        val idNuevo = exerciseDao.insertExercise(
+                            ExerciseEntity(
+                                name = nombre,
+                                category = backendCatalog[ref.exerciseId]?.category ?: "Personalizado",
+                                description = backendCatalog[ref.exerciseId]?.description ?: "",
+                                videoUrl = backendCatalog[ref.exerciseId]?.videoUrl ?: "",
+                                isSystemDefault = false
+                            )
+                        ).toInt()
+                        exerciseDao.getExerciseByName(nombre) ?: ExerciseEntity(id = idNuevo, name = nombre, category = "Personalizado", description = "", videoUrl = "", isSystemDefault = false)
+                    }
+                    crossRefs.add(RoutineExerciseEntity(routineId = localId, exerciseId = local.id, order = ref.order))
+                }
+                if (crossRefs.isNotEmpty()) {
+                    routineDao.insertRoutineExercises(crossRefs)
+                }
+            }
+        } catch (_: Exception) {
+            // Offline o backend caído: se reintenta la próxima vez que se abra la pantalla.
+        }
     }
 }
