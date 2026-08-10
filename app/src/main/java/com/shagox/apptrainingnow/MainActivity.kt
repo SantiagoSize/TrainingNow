@@ -45,7 +45,8 @@ class MainActivity : ComponentActivity() {
                     trainerRepository = app.trainerRepository,
                     progressRepository = app.progressRepository,
                     notificationRepository = app.notificationRepository,
-                    exerciseRepository = app.exerciseRepository
+                    exerciseRepository = app.exerciseRepository,
+                    workoutRepository = app.workoutRepository
                 )
             }
         }

@@ -88,6 +88,8 @@ dependencies {
 
     //cargar imagenes (para mostrarlas en la UI)
     implementation("io.coil-kt:coil-compose:2.7.0")
+    // Lectura de orientación EXIF para comprimir imágenes correctamente
+    implementation("androidx.exifinterface:exifinterface:1.4.1")
 
     //Data Store Preferencia
     implementation("androidx.datastore:datastore-preferences:1.2.0")

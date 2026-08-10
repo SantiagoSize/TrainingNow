@@ -46,6 +46,9 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
     /** Crear categoría de ejercicios (admin) */
     data object AdminCreateCategory : Route("admin_create_category", "Nueva Categoría", Icons.AutoMirrored.Filled.Label)
 
+    /** Gestión de ejercicios de la biblioteca (admin) */
+    data object AdminExercises : Route("admin_exercises", "Biblioteca", Icons.Filled.FitnessCenter)
+
     /** Enviar notificación segmentada (admin) */
     data object AdminSendNotification : Route("admin_send_notification", "Enviar Notificación", Icons.Filled.Notifications)
 
@@ -93,6 +96,9 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
     /** Notificaciones */
     data object Notifications : Route("notifications", "Alertas", Icons.Filled.Notifications)
     
+    /** Reporte mensual de entrenamiento */
+    data object MonthlyReport : Route("monthly_report", "Mi avance", Icons.Filled.DateRange)
+
     /** Perfil de usuario */
     data object Profile : Route("profile", "Perfil", Icons.Filled.Person)
 
@@ -171,6 +177,55 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
          * Se construye una lista nueva en cada llamada para evitar referencias
          * nulas por inicialización diferida del companion object.
          */
+/**
+         * Devuelve, para una ruta cualquiera, las secciones de la barra a las que
+         * pertenece, en orden de preferencia. La barra marca la primera que exista
+         * en el rol actual, de modo que las subpantallas nunca "saltan" de sección.
+         *
+         * Ejemplo: estando en "library_category/Pectorales" la barra sigue marcando
+         * Biblioteca; en "client_detail/3" sigue marcando Clientes.
+         */
+        fun seccionesCandidatas(ruta: String?): List<String> {
+            if (ruta.isNullOrBlank()) return emptyList()
+            return when {
+                // ===== Biblioteca =====
+                ruta.startsWith("library_category") ||
+                        ruta.startsWith("exercise_detail") -> listOf(Library.path, AdminPanel.path)
+
+                // ===== Rutinas (usuario o entrenador) =====
+                ruta.startsWith("routine_active") ||
+                        ruta.startsWith("create_routine") ->
+                    listOf(UserRoutines.path, CoachRoutines.path, AdminPanel.path)
+
+                // ===== Chats =====
+                ruta.startsWith("chat_detail") ->
+                    listOf(UserChats.path, CoachChats.path, AdminChats.path)
+
+                // ===== Clientes del entrenador =====
+                ruta.startsWith("client_detail") ||
+                        ruta.startsWith("create_goal") ||
+                        ruta == CoachUsers.path -> listOf(CoachClients.path)
+
+                // ===== Panel de administración =====
+                ruta == AdminCreateCategory.path ||
+                        ruta == AdminExercises.path ||
+                        ruta == AdminSendNotification.path -> listOf(AdminPanel.path)
+
+                // ===== Gestión de usuarios (admin) =====
+                ruta == AdminUserList.path ||
+                        ruta == AdminCreateUser.path ||
+                        ruta == AdminSanctions.path -> listOf(AdminUserManagement.path)
+
+                // ===== Perfil =====
+                ruta == MonthlyReport.path ||
+                        ruta == Login.path ||
+                        ruta == Register.path ||
+                        ruta == Home.path -> listOf(Profile.path)
+
+                else -> emptyList()
+            }
+        }
+
         fun getBottomNavRoutes(role: String): List<Route> {
             return when (role.uppercase()) {
                 "ADMIN" -> listOf(

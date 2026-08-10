@@ -5,6 +5,7 @@ import com.shagox.apptrainingnow.data.remote.RemoteModule
 import com.shagox.apptrainingnow.data.remote.NotificationApi
 import com.shagox.apptrainingnow.data.remote.dto.NotificationDto
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import retrofit2.HttpException
 
@@ -19,7 +20,7 @@ class NotificationApiRepository(
 
     override fun getUserNotifications(userId: Int): Flow<List<NotificationEntity>> = flow {
         emit(api.getNotificationsByUser(userId).map { it.toEntity() })
-    }
+    }.catch { emit(emptyList()) }
 
     private fun NotificationDto.toEntity(): NotificationEntity = NotificationEntity(
         id = id,

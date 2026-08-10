@@ -5,6 +5,7 @@ import com.shagox.apptrainingnow.data.remote.RemoteModule
 import com.shagox.apptrainingnow.data.remote.UserApi
 import com.shagox.apptrainingnow.data.remote.dto.UserDto
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import retrofit2.HttpException
 
@@ -22,7 +23,7 @@ class UserApiRepository(
     override fun getAllUsers(): Flow<List<UserEntity>> = flow {
         val list = api.getUsers().map { it.toEntity() }
         emit(list)
-    }
+    }.catch { emit(emptyList()) }
 
     /** IDs de todos los usuarios. */
     override suspend fun getAllUserIds(): List<Int> = api.getUsers().map { it.id }
@@ -100,7 +101,7 @@ class UserApiRepository(
     /** Flujo de todos los entrenadores. */
     override fun getAllTrainers(): Flow<List<UserEntity>> = flow {
         emit(api.getTrainers().map { it.toEntity() })
-    }
+    }.catch { emit(emptyList()) }
 
     override suspend fun getUserById(userId: Int): UserEntity? = try {
         api.getUserById(userId).toEntity()
@@ -164,7 +165,7 @@ class UserApiRepository(
     /** Extrae "error" del cuerpo JSON {"error": "..."}. */
     private fun extractErrorMessage(body: String?): String? {
         if (body == null) return null
-        return Regex("\"error\"\s*:\s*\"([^\"]+)\"").find(body)?.groupValues?.get(1)
+        return Regex("\"error\"\\s*:\\s*\"([^\"]+)\"").find(body)?.groupValues?.get(1)
     }
 
     private fun translateException(e: Exception): Exception = when (e) {

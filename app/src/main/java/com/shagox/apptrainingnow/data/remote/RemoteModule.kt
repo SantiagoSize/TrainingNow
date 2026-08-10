@@ -69,6 +69,7 @@ object RemoteModule {
     fun exerciseApi(): ExerciseApi = exerciseRetrofit.create(ExerciseApi::class.java)
     fun routineApi(): RoutineApi = routineRetrofit.create(RoutineApi::class.java)
     fun workoutApi(): WorkoutApi = workoutRetrofit.create(WorkoutApi::class.java)
+    fun attendanceApi(): AttendanceApi = routineRetrofit.create(AttendanceApi::class.java)
     fun notificationApi(): NotificationApi = notificationRetrofit.create(NotificationApi::class.java)
     fun chatApi(): ChatApi = notificationRetrofit.create(ChatApi::class.java)
 

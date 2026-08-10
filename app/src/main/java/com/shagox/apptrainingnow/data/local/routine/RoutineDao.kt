@@ -92,6 +92,10 @@ interface RoutineDao {
     @Query("SELECT * FROM routines WHERE ownerId = :userId")
     suspend fun getRoutinesByOwnerOnce(userId: Int): List<RoutineEntity>
 
+    /** Rutinas públicas (consulta puntual, para sincronización con el backend). */
+    @Query("SELECT * FROM routines WHERE ownerId IS NULL")
+    suspend fun getGlobalRoutinesOnce(): List<RoutineEntity>
+
     /**
      * Obtiene solo las rutinas globales (públicas).
      */

@@ -344,10 +344,13 @@ class RoutineRepository(
         try {
             val routineApi = RemoteModule.routineApi()
             val exerciseApi = RemoteModule.exerciseApi()
-            val remote = routineApi.getRoutinesByOwner(userId)
+            // Rutinas asignadas al usuario + rutinas públicas (recomendadas)
+            val asignadas = if (userId > 0) routineApi.getRoutinesByOwner(userId) else emptyList()
+            val publicas = routineApi.getPublicRoutines()
+            val remote = asignadas + publicas
             if (remote.isEmpty()) return
 
-            val locales = routineDao.getRoutinesByOwnerOnce(userId)
+            val locales = routineDao.getRoutinesByOwnerOnce(userId) + routineDao.getGlobalRoutinesOnce()
             val existentes = locales.map { Triple(it.name, it.dayInfo, it.creationDate) }.toHashSet()
             val backendCatalog = exerciseApi.getExercises().associateBy { it.id }
 
@@ -360,7 +363,7 @@ class RoutineRepository(
                         ownerId = r.ownerId,
                         creatorId = r.creatorId,
                         name = r.name,
-                        dayInfo = r.dayInfo,
+                        dayInfo = r.dayInfo ?: "",
                         creationDate = r.creationDate ?: System.currentTimeMillis(),
                         scheduledTime = r.scheduledTime ?: System.currentTimeMillis()
                     )

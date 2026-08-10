@@ -47,7 +47,7 @@ import kotlinx.coroutines.launch
  * - Sesiones de entrenamiento con registro detallado
  * - Relaciones entrenador-cliente
  * 
- * @version 5 - Usuarios: suspendedUntil, suspendReason, isBanned, banReason (sanciones admin)
+ * @version 7 - Ejercicios: instrucciones, consejos, errores comunes y volumen recomendado
  */
 @Database(
     entities = [
@@ -75,7 +75,7 @@ import kotlinx.coroutines.launch
         GoalEntity::class,
         PersonalRecordEntity::class
     ],
-    version = 5,
+    version = 7,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -122,6 +122,24 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Garantiza que existan los datos base (ejercicios y rutinas recomendadas).
+         * Es idempotente: cada prepopulate se salta si su tabla ya tiene registros.
+         * Se llama en cada arranque, de modo que también repuebla si la base quedó
+         * vacía tras una migración destructiva.
+         */
+        fun asegurarDatosBase(database: AppDatabase) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    prepopulateExercises(database.exerciseDao())
+                    prepopulateRoutines(database.routineDao())
+                    android.util.Log.d(TAG, "Datos base verificados")
+                } catch (e: Exception) {
+                    android.util.Log.e(TAG, "Error asegurando datos base", e)
+                }
+            }
+        }
+
         private fun buildDatabase(context: Context): AppDatabase {
             return Room.databaseBuilder(
                 context.applicationContext,
@@ -140,6 +158,19 @@ abstract class AppDatabase : RoomDatabase() {
         private class DatabaseCallback : Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
+                poblarDatosIniciales()
+            }
+
+            /**
+             * Al subir de versión con migración destructiva la BD se recrea vacía:
+             * hay que volver a poblar los datos base (rutinas públicas, ejercicios, etc.).
+             */
+            override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
+                super.onDestructiveMigration(db)
+                poblarDatosIniciales()
+            }
+
+            private fun poblarDatosIniciales() {
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
                         kotlinx.coroutines.delay(200)

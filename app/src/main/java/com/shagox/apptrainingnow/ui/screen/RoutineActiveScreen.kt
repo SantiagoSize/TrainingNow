@@ -18,9 +18,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.window.Popup
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.rememberCoroutineScope
@@ -29,7 +31,6 @@ import kotlinx.coroutines.flow.flowOf
 import com.shagox.apptrainingnow.data.repository.IExerciseRepository
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AlertDialog
@@ -103,6 +104,7 @@ private fun indiceDiaHoy(): Int {
 fun RoutineActiveScreen(
     routineRepository: RoutineRepository,
     exerciseRepository: IExerciseRepository? = null,
+    workoutRepository: com.shagox.apptrainingnow.data.repository.WorkoutRepository? = null,
     userId: Int,
     routineId: Int,
     initialRoutineName: String,
@@ -111,12 +113,36 @@ fun RoutineActiveScreen(
     val context = LocalContext.current
     var showExitDialog by remember { mutableStateOf(false) }
     var notificationsEnabled by remember { mutableStateOf(ReminderHelper.isEnabled(context)) }
+    // Aviso flotante breve al activar/desactivar recordatorios
+    var avisoTexto by remember { mutableStateOf<String?>(null) }
+    var avisoActivado by remember { mutableStateOf(true) }
     val routineWithDays by routineRepository.getRoutineWithDays(routineId, userId).collectAsState(initial = null)
     val days = routineWithDays?.days ?: emptyList()
-    val todayDayName = nombreDiaHoy()
-    val todayDayIndex = indiceDiaHoy()
+    // Día actual del sistema; se refresca solo cuando cambia la fecha del teléfono
+    var todayDayIndex by remember { mutableStateOf(indiceDiaHoy()) }
+    var todayDayName by remember { mutableStateOf(nombreDiaHoy()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            val nuevoIndice = indiceDiaHoy()
+            if (nuevoIndice != todayDayIndex) {
+                todayDayIndex = nuevoIndice
+                todayDayName = nombreDiaHoy()
+            }
+            kotlinx.coroutines.delay(60_000L) // comprueba cada minuto
+        }
+    }
     var selectedDayRoutineId by remember(routineId) { mutableStateOf<Int?>(null) }
     var showAddExerciseDialog by remember { mutableStateOf(false) }
+
+    // Progreso semanal persistido en caché (SharedPreferences), se reinicia cada semana
+    val weekProgress = remember(routineId, userId) { WeekProgressStore(context, userId, routineId) }
+    var completedDays by remember(routineId, userId) { mutableStateOf(weekProgress.load()) }
+    // Sesiones COMPLETED del backend/Room de esta semana (fuente adicional de verdad)
+    val weekStart = remember(todayDayIndex) { startOfWeekMillis() }
+    val weekSessions by (workoutRepository
+        ?.getWorkoutsInDateRange(userId, weekStart, weekStart + 7L * 24 * 60 * 60 * 1000)
+        ?: kotlinx.coroutines.flow.flowOf(emptyList()))
+        .collectAsState(initial = emptyList())
     val addExerciseScope = rememberCoroutineScope()
     val allExercisesForPicker by (exerciseRepository?.getAllExercises() ?: flowOf(emptyList()))
         .collectAsState(initial = emptyList())
@@ -144,13 +170,43 @@ fun RoutineActiveScreen(
     }
 
     var showNotificationTimeDialog by remember { mutableStateOf(false) }
-    var showCalendarDialog by remember { mutableStateOf(false) }
     var notificationHour by remember { mutableStateOf(ReminderHelper.getHour(context)) }
     var notificationMinute by remember { mutableStateOf(ReminderHelper.getMinute(context)) }
     var checkedExerciseIds by remember(selectedDayRoutineId) { mutableStateOf(setOf<Int>()) }
     val allExercisesChecked = selectedDay?.exercises?.isNotEmpty() == true &&
             selectedDay.exercises.all { it.id in checkedExerciseIds }
-    val seguimientoStatus = if (allExercisesChecked) "Terminado" else "Pendiente"
+
+    // Guardar en caché el día como completado y registrar la asistencia en el backend
+    val attendanceRepository = remember { com.shagox.apptrainingnow.data.repository.AttendanceRepository() }
+    val selectedIndexForProgress = days.indexOfFirst { it.routineId == selectedDayRoutineId }
+    val ejerciciosDelDia = selectedDay?.exercises?.size ?: 0
+    androidx.compose.runtime.LaunchedEffect(allExercisesChecked, selectedIndexForProgress) {
+        if (selectedIndexForProgress >= 0) {
+            val nuevo = if (allExercisesChecked) completedDays + selectedIndexForProgress
+                        else completedDays - selectedIndexForProgress
+            if (nuevo != completedDays) {
+                completedDays = nuevo
+                weekProgress.save(nuevo)
+            }
+            // Registrar asistencia del día en TrainNow-Rutinas (alimenta el reporte mensual)
+            if (allExercisesChecked && userId > 0) {
+                attendanceRepository.registerTrainedToday(
+                    userId = userId,
+                    routineId = selectedDayRoutineId,
+                    exercisesCompleted = ejerciciosDelDia
+                )
+            }
+        }
+    }
+    // Estado del seguimiento del día seleccionado, con el mismo criterio de colores de la franja
+    val indiceSeleccionado = days.indexOfFirst { it.routineId == selectedDayRoutineId }
+    val estadoDelDia: DayStatus = computeDayStates(days, completedDays, weekSessions, weekStart, todayDayIndex)
+        .getOrElse(indiceSeleccionado.coerceAtLeast(0)) { DayStatus.DESCANSO }
+    val seguimientoStatus = when {
+        allExercisesChecked -> DayStatus.COMPLETADO.label
+        else -> estadoDelDia.label
+    }
+    val seguimientoColor = if (allExercisesChecked) DayStatus.COMPLETADO.color else estadoDelDia.color
 
     Box(
         modifier = Modifier
@@ -221,7 +277,17 @@ fun RoutineActiveScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 2) Contenedor con borde verde: Calendario | Notificaciones (arriba) + línea verde + Seguimiento + botón amarillo (abajo)
+                // Franja semanal: estado de cada día (completado / pendiente / descanso)
+                WeekStrip(
+                    dayStates = computeDayStates(days, completedDays, weekSessions, weekStart, todayDayIndex),
+                    selectedIndex = days.indexOfFirst { it.routineId == selectedDayRoutineId },
+                    onDayClick = { index ->
+                        days.getOrNull(index)?.let { selectedDayRoutineId = it.routineId }
+                    }
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // 2) Contenedor con borde verde: Notificaciones (arriba) + línea verde + Seguimiento (abajo)
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -236,30 +302,6 @@ fun RoutineActiveScreen(
                                 .height(72.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(72.dp)
-                                    .clickable { showCalendarDialog = true },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(
-                                        imageVector = Icons.Filled.CalendarToday,
-                                        contentDescription = "Calendario",
-                                        tint = VerdeTN,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text("Calendario", color = VerdeTN, fontSize = 14.sp)
-                                }
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .width(1.dp)
-                                    .height(48.dp)
-                                    .background(VerdeTN)
-                            )
                             val viewConfig = LocalViewConfiguration.current
                             CompositionLocalProvider(
                                 LocalViewConfiguration provides object : ViewConfiguration {
@@ -285,8 +327,12 @@ fun RoutineActiveScreen(
                                                     if (notificationsEnabled) {
                                                         ReminderHelper.saveUserId(context, userId)
                                                         ReminderHelper.schedule(context, userId)
+                                                        avisoActivado = true
+                                                        avisoTexto = "Recordatorios activados"
                                                     } else {
                                                         ReminderHelper.cancel(context)
+                                                        avisoActivado = false
+                                                        avisoTexto = "Recordatorios desactivados"
                                                     }
                                                 },
                                                 onLongPress = {
@@ -343,15 +389,13 @@ fun RoutineActiveScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxWidth()
-                                    .background(
-                                        VerdeTN
-                                    )
+                                    .background(seguimientoColor)
                                     .padding(vertical = 14.dp, horizontal = 16.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = seguimientoStatus,
-                                    color = NegroFondo,
+                                    color = if (seguimientoColor == DayStatus.NO_ENTRENADO.color) Color.White else NegroFondo,
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -383,6 +427,13 @@ fun RoutineActiveScreen(
             }
         }
     }
+
+    // Aviso flotante: aparece y se desvanece solo
+    AvisoFlotante(
+        texto = avisoTexto,
+        activado = avisoActivado,
+        onOculto = { avisoTexto = null }
+    )
 
     if (showAddExerciseDialog) {
         val currentDay = selectedDay
@@ -461,218 +512,27 @@ fun RoutineActiveScreen(
     }
 
     if (showNotificationTimeDialog) {
-        val hour12 = when (val h = notificationHour.coerceIn(0, 23)) {
-            0 -> 12
-            in 1..12 -> h
-            else -> h - 12
-        }
-        val isPM = notificationHour >= 12
-        val minuteOptions = listOf(0, 15, 30, 45)
-        AlertDialog(
-            onDismissRequest = { showNotificationTimeDialog = false },
-            title = { Text("Hora del recordatorio", color = Color.White) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text("Elige a qué hora recordar tu entrenamiento.", color = Color.Gray, fontSize = 14.sp)
-                    Text("Hora", color = Color.Gray, fontSize = 12.sp)
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(1..4, 5..8, 9..12).forEach { range ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                range.forEach { h ->
-                                    val selected = hour12 == h
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(if (selected) VerdeTN else Color(0xFF2C2C2C))
-                                            .border(1.dp, if (selected) VerdeTN else Color.Gray, RoundedCornerShape(10.dp))
-                                            .clickable {
-                                                notificationHour = if (isPM) {
-                                                    if (h == 12) 12 else h + 12
-                                                } else {
-                                                    if (h == 12) 0 else h
-                                                }
-                                            }
-                                            .padding(vertical = 12.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = h.toString(),
-                                            color = if (selected) Color.Black else Color.White,
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Text("Minutos", color = Color.Gray, fontSize = 12.sp)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        minuteOptions.forEach { m ->
-                            val selected = notificationMinute == m
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(if (selected) VerdeTN else Color(0xFF2C2C2C))
-                                    .border(1.dp, if (selected) VerdeTN else Color.Gray, RoundedCornerShape(12.dp))
-                                    .clickable { notificationMinute = m }
-                                    .padding(vertical = 14.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = m.toString().padStart(2, '0'),
-                                    color = if (selected) Color.Black else Color.White,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    }
-                    Text("AM o PM", color = Color.Gray, fontSize = 12.sp)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (!isPM) VerdeTN else Color(0xFF2C2C2C))
-                                .border(1.dp, if (!isPM) VerdeTN else Color.Gray, RoundedCornerShape(12.dp))
-                                .clickable { notificationHour = if (hour12 == 12) 0 else hour12 }
-                                .padding(vertical = 14.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("AM", color = if (!isPM) Color.Black else Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isPM) VerdeTN else Color(0xFF2C2C2C))
-                                .border(1.dp, if (isPM) VerdeTN else Color.Gray, RoundedCornerShape(12.dp))
-                                .clickable { notificationHour = if (hour12 == 12) 12 else hour12 + 12 }
-                                .padding(vertical = 14.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("PM", color = if (isPM) Color.Black else Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
+        RecordatorioHoraDialog(
+            hora = notificationHour,
+            minuto = notificationMinute,
+            onHoraCambio = { notificationHour = it },
+            onMinutoCambio = { notificationMinute = it },
+            onGuardar = {
+                ReminderHelper.saveTime(context, notificationHour, notificationMinute)
+                if (notificationsEnabled) {
+                    ReminderHelper.saveUserId(context, userId)
+                    ReminderHelper.schedule(context, userId)
                 }
+                showNotificationTimeDialog = false
+                avisoActivado = true
+                avisoTexto = "Recordatorio guardado"
             },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        ReminderHelper.saveTime(context, notificationHour, notificationMinute)
-                        if (notificationsEnabled) {
-                            ReminderHelper.saveUserId(context, userId)
-                            ReminderHelper.schedule(context, userId)
-                        }
-                        showNotificationTimeDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = Color.Black)
-                ) {
-                    Text("Guardar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showNotificationTimeDialog = false }) {
-                    Text("Cancelar", color = VerdeTN)
-                }
-            },
-            containerColor = Color(0xFF1E1E1E),
-            titleContentColor = Color.White,
-            textContentColor = Color.White
+            onCancelar = { showNotificationTimeDialog = false }
         )
     }
 
-    if (showCalendarDialog) {
-        CalendarWeekDialog(
-            days = days,
-            selectedDayRoutineId = selectedDayRoutineId,
-            checkedExerciseIds = checkedExerciseIds,
-            onDismiss = { showCalendarDialog = false }
-        )
-    }
 }
 
-@Composable
-private fun CalendarWeekDialog(
-    days: List<RoutineDayView>,
-    selectedDayRoutineId: Int?,
-    checkedExerciseIds: Set<Int>,
-    onDismiss: () -> Unit
-) {
-    val weekdays = listOf("Lunes", "Martes", "Miércoles", "Jueves", "Viernes")
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Semana de entrenamiento", color = Color.White) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    "Estado por día (Lunes a Viernes):",
-                    color = Color.Gray,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-                weekdays.forEachIndexed { index, dayName ->
-                    val dayView = days.getOrNull(index)
-                    val status = when {
-                        dayView == null -> "Sin entrenamiento"
-                        dayView.routineId == selectedDayRoutineId -> {
-                            val allChecked = dayView.exercises.isNotEmpty() &&
-                                dayView.exercises.all { it.id in checkedExerciseIds }
-                            if (allChecked) "Completado" else "Pendiente"
-                        }
-                        else -> "Pendiente"
-                    }
-                    val (bgColor, textColor) = when (status) {
-                        "Completado" -> VerdeTN to Color.Black
-                        "Pendiente" -> VerdeTN to Color.Black
-                        else -> Color(0xFF555555) to Color.White
-                    }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp)
-                            .background(bgColor, RoundedCornerShape(10.dp))
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = dayName,
-                            color = textColor,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.widthIn(min = 100.dp)
-                        )
-                        Text(
-                            text = status,
-                            color = textColor,
-                            fontSize = 14.sp
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cerrar", color = VerdeTN)
-            }
-        },
-        containerColor = Color(0xFF1E1E1E),
-        titleContentColor = Color.White,
-        textContentColor = Color.White
-    )
-}
 
 @Composable
 private fun TabChipFullBody(
@@ -848,3 +708,422 @@ private fun TabChip(
 // ==================== VISTA PREVIA ====================
 // Nota: El preview completo requiere RoutineRepository inyectado (MainActivity/AppNavGraph).
 // Para previsualizar componentes aislados use Preview de DayChip, TabChip o ExerciseListPlaceholder.
+
+// ==================== PROGRESO SEMANAL ====================
+
+/** Nombres largos de los días, de lunes a domingo. */
+private val DIAS_SEMANA_LARGOS = listOf(
+    "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"
+)
+
+/** Estado de un día en la semana de entrenamiento. */
+enum class DayStatus(val label: String, val color: Color) {
+    /** Entrenó ese día. */
+    COMPLETADO("Completado", VerdeTN),
+    /** Tiene ejercicios asignados y aún está a tiempo (hoy o días siguientes). */
+    PENDIENTE("Pendiente", Color(0xFFFFC107)),
+    /** Día pasado con ejercicios que no se completaron. */
+    NO_ENTRENADO("No entrenado", Color(0xFFE53935)),
+    /** Sin ejercicios asignados. */
+    DESCANSO("Descanso", Color(0xFF9E9E9E))
+}
+
+/** Lunes 00:00 de la semana actual, en epoch millis. */
+private fun startOfWeekMillis(): Long {
+    val cal = java.util.Calendar.getInstance()
+    cal.firstDayOfWeek = java.util.Calendar.MONDAY
+    cal.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.MONDAY)
+    cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+    cal.set(java.util.Calendar.MINUTE, 0)
+    cal.set(java.util.Calendar.SECOND, 0)
+    cal.set(java.util.Calendar.MILLISECOND, 0)
+    if (cal.timeInMillis > System.currentTimeMillis()) {
+        cal.add(java.util.Calendar.DAY_OF_YEAR, -7)
+    }
+    return cal.timeInMillis
+}
+
+/**
+ * Guarda el progreso semanal en caché (SharedPreferences).
+ * La clave incluye el número de semana, por lo que cada semana empieza limpia.
+ */
+class WeekProgressStore(
+    context: android.content.Context,
+    userId: Int,
+    routineId: Int
+) {
+    private val prefs = context.getSharedPreferences("week_progress", android.content.Context.MODE_PRIVATE)
+    private val key: String = run {
+        val cal = java.util.Calendar.getInstance()
+        val semana = cal.get(java.util.Calendar.WEEK_OF_YEAR)
+        val anio = cal.get(java.util.Calendar.YEAR)
+        "u${userId}_r${routineId}_${anio}w$semana"
+    }
+
+    fun load(): Set<Int> = prefs.getStringSet(key, emptySet())
+        ?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
+
+    fun save(days: Set<Int>) {
+        prefs.edit().putStringSet(key, days.map { it.toString() }.toSet()).apply()
+    }
+}
+
+/**
+ * Calcula el estado de los 7 días:
+ * - COMPLETADO: marcado en caché o con sesión COMPLETED registrada esa jornada.
+ * - PENDIENTE: el día tiene ejercicios asignados pero no se completó.
+ * - DESCANSO: no hay ejercicios para ese día.
+ */
+private fun computeDayStates(
+    days: List<RoutineDayView>,
+    completedDays: Set<Int>,
+    weekSessions: List<com.shagox.apptrainingnow.data.local.workout.WorkoutSessionEntity>,
+    weekStart: Long,
+    indiceHoy: Int = indiceDiaHoy()
+): List<DayStatus> {
+    val dayMillis = 24L * 60 * 60 * 1000
+    return (0..6).map { index ->
+        val dayView = days.getOrNull(index)
+        val tieneEjercicios = dayView != null && dayView.exercises.isNotEmpty()
+        val sesionCompletada = weekSessions.any { s ->
+            s.status == "COMPLETED" &&
+                    (s.startTime - weekStart) in (index * dayMillis) until ((index + 1) * dayMillis)
+        }
+        when {
+            index in completedDays || sesionCompletada -> DayStatus.COMPLETADO
+            // Días ya pasados de esta semana con plan sin cumplir
+            tieneEjercicios && index < indiceHoy -> DayStatus.NO_ENTRENADO
+            tieneEjercicios -> DayStatus.PENDIENTE
+            else -> DayStatus.DESCANSO
+        }
+    }
+}
+
+/**
+ * Franja semanal de círculos: verde = completado, amarillo = pendiente, gris = descanso.
+ * Tap = ir a ese día (permite volver a días anteriores y editarlos).
+ * Mantener presionado = muestra un cartel con el estado.
+ */
+@Composable
+private fun WeekStrip(
+    dayStates: List<DayStatus>,
+    selectedIndex: Int,
+    onDayClick: (Int) -> Unit
+) {
+    val iniciales = listOf("L", "M", "X", "J", "V", "S", "D")
+    val hoy = (java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7
+    var tooltipIndex by remember { mutableStateOf<Int?>(null) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            dayStates.forEachIndexed { index, status ->
+                Box(contentAlignment = Alignment.TopCenter) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (status == DayStatus.DESCANSO) Color.Transparent
+                                else status.color
+                            )
+                            .border(
+                                width = if (index == selectedIndex) 3.dp else if (index == hoy) 2.dp else 1.5.dp,
+                                color = when {
+                                    index == selectedIndex -> Color.White
+                                    index == hoy -> Color.White.copy(alpha = 0.6f)
+                                    else -> status.color
+                                },
+                                shape = CircleShape
+                            )
+                            .pointerInput(index) {
+                                detectTapGestures(
+                                    onTap = { onDayClick(index) },
+                                    onLongPress = { tooltipIndex = index },
+                                    onPress = {
+                                        // Al soltar el dedo se oculta el cartel
+                                        tryAwaitRelease()
+                                        tooltipIndex = null
+                                    }
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = iniciales[index],
+                            color = if (status == DayStatus.DESCANSO) GrisTexto else NegroFondo,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Cartel al mantener presionado
+                    if (tooltipIndex == index) {
+                        Popup(
+                            alignment = Alignment.TopCenter,
+                            offset = androidx.compose.ui.unit.IntOffset(0, -110),
+                            onDismissRequest = { tooltipIndex = null }
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF1F1F1F))
+                                    .border(1.5.dp, status.color, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 12.dp, vertical = 7.dp)
+                            ) {
+                                Text(
+                                    text = status.label,
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Mensaje breve que aparece arriba y se desvanece solo (1,4 s).
+ * Verde al activar los recordatorios, gris al desactivarlos.
+ */
+@Composable
+private fun AvisoFlotante(
+    texto: String?,
+    activado: Boolean,
+    onOculto: () -> Unit
+) {
+    var visible by remember(texto) { mutableStateOf(texto != null) }
+
+    LaunchedEffect(texto) {
+        if (texto != null) {
+            visible = true
+            kotlinx.coroutines.delay(1400L)
+            visible = false
+            kotlinx.coroutines.delay(250L)
+            onOculto()
+        }
+    }
+
+    if (texto == null) return
+
+    val color = if (activado) VerdeTN else Color(0xFF9E9E9E)
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        androidx.compose.animation.AnimatedVisibility(
+            visible = visible,
+            enter = androidx.compose.animation.fadeIn(
+                animationSpec = androidx.compose.animation.core.tween(180)
+            ) + androidx.compose.animation.slideInVertically(
+                initialOffsetY = { -it },
+                animationSpec = androidx.compose.animation.core.tween(220)
+            ),
+            exit = androidx.compose.animation.fadeOut(
+                animationSpec = androidx.compose.animation.core.tween(220)
+            ) + androidx.compose.animation.slideOutVertically(
+                targetOffsetY = { -it },
+                animationSpec = androidx.compose.animation.core.tween(220)
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(top = 24.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xFF1F1F1F))
+                    .border(1.5.dp, color, RoundedCornerShape(24.dp))
+                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Notifications,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = texto,
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Selector de la hora del recordatorio de entrenamiento.
+ * Muestra la hora elegida en grande y permite ajustarla con atajos rápidos
+ * o con los controles de hora/minuto.
+ */
+@Composable
+private fun RecordatorioHoraDialog(
+    hora: Int,
+    minuto: Int,
+    onHoraCambio: (Int) -> Unit,
+    onMinutoCambio: (Int) -> Unit,
+    onGuardar: () -> Unit,
+    onCancelar: () -> Unit
+) {
+    val horaValida = hora.coerceIn(0, 23)
+    val hora12 = when (horaValida) {
+        0 -> 12
+        in 1..12 -> horaValida
+        else -> horaValida - 12
+    }
+    val sufijo = if (horaValida >= 12) "PM" else "AM"
+    val descripcion = when (horaValida) {
+        in 5..11 -> "Entrenamiento por la mañana"
+        in 12..17 -> "Entrenamiento por la tarde"
+        in 18..21 -> "Entrenamiento por la noche"
+        else -> "Recordatorio de madrugada"
+    }
+
+    AlertDialog(
+        onDismissRequest = onCancelar,
+        containerColor = Color(0xFF141414),
+        shape = RoundedCornerShape(20.dp),
+        title = {
+            Column {
+                Text(
+                    text = "RECORDATORIO",
+                    color = VerdeTN,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "¿A qué hora entrenas?",
+                    color = Color.White,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+
+                // ===== Hora elegida, en grande, con AM/PM =====
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFF1F1F1F))
+                        .border(1.5.dp, VerdeTN, RoundedCornerShape(16.dp))
+                        .padding(vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "%02d:%02d".format(horaValida, minuto),
+                        color = VerdeTN,
+                        fontSize = 42.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = "%d:%02d %s".format(hora12, minuto, sufijo),
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = descripcion,
+                        color = GrisTexto,
+                        fontSize = 12.sp
+                    )
+                }
+
+                // ===== Ajuste de hora y minutos =====
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    SelectorNumerico(
+                        etiqueta = "Hora",
+                        valor = "%02d".format(horaValida),
+                        onMenos = { onHoraCambio(if (horaValida == 0) 23 else horaValida - 1) },
+                        onMas = { onHoraCambio(if (horaValida == 23) 0 else horaValida + 1) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    SelectorNumerico(
+                        etiqueta = "Minutos",
+                        valor = "%02d".format(minuto),
+                        onMenos = { onMinutoCambio(if (minuto == 0) 45 else minuto - 15) },
+                        onMas = { onMinutoCambio(if (minuto >= 45) 0 else minuto + 15) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onGuardar,
+                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = NegroFondo),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("GUARDAR", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancelar) {
+                Text("Cancelar", color = GrisTexto, fontSize = 13.sp)
+            }
+        }
+    )
+}
+
+/** Control - / valor / + usado para ajustar hora y minutos. */
+@Composable
+private fun SelectorNumerico(
+    etiqueta: String,
+    valor: String,
+    onMenos: () -> Unit,
+    onMas: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0xFF1F1F1F))
+            .padding(vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(etiqueta, color = GrisTexto, fontSize = 10.sp)
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            BotonCircular("−", onMenos)
+            Text(
+                text = valor,
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.width(48.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            BotonCircular("+", onMas)
+        }
+    }
+}
+
+@Composable
+private fun BotonCircular(simbolo: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .background(VerdeTN.copy(alpha = 0.18f))
+            .border(1.dp, VerdeTN.copy(alpha = 0.6f), CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(simbolo, color = VerdeTN, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+    }
+}

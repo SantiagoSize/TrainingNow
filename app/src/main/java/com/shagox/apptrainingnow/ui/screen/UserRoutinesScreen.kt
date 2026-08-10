@@ -12,23 +12,30 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -45,74 +52,54 @@ import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
 
-/** Texto con contorno negro (stroke). */
-@Composable
-private fun TextWithOutline(
-    text: String,
-    color: Color,
-    modifier: Modifier = Modifier,
-    fontSize: TextUnit = 14.sp,
-    fontWeight: FontWeight? = null,
-    outlineColor: Color = NegroFondo,
-    outlineWidth: Dp = 1.dp
-) {
-    val offsets = listOf(
-        outlineWidth to 0.dp,
-        (-outlineWidth) to 0.dp,
-        0.dp to outlineWidth,
-        0.dp to (-outlineWidth),
-        outlineWidth to outlineWidth,
-        outlineWidth to (-outlineWidth),
-        (-outlineWidth) to outlineWidth,
-        (-outlineWidth) to (-outlineWidth)
-    )
-    Box(modifier = modifier) {
-        offsets.forEach { (x, y) ->
-            Text(
-                text = text,
-                color = outlineColor,
-                fontSize = fontSize,
-                fontWeight = fontWeight ?: FontWeight.Normal,
-                modifier = Modifier.offset(x, y)
-            )
-        }
-        Text(
-            text = text,
-            color = color,
-            fontSize = fontSize,
-            fontWeight = fontWeight ?: FontWeight.Normal
-        )
-    }
-}
 
 /**
  * Pantalla Mis Rutinas: mismo diseño que Biblioteca y resto de la app.
  * Crear RUTINA, RUTINAS RECOMENDADAS (lista vertical, tarjetas mismo tamaño), MIS RUTINAS.
  */
+private val RojoAviso = Color(0xFFE53935)
+
 @Composable
 fun UserRoutinesScreen(
     routineRepository: RoutineRepository,
     userId: Int,
+    isLoggedIn: Boolean = userId > 0,
+    avisoYaMostrado: Boolean = false,
+    onAvisoMostrado: () -> Unit = {},
+    onCrearCuenta: () -> Unit = {},
     onCreateRoutine: () -> Unit,
     onRoutineClick: (routineId: Int) -> Unit
 ) {
     val globalRoutines by routineRepository.getGlobalRoutines().collectAsState(initial = emptyList())
     val myRoutines by routineRepository.getUserOwnRoutines(userId).collectAsState(initial = emptyList())
+
+
     UserRoutinesScreenContent(
         globalRoutines = globalRoutines,
         myRoutines = myRoutines,
+        isLoggedIn = isLoggedIn,
+        avisoYaMostrado = avisoYaMostrado,
+        onAvisoMostrado = onAvisoMostrado,
+        onCrearCuenta = onCrearCuenta,
         onCreateRoutine = onCreateRoutine,
         onRoutineClick = onRoutineClick
     )
 }
 
+
 @Composable
 private fun UserRoutinesScreenContent(
     globalRoutines: List<RoutineEntity>,
     myRoutines: List<RoutineEntity>,
+    isLoggedIn: Boolean = true,
+    avisoYaMostrado: Boolean = false,
+    onAvisoMostrado: () -> Unit = {},
+    onCrearCuenta: () -> Unit = {},
     onCreateRoutine: () -> Unit,
     onRoutineClick: (routineId: Int) -> Unit
 ) {
+    var mostrarAvisoCuenta by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -133,7 +120,10 @@ private fun UserRoutinesScreenContent(
                 .padding(vertical = 12.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(VerdeTN)
-                .clickable(onClick = onCreateRoutine)
+                .clickable {
+                    if (isLoggedIn || avisoYaMostrado) onCreateRoutine()
+                    else mostrarAvisoCuenta = true
+                }
                 .padding(20.dp)
         ) {
             Row(
@@ -142,24 +132,23 @@ private fun UserRoutinesScreenContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    TextWithOutline(
+                    Text(
                         text = "Crear",
-                        color = Color.White,
+                        color = NegroFondo.copy(alpha = 0.75f),
                         fontSize = 14.sp,
-                        outlineWidth = 1.dp
+                        fontWeight = FontWeight.Medium
                     )
-                    TextWithOutline(
+                    Text(
                         text = "RUTINA",
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        outlineWidth = 1.5.dp
+                        color = NegroFondo,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.ExtraBold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
-                    TextWithOutline(
+                    Text(
                         text = "Diseña tu plan personalizado",
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 12.sp,
-                        outlineWidth = 1.dp
+                        color = NegroFondo.copy(alpha = 0.7f),
+                        fontSize = 12.sp
                     )
                 }
                 Box(
@@ -180,12 +169,12 @@ private fun UserRoutinesScreenContent(
         }
 
         // Título sección (mismo estilo que CATEGORÍAS en Biblioteca, con contorno negro)
-        TextWithOutline(
+        Text(
             text = "RUTINAS RECOMENDADAS",
             color = VerdeTN,
             fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            outlineWidth = 1.dp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.5.sp,
             modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
         )
 
@@ -204,12 +193,11 @@ private fun UserRoutinesScreenContent(
 
             item {
                 Spacer(modifier = Modifier.height(8.dp))
-                TextWithOutline(
+                Text(
                     text = "MIS RUTINAS",
                     color = VerdeTN,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
-                    outlineWidth = 1.dp,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
             }
@@ -263,6 +251,23 @@ private fun UserRoutinesScreenContent(
                 }
             }
         }
+    }
+
+    // Aviso al crear una rutina sin cuenta
+    if (mostrarAvisoCuenta) {
+        CuentaRecomendadaDialog(
+            onCrearCuenta = {
+                mostrarAvisoCuenta = false
+                onAvisoMostrado()
+                onCrearCuenta()
+            },
+            onContinuarSinCuenta = {
+                mostrarAvisoCuenta = false
+                onAvisoMostrado()
+                onCreateRoutine()
+            },
+            onDismiss = { mostrarAvisoCuenta = false }
+        )
     }
 }
 
@@ -340,3 +345,94 @@ private fun PreviewUserRoutinesScreen() {
         onRoutineClick = { }
     )
 }
+
+
+/**
+ * Aviso al crear una rutina sin haber iniciado sesión.
+ * Fondo negro con acentos verdes; la opción de continuar sin cuenta se destaca en rojo.
+ */
+@Composable
+private fun CuentaRecomendadaDialog(
+    onCrearCuenta: () -> Unit,
+    onContinuarSinCuenta: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.88f)
+                .clip(RoundedCornerShape(18.dp))
+                .background(NegroFondo)
+                .border(1.5.dp, VerdeTN, RoundedCornerShape(18.dp))
+        ) {
+            // Contenido
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(VerdeTN.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Warning,
+                            contentDescription = null,
+                            tint = VerdeTN,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "¿Creamos tu cuenta?",
+                        color = VerdeTN,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "Sin cuenta puedes crear tu rutina, pero se guarda solo en este teléfono y se pierde al desinstalar la app.",
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp
+                )
+            }
+
+            // Botones horizontales pegados al borde inferior
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(RojoAviso)
+                        .clickable(onClick = onContinuarSinCuenta)
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "NO, CONTINUAR",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(VerdeTN)
+                        .clickable(onClick = onCrearCuenta)
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "SÍ, CREAR CUENTA",
+                        color = NegroFondo,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+

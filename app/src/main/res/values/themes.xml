@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Base application theme compatible with Material3 and AppCompat -->
-    <style name="Theme.AppTrainingNow" parent="Theme.AppCompat.Light.NoActionBar" />
+    <!-- Tema base: fondo negro para que el arranque no muestre pantalla blanca -->
+    <style name="Theme.AppTrainingNow" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/negro_fondo</item>
+        <item name="android:statusBarColor">@color/negro_fondo</item>
+        <item name="android:navigationBarColor">@color/negro_fondo</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
 </resources>

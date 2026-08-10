@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -88,7 +89,8 @@ import java.util.Locale
 @Composable
 fun ProfileScreen(
     authViewModel: AuthViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onVerAvanceMensual: () -> Unit = {}
 ) {
     val loginState by authViewModel.loginState.collectAsState()
     val registerState by authViewModel.register.collectAsState()
@@ -117,6 +119,28 @@ fun ProfileScreen(
                 onEdit = { showEditProfile = true },
                 onLogout = { authViewModel.logout() }
             )
+
+            // Acceso al reporte mensual de entrenamiento
+            Button(
+                onClick = onVerAvanceMensual,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = GrisFondo,
+                    contentColor = VerdeTN
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.CalendarToday,
+                    contentDescription = null,
+                    tint = VerdeTN,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("MI AVANCE MENSUAL", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
 
             if (showEditProfile) {
                 EditProfileDialog(
@@ -928,76 +952,6 @@ private fun RegisterTabContent(
     }
 }
 
-
-/**
- * Diálogo de edición de perfil: nombre, apellidos, teléfono, altura y peso.
- * Guarda vía AuthViewModel.updateUser (sincroniza con tn-usuarios).
- */
-@Composable
-private fun EditProfileDialog(
-    user: com.shagox.apptrainingnow.data.local.user.UserEntity,
-    onDismiss: () -> Unit,
-    onSave: (com.shagox.apptrainingnow.data.local.user.UserEntity) -> Unit
-) {
-    var name by remember { mutableStateOf(user.name) }
-    var lastName by remember { mutableStateOf(user.lastName) }
-    var phone by remember { mutableStateOf(user.phone) }
-    var height by remember { mutableStateOf(user.height?.toString() ?: "") }
-    var weight by remember { mutableStateOf(user.weight?.toString() ?: "") }
-
-    val fieldColors = OutlinedTextFieldDefaults.colors(
-        focusedBorderColor = VerdeTN,
-        unfocusedBorderColor = GrisTexto,
-        focusedTextColor = androidx.compose.ui.graphics.Color.White,
-        unfocusedTextColor = androidx.compose.ui.graphics.Color.White,
-        cursorColor = VerdeTN,
-        focusedLabelColor = VerdeTN,
-        unfocusedLabelColor = GrisTexto
-    )
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = GrisFondo,
-        title = { Text("Editar perfil", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it },
-                    label = { Text("Nombre") }, singleLine = true, colors = fieldColors)
-                OutlinedTextField(value = lastName, onValueChange = { lastName = it },
-                    label = { Text("Apellidos") }, singleLine = true, colors = fieldColors)
-                OutlinedTextField(value = phone, onValueChange = { phone = it },
-                    label = { Text("Teléfono") }, singleLine = true, colors = fieldColors)
-                OutlinedTextField(value = height, onValueChange = { height = it },
-                    label = { Text("Altura (cm)") }, singleLine = true, colors = fieldColors)
-                OutlinedTextField(value = weight, onValueChange = { weight = it },
-                    label = { Text("Peso (kg)") }, singleLine = true, colors = fieldColors)
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onSave(
-                        user.copy(
-                            name = name.trim(),
-                            lastName = lastName.trim(),
-                            phone = phone.trim(),
-                            height = height.toFloatOrNull(),
-                            weight = weight.toFloatOrNull()
-                        )
-                    )
-                },
-                enabled = name.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = NegroFondo)
-            ) { Text("Guardar", fontWeight = FontWeight.Bold) }
-        },
-        dismissButton = {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = GrisBorde, contentColor = androidx.compose.ui.graphics.Color.White)
-            ) { Text("Cancelar") }
-        }
-    )
-}
 
 /**
  * Diálogo "Olvidé mi contraseña" en 3 pasos:

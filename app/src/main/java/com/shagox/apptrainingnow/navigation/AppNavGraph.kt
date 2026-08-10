@@ -1,5 +1,13 @@
 package com.shagox.apptrainingnow.navigation
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -101,7 +109,8 @@ fun AppNavGraph(
     trainerRepository: TrainerRepository? = null,
     progressRepository: ProgressRepository? = null,
     notificationRepository: INotificationRepository? = null,
-    exerciseRepository: IExerciseRepository? = null
+    exerciseRepository: IExerciseRepository? = null,
+    workoutRepository: com.shagox.apptrainingnow.data.repository.WorkoutRepository? = null
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -114,6 +123,18 @@ fun AppNavGraph(
     val context = LocalContext.current
     val safeStartDestination = startDestination.ifBlank { Route.Welcome.path }
 
+    // Id efectivo para guardar datos locales: el usuario logueado o el invitado
+    var guestId by remember { mutableStateOf(0) }
+    LaunchedEffect(currentUserId) {
+        if (currentUserId <= 0) {
+            guestId = com.shagox.apptrainingnow.data.local.user.GuestSession.obtenerGuestId(context)
+        } else {
+            // Al iniciar sesión, las rutinas creadas como invitado pasan a la cuenta
+            com.shagox.apptrainingnow.data.local.user.GuestSession.migrarRutinasA(context, currentUserId)
+        }
+    }
+    val effectiveUserId = if (currentUserId > 0) currentUserId else guestId
+
     // Ocultar barra en Welcome, detalle y subpantallas de admin
     val hideBottomBarRoutes = listOf(
         Route.Welcome.path,
@@ -121,7 +142,8 @@ fun AppNavGraph(
         Route.AdminSendNotification.path,
         Route.AdminUserList.path,
         Route.AdminCreateUser.path,
-        Route.AdminSanctions.path
+        Route.AdminSanctions.path,
+        Route.AdminExercises.path
     )
     val shouldHideBottomBar = currentRoute in hideBottomBarRoutes ||
             currentRoute?.startsWith("chat_detail") == true ||
@@ -144,10 +166,40 @@ fun AppNavGraph(
         }
     ) { padding ->
 
+        // Transiciones: las pantallas entran deslizándose con un leve zoom y desvanecido
+        val duracion = 320
+        val easing = FastOutSlowInEasing
+
         NavHost(
             navController = navController,
             startDestination = safeStartDestination,
-            modifier = Modifier.padding(padding)
+            modifier = Modifier.padding(padding),
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { it / 5 },
+                    animationSpec = tween(duracion, easing = easing)
+                ) + fadeIn(animationSpec = tween(duracion)) +
+                        scaleIn(initialScale = 0.96f, animationSpec = tween(duracion, easing = easing))
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { -it / 6 },
+                    animationSpec = tween(duracion, easing = easing)
+                ) + fadeOut(animationSpec = tween(duracion / 2))
+            },
+            popEnterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { -it / 5 },
+                    animationSpec = tween(duracion, easing = easing)
+                ) + fadeIn(animationSpec = tween(duracion))
+            },
+            popExitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { it / 4 },
+                    animationSpec = tween(duracion, easing = easing)
+                ) + fadeOut(animationSpec = tween(duracion / 2)) +
+                        scaleOut(targetScale = 0.96f, animationSpec = tween(duracion))
+            }
         ) {
 
             // ==================== BIENVENIDA (solo primera vez) ====================
@@ -235,14 +287,33 @@ fun AppNavGraph(
             }
 
             composable(Route.UserRoutines.path) {
-                // Sincronizar rutinas asignadas por el entrenador desde el backend
+                // Sincronizar rutinas (asignadas por el entrenador y públicas) desde el backend
                 androidx.compose.runtime.LaunchedEffect(currentUserId) {
                     routineRepository.syncRoutinesFromBackend(currentUserId)
                 }
                 UserRoutinesScreen(
                     routineRepository = routineRepository,
-                    userId = currentUserId,
+                    userId = effectiveUserId,
+                    isLoggedIn = currentUserId > 0,
+                    onCrearCuenta = {
+                        // Mismo comportamiento que la barra inferior: se puede volver a Rutinas
+                        navController.navigate(Route.Profile.path) {
+                            popUpTo(safeStartDestination) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    avisoYaMostrado = context
+                        .getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+                        .getBoolean("aviso_cuenta_mostrado", false),
+                    onAvisoMostrado = {
+                        context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+                            .edit()
+                            .putBoolean("aviso_cuenta_mostrado", true)
+                            .apply()
+                    },
                     onCreateRoutine = {
+                        // Se permite crear sin cuenta; el aviso solo aparece la primera vez
                         navController.navigate(Route.CreateRoutine.createRoute())
                     },
                     onRoutineClick = { routineId ->
@@ -268,7 +339,8 @@ fun AppNavGraph(
                 RoutineActiveScreen(
                     routineRepository = routineRepository,
                     exerciseRepository = exerciseRepository,
-                    userId = currentUserId,
+                    workoutRepository = workoutRepository,
+                    userId = effectiveUserId,
                     routineId = routineId,
                     initialRoutineName = routineName,
                     onBack = {
@@ -369,7 +441,7 @@ fun AppNavGraph(
 
             composable(Route.AdminPanel.path) {
                 AdminPanelScreen(
-                    onBiblioteca = { navController.navigate(Route.Library.path) },
+                    onBiblioteca = { navController.navigate(Route.AdminExercises.path) },
                     onNuevaCategoria = { navController.navigate(Route.AdminCreateCategory.path) },
                     onEntrenamientoGlobal = { navController.navigate(Route.CreateRoutine.createRoute()) },
                     onEnviarNotificacion = { navController.navigate(Route.AdminSendNotification.path) },
@@ -419,11 +491,27 @@ fun AppNavGraph(
                 )
             }
 
+            composable(Route.MonthlyReport.path) {
+                com.shagox.apptrainingnow.ui.screen.MonthlyReportScreen(
+                    userId = currentUserId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
             composable(Route.CoachUsers.path) {
                 com.shagox.apptrainingnow.ui.screen.coach.CoachUsersScreen(
                     userRepository = userRepository,
                     onBack = { navController.popBackStack() }
                 )
+            }
+
+            composable(Route.AdminExercises.path) {
+                if (exerciseRepository != null) {
+                    com.shagox.apptrainingnow.ui.screen.admin.AdminExerciseManagerScreen(
+                        exerciseRepository = exerciseRepository,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
             }
 
             composable(Route.AdminCreateUser.path) {
@@ -510,7 +598,12 @@ fun AppNavGraph(
             }
 
             composable(Route.Profile.path) {
-                ProfileScreen(authViewModel = authViewModel)
+                ProfileScreen(
+                    authViewModel = authViewModel,
+                    onVerAvanceMensual = {
+                        if (currentUserId > 0) navController.navigate(Route.MonthlyReport.path)
+                    }
+                )
             }
 
             // ==================== CREACIÓN (Para entrenadores) ====================
@@ -556,7 +649,7 @@ fun AppNavGraph(
                                     )
                                 )
                             } else {
-                                routineRepository.savePersonalRoutine(currentUserId, name, days)
+                                routineRepository.savePersonalRoutine(effectiveUserId, name, days)
                             }
                             withContext(Dispatchers.Main) { navController.popBackStack() }
                         }

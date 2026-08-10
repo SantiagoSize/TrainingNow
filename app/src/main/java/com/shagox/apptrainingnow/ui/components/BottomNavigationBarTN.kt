@@ -1,50 +1,56 @@
 package com.shagox.apptrainingnow.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.shagox.apptrainingnow.navigation.Route
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
 
-private const val NAV_ITEM_SIZE_DP = 56
+private val INDICADOR_SIZE = 56.dp
 
 /**
- * Barra de navegación inferior personalizada para TrainingNow.
- * Muestra 5 iconos según el rol; cada slot tiene tamaño fijo para que todos se dibujen.
+ * Barra de navegación inferior de TrainingNow.
  *
- * @param navController Controlador de navegación
- * @param userRole Rol del usuario: "USER", "TRAINER", "ADMIN"
- * @param startDestinationRoute Ruta de destino inicial (evita acceder a navController.graph antes de setGraph)
+ * El indicador verde se **desplaza** horizontalmente hasta el ítem activo
+ * (en lugar de encenderse y apagarse), con un movimiento suave y estable.
  */
 @Composable
 fun BottomNavigationBarTN(
@@ -53,13 +59,35 @@ fun BottomNavigationBarTN(
     startDestinationRoute: String
 ) {
     val role = userRole.takeIf { it.isNotBlank() } ?: "USER"
-    val items = remember(role) {
-        Route.getBottomNavRoutes(role)
-    }
+    val items = remember(role) { Route.getBottomNavRoutes(role) }
+
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
     if (items.isEmpty()) return
+
+    val rutaActual = currentDestination?.route
+
+    // 1) Coincidencia directa con un ítem de la barra
+    val indiceDirecto = items.indexOfFirst { route ->
+        currentDestination?.hierarchy?.any { it.route == route.path } == true
+    }
+
+    // 2) Subpantallas: se resuelven a su sección según el rol actual
+    val indicePorSeccion = Route.seccionesCandidatas(rutaActual)
+        .firstNotNullOfOrNull { seccion ->
+            items.indexOfFirst { it.path == seccion }.takeIf { it >= 0 }
+        } ?: -1
+
+    // 3) Si nada coincide, se conserva la última sección activa
+    var ultimoIndiceValido by remember { mutableIntStateOf(0) }
+    val indiceResuelto = when {
+        indiceDirecto >= 0 -> indiceDirecto
+        indicePorSeccion >= 0 -> indicePorSeccion
+        else -> ultimoIndiceValido
+    }
+    LaunchedEffect(indiceResuelto) { ultimoIndiceValido = indiceResuelto }
+    val selectedIndex = indiceResuelto
 
     Surface(
         modifier = Modifier
@@ -75,36 +103,64 @@ fun BottomNavigationBarTN(
                     .height(2.dp)
                     .background(Color(0xFF2A2A2A))
             )
-            Row(
+
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(108.dp)
                     .padding(horizontal = 8.dp)
-                    .padding(top = 8.dp, bottom = 28.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(top = 8.dp, bottom = 28.dp)
             ) {
-                items.forEach { route ->
-                    val icon = route.icon
-                    val path = route.path
-                    val title = route.title
-                    val isSelected = currentDestination?.hierarchy?.any { it.route == path } == true
-                    Box(
-                        modifier = Modifier.size(NAV_ITEM_SIZE_DP.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        NavBarItem(
-                            isSelected = isSelected,
-                            iconVector = icon,
-                            contentDescription = title,
-                            onClick = {
-                                navController.navigate(path) {
-                                    popUpTo(startDestinationRoute) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            }
+                val anchoCelda = maxWidth / items.size
+                // Posición animada del indicador: se desliza hasta el ítem activo
+                val offsetIndicador by animateDpAsState(
+                    targetValue = anchoCelda * selectedIndex + (anchoCelda - INDICADOR_SIZE) / 2,
+                    animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                    label = "indicadorOffset"
+                )
+
+                // Indicador deslizante
+                Box(
+                    modifier = Modifier
+                        .offset(x = offsetIndicador)
+                        .align(Alignment.CenterStart)
+                        .size(INDICADOR_SIZE)
+                        .shadow(
+                            elevation = 8.dp,
+                            shape = RoundedCornerShape(18.dp),
+                            ambientColor = VerdeTN,
+                            spotColor = VerdeTN
                         )
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(VerdeTN)
+                )
+
+                // Íconos: ocupan todo el alto para centrarse igual que el indicador
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    items.forEachIndexed { index, route ->
+                        // Cada ítem ocupa exactamente una celda: coincide con el indicador
+                        Box(
+                            modifier = Modifier.weight(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            NavBarItem(
+                                isSelected = index == selectedIndex,
+                                iconVector = route.icon,
+                                contentDescription = route.title,
+                                onClick = {
+                                    navController.navigate(route.path) {
+                                        popUpTo(startDestinationRoute) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -112,6 +168,10 @@ fun BottomNavigationBarTN(
     }
 }
 
+/**
+ * Ícono de la barra. El fondo lo pinta el indicador deslizante;
+ * aquí solo se anima el color para evitar movimientos superpuestos.
+ */
 @Composable
 private fun NavBarItem(
     isSelected: Boolean,
@@ -119,30 +179,15 @@ private fun NavBarItem(
     contentDescription: String?,
     onClick: () -> Unit
 ) {
-    val backgroundColor by animateColorAsState(
-        targetValue = if (isSelected) VerdeTN else Color.Transparent,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "bgColor"
-    )
     val iconColor by animateColorAsState(
         targetValue = if (isSelected) Color.Black else Color(0xFF808080),
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
         label = "iconColor"
     )
-    val boxSizeDp = if (isSelected) 58.dp else NAV_ITEM_SIZE_DP.dp
-    val elevationDp = if (isSelected) 6.dp else 0.dp
-
     Box(
         modifier = Modifier
-            .size(boxSizeDp)
-            .shadow(
-                elevation = elevationDp,
-                shape = RoundedCornerShape(16.dp),
-                ambientColor = if (isSelected) VerdeTN else Color.Transparent,
-                spotColor = if (isSelected) VerdeTN else Color.Transparent
-            )
-            .clip(RoundedCornerShape(16.dp))
-            .background(backgroundColor)
+            .size(INDICADOR_SIZE)
+            .clip(RoundedCornerShape(18.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -153,7 +198,7 @@ private fun NavBarItem(
         Icon(
             imageVector = iconVector,
             contentDescription = contentDescription,
-            modifier = Modifier.size(28.dp),
+            modifier = Modifier.size(27.dp),
             tint = iconColor
         )
     }
@@ -169,27 +214,5 @@ private fun PreviewBottomNavigationBarTN_User() {
         navController = navController,
         userRole = "USER",
         startDestinationRoute = Route.UserRoutines.path
-    )
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF000000)
-@Composable
-private fun PreviewBottomNavigationBarTN_Coach() {
-    val navController = rememberNavController()
-    BottomNavigationBarTN(
-        navController = navController,
-        userRole = "TRAINER",
-        startDestinationRoute = Route.CoachClients.path
-    )
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF000000)
-@Composable
-private fun PreviewBottomNavigationBarTN_Admin() {
-    val navController = rememberNavController()
-    BottomNavigationBarTN(
-        navController = navController,
-        userRole = "ADMIN",
-        startDestinationRoute = Route.CoachClients.path
     )
 }

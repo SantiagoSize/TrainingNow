@@ -38,6 +38,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,28 +75,39 @@ fun WelcomeScreen(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
-    // Permisos: estado según el sistema
-    val cameraPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-    } else true
-    val galleryPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
-    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-    } else true
-    val notificationPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-    } else true
+    // Permisos como estado reactivo: al aceptar, la tarjeta se actualiza al instante
+    fun hasPermission(permission: String): Boolean =
+        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+    fun checkGallery(): Boolean = when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ->
+            hasPermission(Manifest.permission.READ_MEDIA_IMAGES) ||
+                    hasPermission(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+            hasPermission(Manifest.permission.READ_MEDIA_IMAGES)
+        else -> hasPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
+    }
+
+    var cameraPermission by remember { mutableStateOf(hasPermission(Manifest.permission.CAMERA)) }
+    var galleryPermission by remember { mutableStateOf(checkGallery()) }
+    var notificationPermission by remember {
+        mutableStateOf(
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                    hasPermission(Manifest.permission.POST_NOTIFICATIONS)
+        )
+    }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) { granted -> /* estado ya reflejado por recomposición */ }
+    ) { granted -> cameraPermission = granted }
+    // Galería: en Android 14+ el sistema puede abrir el selector de fotos (acceso parcial);
+    // se piden ambos permisos y con cualquiera concedido la tarjeta queda activada.
     val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted -> /* idem */ }
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { _ -> galleryPermission = checkGallery() }
     val notificationLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) { granted -> /* idem */ }
+    ) { granted -> notificationPermission = granted }
 
     Box(
         modifier = Modifier
@@ -174,12 +187,16 @@ fun WelcomeScreen(
                 isGranted = galleryPermission,
                 onActivate = {
                     if (!galleryPermission) {
-                        val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            Manifest.permission.READ_MEDIA_IMAGES
-                        } else {
-                            Manifest.permission.READ_EXTERNAL_STORAGE
+                        val perms = when {
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> arrayOf(
+                                Manifest.permission.READ_MEDIA_IMAGES,
+                                Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+                            )
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+                                arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
+                            else -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
                         }
-                        galleryLauncher.launch(perm)
+                        galleryLauncher.launch(perms)
                     }
                 }
             )
@@ -276,10 +293,10 @@ private fun PermissionCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(GrisCard.copy(alpha = 0.9f))
+            .background(if (isGranted) GrisCard.copy(alpha = 0.45f) else GrisCard.copy(alpha = 0.9f))
             .border(
                 width = 1.5.dp,
-                color = VerdeTN.copy(alpha = borderColor),
+                color = if (isGranted) Color.Gray.copy(alpha = 0.5f) else VerdeTN.copy(alpha = borderColor),
                 shape = RoundedCornerShape(16.dp)
             )
             .padding(18.dp)
@@ -298,7 +315,7 @@ private fun PermissionCard(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = if (isGranted) VerdeTN else Color.White.copy(alpha = 0.8f),
+                    tint = if (isGranted) Color.Gray else Color.White.copy(alpha = 0.8f),
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -309,13 +326,13 @@ private fun PermissionCard(
             ) {
                 Text(
                     text = title,
-                    color = Color.White,
+                    color = if (isGranted) Color.Gray else Color.White,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
                     text = description,
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = if (isGranted) Color.Gray.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.7f),
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 2.dp)
                 )
@@ -325,13 +342,13 @@ private fun PermissionCard(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(VerdeTN.copy(alpha = 0.25f)),
+                        .background(Color.Gray.copy(alpha = 0.25f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Check,
                         contentDescription = "Activado",
-                        tint = VerdeTN,
+                        tint = Color.Gray,
                         modifier = Modifier.size(20.dp)
                     )
                 }
