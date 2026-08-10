@@ -64,6 +64,8 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 import com.shagox.apptrainingnow.utils.ImageCompressor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -151,7 +153,7 @@ fun AdminExerciseManagerScreen(
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(exercise.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text(exercise.name, color = TextoPrincipal, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                         Text(exercise.category, color = GrisTexto, fontSize = 12.sp)
                     }
                     Icon(
@@ -202,7 +204,7 @@ fun AdminExerciseManagerScreen(
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
             containerColor = GrisFondo,
-            title = { Text("Eliminar ejercicio", color = Color.White, fontWeight = FontWeight.Bold) },
+            title = { Text("Eliminar ejercicio", color = TextoPrincipal, fontWeight = FontWeight.Bold) },
             text = { Text("¿Eliminar \"${target.name}\" de la biblioteca?", color = GrisTexto) },
             confirmButton = {
                 Button(
@@ -268,8 +270,8 @@ private fun ExerciseFormDialog(
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = VerdeTN,
         unfocusedBorderColor = GrisTexto,
-        focusedTextColor = Color.White,
-        unfocusedTextColor = Color.White,
+        focusedTextColor = TextoPrincipal,
+        unfocusedTextColor = TextoPrincipal,
         cursorColor = VerdeTN,
         focusedLabelColor = VerdeTN,
         unfocusedLabelColor = GrisTexto
@@ -390,7 +392,7 @@ private fun ExerciseFormDialog(
                     )
                 },
                 enabled = name.isNotBlank() && category.isNotBlank() && !comprimiendo,
-                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = NegroFondo)
+                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = TextoSobreVerde)
             ) { Text("GUARDAR", fontWeight = FontWeight.Bold) }
         },
         dismissButton = {

@@ -7,6 +7,7 @@ import com.shagox.apptrainingnow.data.domain.RoutineWithDays
 import com.shagox.apptrainingnow.data.local.exercise.ExerciseEntity
 import com.shagox.apptrainingnow.data.local.exercise.ExerciseDao
 import com.shagox.apptrainingnow.data.local.routine.RoutineDao
+import com.shagox.apptrainingnow.data.local.routine.RoutineDayEntity
 import com.shagox.apptrainingnow.data.local.routine.RoutineEntity
 import com.shagox.apptrainingnow.data.remote.RemoteModule
 import com.shagox.apptrainingnow.data.remote.dto.NotificationDto
@@ -42,11 +43,11 @@ interface RoutineRepositoryContract {
     suspend fun insertRoutine(routine: RoutineEntity): Long
     suspend fun updateRoutine(routine: RoutineEntity)
     suspend fun deleteRoutine(routine: RoutineEntity)
-    suspend fun getExercisesForDay(routineId: Int): List<ExerciseEntity>
-    suspend fun addExerciseToDay(routineId: Int, exerciseId: Int)
-    suspend fun removeExerciseFromDay(routineId: Int, exerciseId: Int)
-    suspend fun canAddExerciseToDay(routineId: Int): Boolean
-    suspend fun updateDayActivity(routineId: Int, dayLabel: String, activityName: String)
+    suspend fun getExercisesForDay(dayId: Int): List<ExerciseEntity>
+    suspend fun addExerciseToDay(dayId: Int, exerciseId: Int)
+    suspend fun removeExerciseFromDay(dayId: Int, exerciseId: Int)
+    suspend fun canAddExerciseToDay(dayId: Int): Boolean
+    suspend fun updateDayActivity(dayId: Int, dayLabel: String, activityName: String)
 }
 
 class RoutineRepository(
@@ -69,14 +70,13 @@ class RoutineRepository(
     }
 
     private suspend fun buildRoutineWithDays(routine: RoutineEntity, userId: Int): RoutineWithDays {
-        val days = routineDao.getDaysForRoutineNameSync(routine.name, userId)
+        val days = routineDao.getDaysOfRoutine(routine.id)
         val dayViews = days.map { day ->
-            val exercises = routineDao.getExercisesForRoutineSync(day.id)
-            val (label, activity) = parseDayInfo(day.dayInfo)
+            val exercises = routineDao.getExercisesForDaySync(day.id)
             RoutineDayView(
-                routineId = day.id,
-                dayLabel = label,
-                activityName = activity,
+                routineId = day.id, // id del día (identifica al día dentro de la rutina)
+                dayLabel = day.dayLabel,
+                activityName = day.activityName,
                 exercises = exercises,
                 exerciseCount = exercises.size
             )
@@ -104,32 +104,47 @@ class RoutineRepository(
     /**
      * Indica si se puede añadir otro ejercicio al día (límite 10 por día).
      */
-    override suspend fun canAddExerciseToDay(routineId: Int): Boolean {
-        return routineDao.countExercisesInRoutine(routineId) < MAX_EXERCISES_PER_DAY
+    override suspend fun canAddExerciseToDay(dayId: Int): Boolean {
+        return routineDao.countExercisesInDay(dayId) < MAX_EXERCISES_PER_DAY
     }
 
     override suspend fun getRoutineById(routineId: Int): RoutineEntity? =
         routineDao.getRoutineById(routineId)
 
-    override suspend fun getExercisesForDay(routineId: Int): List<ExerciseEntity> =
-        routineDao.getExercisesForRoutineSync(routineId)
+    override suspend fun getExercisesForDay(dayId: Int): List<ExerciseEntity> =
+        routineDao.getExercisesForDaySync(dayId)
 
-    override suspend fun addExerciseToDay(routineId: Int, exerciseId: Int) {
-        if (!canAddExerciseToDay(routineId)) return
-        val count = routineDao.countExercisesInRoutine(routineId)
+    override suspend fun addExerciseToDay(dayId: Int, exerciseId: Int) {
+        if (!canAddExerciseToDay(dayId)) return
+        val count = routineDao.countExercisesInDay(dayId)
         routineDao.insertRoutineExercise(
-            RoutineExerciseEntity(routineId = routineId, exerciseId = exerciseId, order = count + 1)
+            RoutineExerciseEntity(dayId = dayId, exerciseId = exerciseId, order = count + 1)
         )
     }
 
-    override suspend fun removeExerciseFromDay(routineId: Int, exerciseId: Int) {
-        routineDao.removeExerciseFromRoutine(routineId, exerciseId)
+    override suspend fun removeExerciseFromDay(dayId: Int, exerciseId: Int) {
+        routineDao.removeExerciseFromDay(dayId, exerciseId)
     }
 
-    override suspend fun updateDayActivity(routineId: Int, dayLabel: String, activityName: String) {
-        val r = routineDao.getRoutineById(routineId) ?: return
-        val dayInfo = if (activityName.isNotBlank()) "$dayLabel - $activityName" else dayLabel
-        routineDao.updateRoutine(r.copy(dayInfo = dayInfo))
+    /** Fija (o quita, con null) la hora del recordatorio de un día. */
+    suspend fun setDayReminder(dayId: Int, hora: Int?, minuto: Int?) {
+        routineDao.updateDayReminder(dayId, hora, minuto)
+    }
+
+    /** Hora propia del día, o null si usa la general. */
+    suspend fun getDayReminder(dayId: Int): Pair<Int, Int>? {
+        val dia = routineDao.getDayById(dayId) ?: return null
+        val hora = dia.reminderHour ?: return null
+        return hora to (dia.reminderMinute ?: 0)
+    }
+
+    /** Días del usuario que tienen recordatorio propio configurado. */
+    suspend fun getDaysWithReminder(userId: Int) = routineDao.getDaysWithReminder(userId)
+
+    /** Cambia el nombre de la sesión de un día (ej. "Pecho y Tríceps"). */
+    override suspend fun updateDayActivity(dayId: Int, dayLabel: String, activityName: String) {
+        val day = routineDao.getDayById(dayId) ?: return
+        routineDao.updateDay(day.copy(dayLabel = dayLabel, activityName = activityName))
     }
 
     override suspend fun insertRoutine(routine: RoutineEntity): Long =
@@ -163,8 +178,8 @@ class RoutineRepository(
     }
 
     // Obtener los ejercicios de una rutina específica (Para cuando le des click)
-    fun getExercisesForRoutine(routineId: Int): Flow<List<ExerciseEntity>> {
-        return routineDao.getExercisesForRoutine(routineId)
+    fun getExercisesForRoutine(dayId: Int): Flow<List<ExerciseEntity>> {
+        return routineDao.getExercisesForDay(dayId)
     }
 
     /**
@@ -175,45 +190,64 @@ class RoutineRepository(
         userId: Int,
         routineName: String,
         days: List<DayRoutineInput>
-    ) {
+    ): Long {
         require(days.size == 7) { "Se requieren exactamente 7 días" }
         val now = System.currentTimeMillis()
-        for (day in days) {
-            val dayInfo = if (day.activityName.isNotBlank()) "${day.dayLabel} - ${day.activityName}" else day.dayLabel
-            val routine = RoutineEntity(
+
+        // Una sola rutina; sus días van en la tabla routine_days
+        val routineId = routineDao.insertRoutine(
+            RoutineEntity(
                 ownerId = userId,
                 creatorId = userId,
                 name = routineName,
-                dayInfo = dayInfo,
+                dayInfo = resumenDeDias(days),
                 creationDate = now,
                 scheduledTime = now
             )
-            val routineId = routineDao.insertRoutine(routine).toInt()
-            val exerciseIds = mutableListOf<Int>()
-            val names = day.exerciseNames.map { it.trim() }.filter { it.isNotBlank() }.take(MAX_EXERCISES_PER_DAY)
-            for (name in names) {
-                val exercise = exerciseDao.getExerciseByName(name)
-                val id = if (exercise != null) {
-                    exercise.id
-                } else {
-                    val newExercise = ExerciseEntity(
-                        name = name,
+        ).toInt()
+
+        guardarDias(routineId, days)
+        return routineId.toLong()
+    }
+
+    /** Crea los días de la rutina con sus ejercicios (resolviendo o creando cada ejercicio). */
+    private suspend fun guardarDias(routineId: Int, days: List<DayRoutineInput>) {
+        days.forEachIndexed { indice, day ->
+            val dayId = routineDao.insertDay(
+                RoutineDayEntity(
+                    routineId = routineId,
+                    dayLabel = day.dayLabel,
+                    activityName = day.activityName.trim(),
+                    dayOrder = indice
+                )
+            ).toInt()
+
+            val nombres = day.exerciseNames.map { it.trim() }
+                .filter { it.isNotBlank() }
+                .take(MAX_EXERCISES_PER_DAY)
+
+            val crossRefs = nombres.mapIndexed { index, nombre ->
+                val existente = exerciseDao.getExerciseByName(nombre)
+                val exerciseId = existente?.id ?: exerciseDao.insertExercise(
+                    ExerciseEntity(
+                        name = nombre,
                         category = "Personalizado",
                         description = "",
                         videoUrl = "",
                         isSystemDefault = false
                     )
-                    exerciseDao.insertExercise(newExercise).toInt()
-                }
-                exerciseIds.add(id)
+                ).toInt()
+                RoutineExerciseEntity(dayId = dayId, exerciseId = exerciseId, order = index + 1)
             }
-            val crossRefs = exerciseIds.mapIndexed { index, exerciseId ->
-                RoutineExerciseEntity(routineId = routineId, exerciseId = exerciseId, order = index + 1)
-            }
-            if (crossRefs.isNotEmpty()) {
-                routineDao.insertRoutineExercises(crossRefs)
-            }
+            if (crossRefs.isNotEmpty()) routineDao.insertRoutineExercises(crossRefs)
         }
+    }
+
+    /** Resumen para la lista: días que tienen ejercicios ("Lunes, Miércoles, Viernes"). */
+    private fun resumenDeDias(days: List<DayRoutineInput>): String {
+        val conEjercicios = days.filter { d -> d.exerciseNames.any { it.isNotBlank() } }
+        return if (conEjercicios.isEmpty()) "Sin días asignados"
+        else conEjercicios.joinToString(", ") { it.dayLabel }
     }
 
     /**
@@ -229,44 +263,22 @@ class RoutineRepository(
     ): Long {
         require(days.size == 7) { "Se requieren exactamente 7 días" }
         val now = System.currentTimeMillis()
-        var firstRoutineId = 0L
-        for (day in days) {
-            val dayInfo = if (day.activityName.isNotBlank()) "${day.dayLabel} - ${day.activityName}" else day.dayLabel
-            val routine = RoutineEntity(
+
+        // Una sola rutina para el cliente, con sus días
+        val routineId = routineDao.insertRoutine(
+            RoutineEntity(
                 ownerId = clientId,
                 creatorId = trainerId,
                 name = routineName,
-                dayInfo = dayInfo,
+                dayInfo = resumenDeDias(days),
                 creationDate = now,
                 scheduledTime = now
             )
-            val routineId = routineDao.insertRoutine(routine)
-            if (firstRoutineId == 0L) firstRoutineId = routineId
-            val exerciseIds = mutableListOf<Int>()
-            val names = day.exerciseNames.map { it.trim() }.filter { it.isNotBlank() }.take(MAX_EXERCISES_PER_DAY)
-            for (name in names) {
-                val exercise = exerciseDao.getExerciseByName(name)
-                val id = if (exercise != null) {
-                    exercise.id
-                } else {
-                    val newExercise = ExerciseEntity(
-                        name = name,
-                        category = "Personalizado",
-                        description = "",
-                        videoUrl = "",
-                        isSystemDefault = false
-                    )
-                    exerciseDao.insertExercise(newExercise).toInt()
-                }
-                exerciseIds.add(id)
-            }
-            val crossRefs = exerciseIds.mapIndexed { index, exerciseId ->
-                RoutineExerciseEntity(routineId = routineId.toInt(), exerciseId = exerciseId, order = index + 1)
-            }
-            if (crossRefs.isNotEmpty()) {
-                routineDao.insertRoutineExercises(crossRefs)
-            }
-        }
+        ).toInt()
+
+        guardarDias(routineId, days)
+        val firstRoutineId = routineId.toLong()
+
         // Enviar al backend (TrainNow-Rutinas) y notificar al cliente (TrainNow-Comunicaciones).
         // Best-effort: si no hay conexión, la rutina queda local y se puede reintentar.
         try {
@@ -344,51 +356,66 @@ class RoutineRepository(
         try {
             val routineApi = RemoteModule.routineApi()
             val exerciseApi = RemoteModule.exerciseApi()
-            // Rutinas asignadas al usuario + rutinas públicas (recomendadas)
+
+            // El backend guarda un registro por día; se agrupan por nombre de rutina
             val asignadas = if (userId > 0) routineApi.getRoutinesByOwner(userId) else emptyList()
             val publicas = routineApi.getPublicRoutines()
-            val remote = asignadas + publicas
-            if (remote.isEmpty()) return
+            val remotas = asignadas + publicas
+            if (remotas.isEmpty()) return
 
             val locales = routineDao.getRoutinesByOwnerOnce(userId) + routineDao.getGlobalRoutinesOnce()
-            val existentes = locales.map { Triple(it.name, it.dayInfo, it.creationDate) }.toHashSet()
-            val backendCatalog = exerciseApi.getExercises().associateBy { it.id }
+            val nombresLocales = locales.map { it.name to it.ownerId }.toHashSet()
+            val catalogo = exerciseApi.getExercises().associateBy { it.id }
 
-            for (r in remote) {
-                val key = Triple(r.name, r.dayInfo, r.creationDate)
-                if (key in existentes) continue
+            remotas.groupBy { it.name to it.ownerId }.forEach { (clave, diasRemotos) ->
+                if (clave in nombresLocales) return@forEach
+                val primero = diasRemotos.first()
 
-                val localId = routineDao.insertRoutine(
+                val routineId = routineDao.insertRoutine(
                     RoutineEntity(
-                        ownerId = r.ownerId,
-                        creatorId = r.creatorId,
-                        name = r.name,
-                        dayInfo = r.dayInfo ?: "",
-                        creationDate = r.creationDate ?: System.currentTimeMillis(),
-                        scheduledTime = r.scheduledTime ?: System.currentTimeMillis()
+                        ownerId = primero.ownerId,
+                        creatorId = primero.creatorId,
+                        name = primero.name,
+                        dayInfo = diasRemotos.mapNotNull { it.dayInfo?.substringBefore(" - ") }
+                            .distinct().joinToString(", "),
+                        creationDate = primero.creationDate ?: System.currentTimeMillis(),
+                        scheduledTime = primero.scheduledTime ?: System.currentTimeMillis()
                     )
                 ).toInt()
 
-                val refs = routineApi.getRoutineExercises(r.id)
-                val crossRefs = mutableListOf<RoutineExerciseEntity>()
-                refs.forEach { ref ->
-                    val nombre = backendCatalog[ref.exerciseId]?.name ?: return@forEach
-                    val local = exerciseDao.getExerciseByName(nombre) ?: run {
-                        val idNuevo = exerciseDao.insertExercise(
-                            ExerciseEntity(
-                                name = nombre,
-                                category = backendCatalog[ref.exerciseId]?.category ?: "Personalizado",
-                                description = backendCatalog[ref.exerciseId]?.description ?: "",
-                                videoUrl = backendCatalog[ref.exerciseId]?.videoUrl ?: "",
-                                isSystemDefault = false
-                            )
-                        ).toInt()
-                        exerciseDao.getExerciseByName(nombre) ?: ExerciseEntity(id = idNuevo, name = nombre, category = "Personalizado", description = "", videoUrl = "", isSystemDefault = false)
+                diasRemotos.forEachIndexed { indice, remota ->
+                    val info = remota.dayInfo.orEmpty()
+                    val etiqueta = info.substringBefore(" - ").ifBlank { "Día ${indice + 1}" }
+                    val actividad = if (info.contains(" - ")) info.substringAfter(" - ") else ""
+
+                    val dayId = routineDao.insertDay(
+                        RoutineDayEntity(
+                            routineId = routineId,
+                            dayLabel = etiqueta,
+                            activityName = actividad,
+                            dayOrder = indice
+                        )
+                    ).toInt()
+
+                    val refs = routineApi.getRoutineExercises(remota.id)
+                    val crossRefs = refs.mapNotNull { ref ->
+                        val nombre = catalogo[ref.exerciseId]?.name ?: return@mapNotNull null
+                        val local = exerciseDao.getExerciseByName(nombre)
+                            ?: run {
+                                exerciseDao.insertExercise(
+                                    ExerciseEntity(
+                                        name = nombre,
+                                        category = catalogo[ref.exerciseId]?.category ?: "Personalizado",
+                                        description = catalogo[ref.exerciseId]?.description.orEmpty(),
+                                        videoUrl = catalogo[ref.exerciseId]?.videoUrl.orEmpty(),
+                                        isSystemDefault = false
+                                    )
+                                )
+                                exerciseDao.getExerciseByName(nombre)
+                            } ?: return@mapNotNull null
+                        RoutineExerciseEntity(dayId = dayId, exerciseId = local.id, order = ref.order)
                     }
-                    crossRefs.add(RoutineExerciseEntity(routineId = localId, exerciseId = local.id, order = ref.order))
-                }
-                if (crossRefs.isNotEmpty()) {
-                    routineDao.insertRoutineExercises(crossRefs)
+                    if (crossRefs.isNotEmpty()) routineDao.insertRoutineExercises(crossRefs)
                 }
             }
         } catch (_: Exception) {

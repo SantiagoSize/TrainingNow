@@ -75,6 +75,9 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.SuperficieElevada
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 import com.shagox.apptrainingnow.utils.ReminderHelper
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -133,6 +136,17 @@ fun RoutineActiveScreen(
     }
     var selectedDayRoutineId by remember(routineId) { mutableStateOf<Int?>(null) }
     var showAddExerciseDialog by remember { mutableStateOf(false) }
+    // Día del que se está configurando la hora propia de recordatorio
+    var diaConfigurandoHora by remember { mutableStateOf<RoutineDayView?>(null) }
+    var horasPorDia by remember(routineId) { mutableStateOf<Map<Int, Pair<Int, Int>>>(emptyMap()) }
+
+    // Cargar las horas propias ya guardadas
+    LaunchedEffect(days) {
+        if (days.isEmpty()) return@LaunchedEffect
+        horasPorDia = days.mapNotNull { vista ->
+            routineRepository.getDayReminder(vista.routineId)?.let { vista.routineId to it }
+        }.toMap()
+    }
 
     // Progreso semanal persistido en caché (SharedPreferences), se reinicia cada semana
     val weekProgress = remember(routineId, userId) { WeekProgressStore(context, userId, routineId) }
@@ -172,7 +186,14 @@ fun RoutineActiveScreen(
     var showNotificationTimeDialog by remember { mutableStateOf(false) }
     var notificationHour by remember { mutableStateOf(ReminderHelper.getHour(context)) }
     var notificationMinute by remember { mutableStateOf(ReminderHelper.getMinute(context)) }
-    var checkedExerciseIds by remember(selectedDayRoutineId) { mutableStateOf(setOf<Int>()) }
+    // Los ejercicios marcados se recuerdan por día durante toda la semana
+    var checkedExerciseIds by remember(selectedDayRoutineId) {
+        mutableStateOf(selectedDayRoutineId?.let { weekProgress.loadChecked(it) } ?: emptySet())
+    }
+    // Persistir cada cambio de marcado
+    LaunchedEffect(checkedExerciseIds, selectedDayRoutineId) {
+        selectedDayRoutineId?.let { weekProgress.saveChecked(it, checkedExerciseIds) }
+    }
     val allExercisesChecked = selectedDay?.exercises?.isNotEmpty() == true &&
             selectedDay.exercises.all { it.id in checkedExerciseIds }
 
@@ -180,6 +201,7 @@ fun RoutineActiveScreen(
     val attendanceRepository = remember { com.shagox.apptrainingnow.data.repository.AttendanceRepository() }
     val selectedIndexForProgress = days.indexOfFirst { it.routineId == selectedDayRoutineId }
     val ejerciciosDelDia = selectedDay?.exercises?.size ?: 0
+    val nombreSesionDelDia = selectedDay?.displayActivity ?: "Entrenamiento"
     androidx.compose.runtime.LaunchedEffect(allExercisesChecked, selectedIndexForProgress) {
         if (selectedIndexForProgress >= 0) {
             val nuevo = if (allExercisesChecked) completedDays + selectedIndexForProgress
@@ -188,11 +210,20 @@ fun RoutineActiveScreen(
                 completedDays = nuevo
                 weekProgress.save(nuevo)
             }
-            // Registrar asistencia del día en TrainNow-Rutinas (alimenta el reporte mensual)
+            // Registrar el entrenamiento completado
             if (allExercisesChecked && userId > 0) {
+                // 1) En la base de datos local, con el nombre de la rutina y de la sesión
+                workoutRepository?.registrarDiaCompletado(
+                    userId = userId,
+                    routineId = routineId,
+                    nombreRutina = routineName,
+                    nombreSesion = nombreSesionDelDia,
+                    ejercicios = ejerciciosDelDia
+                )
+                // 2) En el backend, para el reporte mensual
                 attendanceRepository.registerTrainedToday(
                     userId = userId,
-                    routineId = selectedDayRoutineId,
+                    routineId = routineId,
                     exercisesCompleted = ejerciciosDelDia
                 )
             }
@@ -249,7 +280,7 @@ fun RoutineActiveScreen(
                     ) {
                         Text(
                             text = todayDateLabel,
-                            color = NegroFondo,
+                            color = TextoSobreVerde,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -258,17 +289,17 @@ fun RoutineActiveScreen(
                                 .width(1.dp)
                                 .height(32.dp)
                                 .padding(horizontal = 16.dp)
-                                .background(NegroFondo.copy(alpha = 0.5f))
+                                .background(TextoSobreVerde.copy(alpha = 0.5f))
                         )
                         Column(modifier = Modifier.weight(1f).padding(start = 16.dp)) {
                             Text(
                                 text = "Actividad de hoy:",
-                                color = NegroFondo,
+                                color = TextoSobreVerde,
                                 fontSize = 14.sp
                             )
                             Text(
                                 text = selectedDay?.displayActivity ?: "-",
-                                color = NegroFondo,
+                                color = TextoSobreVerde,
                                 fontSize = 14.sp
                             )
                         }
@@ -293,7 +324,7 @@ fun RoutineActiveScreen(
                         .fillMaxWidth()
                         .border(1.5.dp, VerdeTN, RoundedCornerShape(16.dp)),
                     shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFF1A1A1A)
+                    color = GrisFondo
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Row(
@@ -336,8 +367,14 @@ fun RoutineActiveScreen(
                                                     }
                                                 },
                                                 onLongPress = {
-                                                    notificationHour = ReminderHelper.getHour(context)
-                                                    notificationMinute = ReminderHelper.getMinute(context)
+                                                    // Configura la hora del día que se está viendo
+                                                    val dia = selectedDay
+                                                    if (dia != null) {
+                                                        val propia = horasPorDia[dia.routineId]
+                                                        notificationHour = propia?.first ?: ReminderHelper.getHour(context)
+                                                        notificationMinute = propia?.second ?: ReminderHelper.getMinute(context)
+                                                        diaConfigurandoHora = dia
+                                                    }
                                                     showNotificationTimeDialog = true
                                                 }
                                             )
@@ -442,7 +479,7 @@ fun RoutineActiveScreen(
         AlertDialog(
             onDismissRequest = { showAddExerciseDialog = false },
             containerColor = GrisFondo,
-            title = { Text("Agregar ejercicio", color = Color.White, fontWeight = FontWeight.Bold) },
+            title = { Text("Agregar ejercicio", color = TextoPrincipal, fontWeight = FontWeight.Bold) },
             text = {
                 if (available.isEmpty()) {
                     Text("No hay más ejercicios disponibles.", color = GrisTexto)
@@ -467,7 +504,7 @@ fun RoutineActiveScreen(
                                     .padding(vertical = 10.dp, horizontal = 4.dp)
                             ) {
                                 Column {
-                                    Text(exercise.name, color = Color.White, fontSize = 15.sp)
+                                    Text(exercise.name, color = TextoPrincipal, fontSize = 15.sp)
                                     Text(exercise.category, color = GrisTexto, fontSize = 12.sp)
                                 }
                             }
@@ -505,7 +542,7 @@ fun RoutineActiveScreen(
                     Text("Cancelar", color = VerdeTN)
                 }
             },
-            containerColor = Color(0xFF1E1E1E),
+            containerColor = GrisFondo,
             titleContentColor = Color.White,
             textContentColor = Color.White
         )
@@ -517,17 +554,41 @@ fun RoutineActiveScreen(
             minuto = notificationMinute,
             onHoraCambio = { notificationHour = it },
             onMinutoCambio = { notificationMinute = it },
+            diaEnEdicion = diaConfigurandoHora,
             onGuardar = {
-                ReminderHelper.saveTime(context, notificationHour, notificationMinute)
-                if (notificationsEnabled) {
+                val dia = diaConfigurandoHora
+                if (dia != null) {
+                    // Hora propia de ese día de la semana
+                    addExerciseScope.launch {
+                        routineRepository.setDayReminder(dia.routineId, notificationHour, notificationMinute)
+                        horasPorDia = horasPorDia + (dia.routineId to (notificationHour to notificationMinute))
+                    }
                     ReminderHelper.saveUserId(context, userId)
-                    ReminderHelper.schedule(context, userId)
+                    ReminderHelper.scheduleForDay(
+                        context = context,
+                        userId = userId,
+                        dayId = dia.routineId,
+                        dayOrder = days.indexOfFirst { it.routineId == dia.routineId }.coerceAtLeast(0),
+                        hour = notificationHour,
+                        minute = notificationMinute
+                    )
+                    avisoTexto = "Recordatorio del ${dia.dayLabel} guardado"
+                } else {
+                    ReminderHelper.saveTime(context, notificationHour, notificationMinute)
+                    if (notificationsEnabled) {
+                        ReminderHelper.saveUserId(context, userId)
+                        ReminderHelper.schedule(context, userId)
+                    }
+                    avisoTexto = "Recordatorio guardado"
                 }
+                diaConfigurandoHora = null
                 showNotificationTimeDialog = false
                 avisoActivado = true
-                avisoTexto = "Recordatorio guardado"
             },
-            onCancelar = { showNotificationTimeDialog = false }
+            onCancelar = {
+                diaConfigurandoHora = null
+                showNotificationTimeDialog = false
+            }
         )
     }
 
@@ -545,7 +606,7 @@ private fun TabChipFullBody(
     Surface(
         modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        color = if (isSelected) VerdeTNMuted else Color(0xFF2C2C2C)
+        color = if (isSelected) VerdeTNMuted else GrisBorde
     ) {
         Column(
             modifier = Modifier
@@ -576,7 +637,7 @@ private fun ExerciseListPlaceholder() {
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 280.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF2C2C2C)),
+        colors = CardDefaults.cardColors(containerColor = GrisBorde),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
@@ -630,7 +691,7 @@ private fun ExerciseListSection(
                 ) {
                     Text(
                         text = "${index + 1}. ${ex.name}",
-                        color = Color.White,
+                        color = TextoPrincipal,
                         fontSize = 15.sp,
                         modifier = Modifier.weight(1f)
                     )
@@ -678,7 +739,7 @@ private fun TabChip(
     Surface(
         modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(10.dp),
-        color = if (isSelected) VerdeTN else Color(0xFF1E1E1E)
+        color = if (isSelected) VerdeTN else GrisFondo
     ) {
         Column(
             modifier = Modifier
@@ -766,6 +827,17 @@ class WeekProgressStore(
     fun save(days: Set<Int>) {
         prefs.edit().putStringSet(key, days.map { it.toString() }.toSet()).apply()
     }
+
+    /** Ejercicios marcados de un día concreto (se conservan al cambiar de día). */
+    fun loadChecked(dayId: Int): Set<Int> =
+        prefs.getStringSet("${key}_d$dayId", emptySet())
+            ?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
+
+    fun saveChecked(dayId: Int, exerciseIds: Set<Int>) {
+        prefs.edit()
+            .putStringSet("${key}_d$dayId", exerciseIds.map { it.toString() }.toSet())
+            .apply()
+    }
 }
 
 /**
@@ -821,21 +893,16 @@ private fun WeekStrip(
         ) {
             dayStates.forEachIndexed { index, status ->
                 Box(contentAlignment = Alignment.TopCenter) {
+                    val esHoy = index == hoy
                     Box(
                         modifier = Modifier
                             .size(42.dp)
                             .clip(CircleShape)
-                            .background(
-                                if (status == DayStatus.DESCANSO) Color.Transparent
-                                else status.color
-                            )
+                            // Solo el día de hoy va relleno; los demás únicamente con borde
+                            .background(if (esHoy) status.color else Color.Transparent)
                             .border(
-                                width = if (index == selectedIndex) 3.dp else if (index == hoy) 2.dp else 1.5.dp,
-                                color = when {
-                                    index == selectedIndex -> Color.White
-                                    index == hoy -> Color.White.copy(alpha = 0.6f)
-                                    else -> status.color
-                                },
+                                width = if (index == selectedIndex) 2.5.dp else 1.5.dp,
+                                color = if (index == selectedIndex) Color.White else status.color,
                                 shape = CircleShape
                             )
                             .pointerInput(index) {
@@ -853,7 +920,7 @@ private fun WeekStrip(
                     ) {
                         Text(
                             text = iniciales[index],
-                            color = if (status == DayStatus.DESCANSO) GrisTexto else NegroFondo,
+                            color = if (esHoy) NegroFondo else status.color,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -869,13 +936,13 @@ private fun WeekStrip(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFF1F1F1F))
+                                    .background(SuperficieElevada)
                                     .border(1.5.dp, status.color, RoundedCornerShape(8.dp))
                                     .padding(horizontal = 12.dp, vertical = 7.dp)
                             ) {
                                 Text(
                                     text = status.label,
-                                    color = Color.White,
+                                    color = TextoPrincipal,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -937,7 +1004,7 @@ private fun AvisoFlotante(
                 modifier = Modifier
                     .padding(top = 24.dp)
                     .clip(RoundedCornerShape(24.dp))
-                    .background(Color(0xFF1F1F1F))
+                    .background(SuperficieElevada)
                     .border(1.5.dp, color, RoundedCornerShape(24.dp))
                     .padding(horizontal = 18.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -951,7 +1018,7 @@ private fun AvisoFlotante(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = texto,
-                    color = Color.White,
+                    color = TextoPrincipal,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -969,6 +1036,7 @@ private fun AvisoFlotante(
 private fun RecordatorioHoraDialog(
     hora: Int,
     minuto: Int,
+    diaEnEdicion: RoutineDayView? = null,
     onHoraCambio: (Int) -> Unit,
     onMinutoCambio: (Int) -> Unit,
     onGuardar: () -> Unit,
@@ -990,19 +1058,23 @@ private fun RecordatorioHoraDialog(
 
     AlertDialog(
         onDismissRequest = onCancelar,
-        containerColor = Color(0xFF141414),
+        containerColor = GrisFondo,
         shape = RoundedCornerShape(20.dp),
         title = {
             Column {
                 Text(
-                    text = "RECORDATORIO",
+                    text = if (diaEnEdicion != null) "RECORDATORIO · ${diaEnEdicion.dayLabel.uppercase()}" else "RECORDATORIO",
                     color = VerdeTN,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "¿A qué hora entrenas?",
-                    color = Color.White,
+                    text = if (diaEnEdicion != null) {
+                        "¿A qué hora entrenas el ${diaEnEdicion.dayLabel.lowercase()}?"
+                    } else {
+                        "¿A qué hora entrenas?"
+                    },
+                    color = TextoPrincipal,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
@@ -1016,7 +1088,7 @@ private fun RecordatorioHoraDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF1F1F1F))
+                        .background(SuperficieElevada)
                         .border(1.5.dp, VerdeTN, RoundedCornerShape(16.dp))
                         .padding(vertical = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -1029,7 +1101,7 @@ private fun RecordatorioHoraDialog(
                     )
                     Text(
                         text = "%d:%02d %s".format(hora12, minuto, sufijo),
-                        color = Color.White,
+                        color = TextoPrincipal,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -1038,6 +1110,15 @@ private fun RecordatorioHoraDialog(
                         text = descripcion,
                         color = GrisTexto,
                         fontSize = 12.sp
+                    )
+                }
+
+                if (diaEnEdicion != null) {
+                    Text(
+                        text = "Cada día puede tener su propia hora. Cambia de día en la franja de arriba y mantén presionada la campana para configurarlo.",
+                        color = GrisTexto,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp
                     )
                 }
 
@@ -1066,7 +1147,7 @@ private fun RecordatorioHoraDialog(
         confirmButton = {
             Button(
                 onClick = onGuardar,
-                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = NegroFondo),
+                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = TextoSobreVerde),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text("GUARDAR", fontWeight = FontWeight.Bold, fontSize = 13.sp)
@@ -1092,7 +1173,7 @@ private fun SelectorNumerico(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
-            .background(Color(0xFF1F1F1F))
+            .background(SuperficieElevada)
             .padding(vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -1102,7 +1183,7 @@ private fun SelectorNumerico(
             BotonCircular("−", onMenos)
             Text(
                 text = valor,
-                color = Color.White,
+                color = TextoPrincipal,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.width(48.dp),

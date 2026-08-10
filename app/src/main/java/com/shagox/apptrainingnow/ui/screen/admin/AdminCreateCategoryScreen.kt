@@ -14,6 +14,7 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -135,9 +136,9 @@ fun AdminCreateCategoryScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = NegroFondo)
+                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = TextoSobreVerde)
             ) {
-                if (isLoading) CircularProgressIndicator(Modifier.size(24.dp), color = NegroFondo)
+                if (isLoading) CircularProgressIndicator(Modifier.size(24.dp), color = TextoSobreVerde)
                 else Text("Crear categoría")
             }
         }

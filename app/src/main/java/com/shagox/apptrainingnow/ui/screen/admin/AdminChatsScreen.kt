@@ -30,6 +30,7 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
 
 /**
  * Chat del admin: lista todos los usuarios para iniciar conversación.
@@ -80,8 +81,8 @@ fun AdminChatsScreen(
                 Icon(Icons.Default.Search, contentDescription = "Buscar", tint = VerdeTN)
             },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
+                focusedTextColor = TextoPrincipal,
+                unfocusedTextColor = TextoPrincipal,
                 focusedBorderColor = VerdeTN,
                 unfocusedBorderColor = GrisTexto,
                 cursorColor = VerdeTN,
@@ -166,7 +167,7 @@ private fun AdminChatUserCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "${user.name} ${user.lastName}",
-                    color = Color.White,
+                    color = TextoPrincipal,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
                 )

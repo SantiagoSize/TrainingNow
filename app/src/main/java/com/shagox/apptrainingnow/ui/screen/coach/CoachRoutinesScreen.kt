@@ -30,6 +30,8 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 import com.shagox.apptrainingnow.ui.viewmodel.CoachViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -141,7 +143,7 @@ fun CoachRoutinesScreen(
     showDeleteDialog?.let { routine ->
         AlertDialog(
             onDismissRequest = { showDeleteDialog = null },
-            title = { Text("Eliminar Rutina", color = Color.White) },
+            title = { Text("Eliminar Rutina", color = TextoPrincipal) },
             text = {
                 Text(
                     "¿Eliminar \"${routine.name}\"? No se puede deshacer.",
@@ -223,7 +225,7 @@ private fun StatItem(
             text = value,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = Color.White
+            color = TextoPrincipal
         )
         Text(
             text = label,
@@ -294,7 +296,7 @@ private fun RoutineCard(
                 text = routine.name,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = TextoPrincipal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -371,7 +373,7 @@ private fun EmptyRoutinesState(filter: RoutineFilter, onCreateRoutine: () -> Uni
             Spacer(modifier = Modifier.height(12.dp))
             Button(
                 onClick = onCreateRoutine,
-                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = NegroFondo)
+                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = TextoSobreVerde)
             ) {
                 Icon(Icons.Default.Add, null, Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))

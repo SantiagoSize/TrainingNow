@@ -30,6 +30,8 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -94,7 +96,7 @@ fun AdminUserListScreen(
                         label = { Text(label, fontSize = 12.sp) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = VerdeTN,
-                            selectedLabelColor = NegroFondo,
+                            selectedLabelColor = TextoSobreVerde,
                             containerColor = GrisFondo,
                             labelColor = Color.White
                         )
@@ -162,7 +164,7 @@ private fun UserListCard(user: UserEntity) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "${user.name} ${user.lastName}",
-                    color = Color.White,
+                    color = TextoPrincipal,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
                 )

@@ -134,28 +134,6 @@ interface RoutineDao {
     // ==================== RUTINAS - PROGRAMACIÓN/CALENDARIO ====================
 
     /**
-     * Obtiene todos los "días" de una rutina por su nombre (misma cabecera).
-     * Cada fila es un día con su dayInfo (ej. "Lunes - Empuje").
-     * Usado para: Lista de días → Vista de detalle de ejercicios.
-     */
-    @Query("""
-        SELECT * FROM routines 
-        WHERE name = :routineName AND (ownerId = :userId OR ownerId IS NULL)
-        ORDER BY id ASC
-    """)
-    fun getDaysForRoutineName(routineName: String, userId: Int): Flow<List<RoutineEntity>>
-
-    /**
-     * Versión síncrona para construir RoutineWithDays.
-     */
-    @Query("""
-        SELECT * FROM routines 
-        WHERE name = :routineName AND (ownerId = :userId OR ownerId IS NULL)
-        ORDER BY id ASC
-    """)
-    suspend fun getDaysForRoutineNameSync(routineName: String, userId: Int): List<RoutineEntity>
-
-    /**
      * Obtiene rutinas programadas para hoy.
      */
     @Query("""
@@ -212,113 +190,81 @@ interface RoutineDao {
     """)
     fun getRoutinesByDay(userId: Int, day: String): Flow<List<RoutineEntity>>
 
-    // ==================== ROUTINE-EXERCISE CROSSREF - CRUD ====================
+    // ==================== DÍAS DE LA RUTINA ====================
 
-    /**
-     * Inserta una relación rutina-ejercicio.
-     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDay(day: RoutineDayEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDays(days: List<RoutineDayEntity>)
+
+    @Update
+    suspend fun updateDay(day: RoutineDayEntity)
+
+    @Query("SELECT * FROM routine_days WHERE routineId = :routineId ORDER BY dayOrder ASC")
+    suspend fun getDaysOfRoutine(routineId: Int): List<RoutineDayEntity>
+
+    @Query("SELECT * FROM routine_days WHERE routineId = :routineId ORDER BY dayOrder ASC")
+    fun observeDaysOfRoutine(routineId: Int): Flow<List<RoutineDayEntity>>
+
+    @Query("SELECT * FROM routine_days WHERE id = :dayId")
+    suspend fun getDayById(dayId: Int): RoutineDayEntity?
+
+    /** Fija la hora del recordatorio de un día concreto. */
+    @Query("UPDATE routine_days SET reminderHour = :hora, reminderMinute = :minuto WHERE id = :dayId")
+    suspend fun updateDayReminder(dayId: Int, hora: Int?, minuto: Int?)
+
+    /** Todos los días con recordatorio propio de las rutinas de un usuario. */
+    @Query("""
+        SELECT routine_days.* FROM routine_days
+        INNER JOIN routines ON routines.id = routine_days.routineId
+        WHERE (routines.ownerId = :userId OR routines.ownerId IS NULL)
+          AND routine_days.reminderHour IS NOT NULL
+    """)
+    suspend fun getDaysWithReminder(userId: Int): List<RoutineDayEntity>
+
+    @Query("DELETE FROM routine_days WHERE routineId = :routineId")
+    suspend fun deleteDaysOfRoutine(routineId: Int)
+
+    // ==================== EJERCICIOS DEL DÍA ====================
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRoutineExercise(crossRef: RoutineExerciseEntity)
 
-    /**
-     * Inserta múltiples relaciones rutina-ejercicio.
-     */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRoutineExercises(exercises: List<RoutineExerciseEntity>)
 
-    /**
-     * Elimina un ejercicio de una rutina.
-     */
-    @Query("DELETE FROM routine_exercise WHERE routineId = :routineId AND exerciseId = :exerciseId")
-    suspend fun removeExerciseFromRoutine(routineId: Int, exerciseId: Int)
+    @Query("DELETE FROM routine_exercise WHERE dayId = :dayId AND exerciseId = :exerciseId")
+    suspend fun removeExerciseFromDay(dayId: Int, exerciseId: Int)
 
-    /**
-     * Elimina todos los ejercicios de una rutina.
-     */
-    @Query("DELETE FROM routine_exercise WHERE routineId = :routineId")
-    suspend fun clearRoutineExercises(routineId: Int)
+    @Query("DELETE FROM routine_exercise WHERE dayId = :dayId")
+    suspend fun clearDayExercises(dayId: Int)
 
-    /**
-     * Actualiza el orden de un ejercicio en la rutina.
-     */
-    @Query("UPDATE routine_exercise SET `order` = :newOrder WHERE routineId = :routineId AND exerciseId = :exerciseId")
-    suspend fun updateExerciseOrder(routineId: Int, exerciseId: Int, newOrder: Int)
+    @Query("UPDATE routine_exercise SET `order` = :newOrder WHERE dayId = :dayId AND exerciseId = :exerciseId")
+    suspend fun updateExerciseOrder(dayId: Int, exerciseId: Int, newOrder: Int)
 
-    // ==================== ROUTINE-EXERCISE - QUERIES ====================
-
-    /**
-     * Obtiene los ejercicios de una rutina con detalles completos.
-     */
+    /** Ejercicios de un día concreto. */
     @Transaction
     @Query("""
-        SELECT exercises.* FROM exercises 
-        INNER JOIN routine_exercise ON exercises.id = routine_exercise.exerciseId 
-        WHERE routine_exercise.routineId = :routineId 
+        SELECT exercises.* FROM exercises
+        INNER JOIN routine_exercise ON exercises.id = routine_exercise.exerciseId
+        WHERE routine_exercise.dayId = :dayId
         ORDER BY routine_exercise.`order` ASC
     """)
-    fun getExercisesForRoutine(routineId: Int): Flow<List<ExerciseEntity>>
+    fun getExercisesForDay(dayId: Int): Flow<List<ExerciseEntity>>
 
-    /**
-     * Obtiene los ejercicios de una rutina de forma síncrona.
-     */
     @Transaction
     @Query("""
-        SELECT exercises.* FROM exercises 
-        INNER JOIN routine_exercise ON exercises.id = routine_exercise.exerciseId 
-        WHERE routine_exercise.routineId = :routineId 
+        SELECT exercises.* FROM exercises
+        INNER JOIN routine_exercise ON exercises.id = routine_exercise.exerciseId
+        WHERE routine_exercise.dayId = :dayId
         ORDER BY routine_exercise.`order` ASC
     """)
-    suspend fun getExercisesForRoutineSync(routineId: Int): List<ExerciseEntity>
+    suspend fun getExercisesForDaySync(dayId: Int): List<ExerciseEntity>
 
-    /**
-     * Cuenta ejercicios en una rutina.
-     */
-    @Query("SELECT COUNT(*) FROM routine_exercise WHERE routineId = :routineId")
-    suspend fun countExercisesInRoutine(routineId: Int): Int
+    @Query("SELECT COUNT(*) FROM routine_exercise WHERE dayId = :dayId")
+    suspend fun countExercisesInDay(dayId: Int): Int
 
-    /**
-     * Verifica si un ejercicio está en una rutina.
-     */
-    @Query("SELECT EXISTS(SELECT 1 FROM routine_exercise WHERE routineId = :routineId AND exerciseId = :exerciseId)")
-    suspend fun isExerciseInRoutine(routineId: Int, exerciseId: Int): Boolean
-
-    /**
-     * Obtiene las rutinas que contienen un ejercicio específico.
-     */
-    @Query("""
-        SELECT routines.* FROM routines
-        INNER JOIN routine_exercise ON routines.id = routine_exercise.routineId
-        WHERE routine_exercise.exerciseId = :exerciseId
-    """)
-    fun getRoutinesContainingExercise(exerciseId: Int): Flow<List<RoutineEntity>>
-
-    /**
-     * Obtiene el detalle de la relación rutina-ejercicio.
-     */
-    @Query("SELECT * FROM routine_exercise WHERE routineId = :routineId ORDER BY `order` ASC")
-    suspend fun getRoutineExerciseDetails(routineId: Int): List<RoutineExerciseEntity>
-
-    // ==================== ESTADÍSTICAS ====================
-
-    /**
-     * Obtiene estadísticas de rutinas de un usuario.
-     */
-    @Query("""
-        SELECT 
-            COUNT(*) as totalRoutines,
-            SUM(CASE WHEN ownerId IS NULL THEN 1 ELSE 0 END) as globalRoutines,
-            SUM(CASE WHEN ownerId = :userId THEN 1 ELSE 0 END) as personalRoutines
-        FROM routines 
-        WHERE ownerId = :userId OR ownerId IS NULL
-    """)
-    suspend fun getRoutineStats(userId: Int): RoutineStats
+    @Query("SELECT EXISTS(SELECT 1 FROM routine_exercise WHERE dayId = :dayId AND exerciseId = :exerciseId)")
+    suspend fun isExerciseInDay(dayId: Int, exerciseId: Int): Boolean
 }
-
-/**
- * Clase de datos para estadísticas de rutinas.
- */
-data class RoutineStats(
-    val totalRoutines: Int,
-    val globalRoutines: Int,
-    val personalRoutines: Int
-)

@@ -58,6 +58,7 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
 
 /** Categoría de la biblioteca con su conteo de ejercicios. */
 data class LibraryCategory(
@@ -139,8 +140,8 @@ fun LibraryScreen(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = VerdeTN,
                     unfocusedBorderColor = GrisBorde,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
+                    focusedTextColor = TextoPrincipal,
+                    unfocusedTextColor = TextoPrincipal,
                     cursorColor = VerdeTN,
                     focusedContainerColor = GrisFondo,
                     unfocusedContainerColor = GrisFondo
@@ -183,7 +184,7 @@ fun LibraryScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 exercise.name,
-                                color = Color.White,
+                                color = TextoPrincipal,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -244,7 +245,7 @@ fun LibraryScreen(
                     } else {
                         Text(
                             text = "No se pudo cargar la biblioteca",
-                            color = Color.White,
+                            color = TextoPrincipal,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -324,7 +325,7 @@ private fun CategoryCard(
             Column {
                 Text(
                     text = name,
-                    color = Color.White,
+                    color = TextoPrincipal,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     lineHeight = 19.sp

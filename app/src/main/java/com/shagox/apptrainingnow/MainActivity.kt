@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -25,12 +29,24 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val app = application as TrainingNowApplication
+        // Si se abrió desde la notificación del recordatorio, ir directo a esa rutina
+        val routineIdDesdeNotificacion = intent?.getIntExtra(ReminderReceiver.EXTRA_ROUTINE_ID, 0) ?: 0
+        if (routineIdDesdeNotificacion > 0) {
+            sharedPreferences.edit()
+                .putString("active_routine_route", Route.RoutineActive.createRoute(routineIdDesdeNotificacion))
+                .apply()
+        }
+
         val startDestination = sharedPreferences.getString("active_routine_route", null)
             ?: sharedPreferences.getBoolean("has_seen_welcome", false).let { seen ->
                 if (seen) Route.UserRoutines.path else Route.Welcome.path
             }
         setContent {
-            AppTrainingNowTheme {
+            // Tema elegido por el usuario (Ajustes); se aplica a toda la app
+            var temaClaro by remember {
+                mutableStateOf(com.shagox.apptrainingnow.ui.theme.ThemePreference.esTemaClaro(this))
+            }
+            AppTrainingNowTheme(temaClaro = temaClaro) {
                 val navController = rememberNavController()
                 val authViewModel: AuthViewModel = viewModel(
                     factory = AuthViewModelFactory(app.userRepository)
@@ -46,7 +62,12 @@ class MainActivity : ComponentActivity() {
                     progressRepository = app.progressRepository,
                     notificationRepository = app.notificationRepository,
                     exerciseRepository = app.exerciseRepository,
-                    workoutRepository = app.workoutRepository
+                    workoutRepository = app.workoutRepository,
+                    temaClaro = temaClaro,
+                    onCambiarTema = { claro ->
+                        temaClaro = claro
+                        com.shagox.apptrainingnow.ui.theme.ThemePreference.guardar(this, claro)
+                    }
                 )
             }
         }

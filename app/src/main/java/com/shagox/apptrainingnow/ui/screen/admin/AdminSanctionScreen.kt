@@ -21,6 +21,8 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -89,8 +91,8 @@ fun AdminSanctionScreen(
                     placeholder = { Text("Ej: 1") },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
+                        focusedTextColor = TextoPrincipal,
+                        unfocusedTextColor = TextoPrincipal,
                         focusedBorderColor = VerdeTN,
                         unfocusedBorderColor = GrisTexto
                     ),
@@ -129,7 +131,7 @@ fun AdminSanctionScreen(
                 ) {
                     Text(
                         "${user.name} ${user.lastName} (${user.email}) - ${user.role}",
-                        color = Color.White,
+                        color = TextoPrincipal,
                         fontSize = 14.sp
                     )
                 }
@@ -149,7 +151,7 @@ fun AdminSanctionScreen(
                         label = { Text(label) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = VerdeTN,
-                            selectedLabelColor = NegroFondo
+                            selectedLabelColor = TextoSobreVerde
                         )
                     )
                 }
@@ -163,8 +165,8 @@ fun AdminSanctionScreen(
                 placeholder = { Text("Indica el motivo de la sanción") },
                 minLines = 2,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
+                    focusedTextColor = TextoPrincipal,
+                    unfocusedTextColor = TextoPrincipal,
                     focusedBorderColor = VerdeTN,
                     unfocusedBorderColor = GrisTexto
                 ),
@@ -179,8 +181,8 @@ fun AdminSanctionScreen(
                     label = { Text("Días de suspensión") },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
+                        focusedTextColor = TextoPrincipal,
+                        unfocusedTextColor = TextoPrincipal,
                         focusedBorderColor = VerdeTN,
                         unfocusedBorderColor = GrisTexto
                     ),
@@ -215,9 +217,9 @@ fun AdminSanctionScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = NegroFondo)
+                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = TextoSobreVerde)
             ) {
-                if (isLoading) CircularProgressIndicator(Modifier.size(24.dp), color = NegroFondo)
+                if (isLoading) CircularProgressIndicator(Modifier.size(24.dp), color = TextoSobreVerde)
                 else Text("Aplicar")
             }
         }
@@ -225,7 +227,7 @@ fun AdminSanctionScreen(
     if (showConfirmDelete && selectedUser != null) {
         AlertDialog(
             onDismissRequest = { showConfirmDelete = false },
-            title = { Text("Eliminar cuenta", color = Color.White) },
+            title = { Text("Eliminar cuenta", color = TextoPrincipal) },
             text = {
                 Text(
                     "¿Eliminar a ${selectedUser!!.name} ${selectedUser!!.lastName}? Motivo: $reason. No se puede deshacer.",

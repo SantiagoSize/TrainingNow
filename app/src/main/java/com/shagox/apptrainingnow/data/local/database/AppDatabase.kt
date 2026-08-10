@@ -18,6 +18,7 @@ import com.shagox.apptrainingnow.data.local.progress.GoalEntity
 import com.shagox.apptrainingnow.data.local.progress.PersonalRecordEntity
 import com.shagox.apptrainingnow.data.local.progress.ProgressDao
 import com.shagox.apptrainingnow.data.local.routine.RoutineDao
+import com.shagox.apptrainingnow.data.local.routine.RoutineDayEntity
 import com.shagox.apptrainingnow.data.local.routine.RoutineEntity
 import com.shagox.apptrainingnow.data.local.routine.RoutineExerciseEntity
 import com.shagox.apptrainingnow.data.local.trainer.TrainerClientDao
@@ -47,7 +48,7 @@ import kotlinx.coroutines.launch
  * - Sesiones de entrenamiento con registro detallado
  * - Relaciones entrenador-cliente
  * 
- * @version 7 - Ejercicios: instrucciones, consejos, errores comunes y volumen recomendado
+ * @version 9 - Días de rutina con hora de recordatorio propia
  */
 @Database(
     entities = [
@@ -57,6 +58,7 @@ import kotlinx.coroutines.launch
         // Ejercicios y rutinas
         ExerciseEntity::class,
         RoutineEntity::class,
+        RoutineDayEntity::class,
         RoutineExerciseEntity::class,
         
         // Comunicación
@@ -75,7 +77,7 @@ import kotlinx.coroutines.launch
         GoalEntity::class,
         PersonalRecordEntity::class
     ],
-    version = 7,
+    version = 9,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -489,6 +491,337 @@ abstract class AppDatabase : RoomDatabase() {
                     description = "Salta abriendo piernas y brazos simultáneamente. Ejercicio de calentamiento y cardio básico.",
                     videoUrl = "https://youtube.com/watch?v=jumping_jacks",
                     isSystemDefault = true
+                ),
+
+                // === BÁSQUETBOL (29-36) ===
+                ExerciseEntity(
+                    name = "Dribbling con Conos",
+                    category = "Básquetbol",
+                    description = "Recorrido en zigzag entre conos manteniendo el balón bajo control con ambas manos. Mejora el manejo y el cambio de dirección.",
+                    videoUrl = "",
+                    muscles = "Antebrazo, Core, Piernas",
+                    difficulty = "PRINCIPIANTE",
+                    equipment = "Balón y conos",
+                    recommendedSets = 4,
+                    recommendedReps = "30 seg",
+                    restSeconds = 45,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Tiro Libre",
+                    category = "Básquetbol",
+                    description = "Serie de lanzamientos desde la línea de tiros libres con rutina previa constante. Trabaja técnica y concentración.",
+                    videoUrl = "",
+                    muscles = "Hombros, Tríceps, Core",
+                    difficulty = "PRINCIPIANTE",
+                    equipment = "Balón y aro",
+                    recommendedSets = 5,
+                    recommendedReps = "10 tiros",
+                    restSeconds = 60,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Salto al Cajón",
+                    category = "Básquetbol",
+                    description = "Salto explosivo con ambos pies sobre un cajón, aterrizando suave con rodillas flexionadas. Desarrolla potencia para el salto vertical.",
+                    videoUrl = "",
+                    muscles = "Cuádriceps, Glúteos, Gemelos",
+                    difficulty = "INTERMEDIO",
+                    equipment = "Cajón pliométrico",
+                    recommendedSets = 4,
+                    recommendedReps = "8-10",
+                    restSeconds = 90,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Desplazamiento Defensivo",
+                    category = "Básquetbol",
+                    description = "Movimiento lateral en posición defensiva, sin cruzar los pies y manteniendo la cadera baja. Base de la defensa individual.",
+                    videoUrl = "",
+                    muscles = "Cuádriceps, Glúteos, Aductores",
+                    difficulty = "PRINCIPIANTE",
+                    equipment = "Peso corporal",
+                    recommendedSets = 4,
+                    recommendedReps = "30 seg",
+                    restSeconds = 45,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Entrada a Canasta",
+                    category = "Básquetbol",
+                    description = "Aproximación en dos tiempos finalizando en bandeja, alternando lado derecho e izquierdo.",
+                    videoUrl = "",
+                    muscles = "Piernas, Core",
+                    difficulty = "INTERMEDIO",
+                    equipment = "Balón y aro",
+                    recommendedSets = 4,
+                    recommendedReps = "10 por lado",
+                    restSeconds = 60,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Sprint de Cancha",
+                    category = "Básquetbol",
+                    description = "Carrera a máxima velocidad de fondo a fondo, con cambio de sentido. Mejora la resistencia específica del partido.",
+                    videoUrl = "",
+                    muscles = "Piernas, Sistema cardiovascular",
+                    difficulty = "INTERMEDIO",
+                    equipment = "Cancha",
+                    recommendedSets = 6,
+                    recommendedReps = "1 largo",
+                    restSeconds = 60,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Rebote y Salida",
+                    category = "Básquetbol",
+                    description = "Captura del rebote con ambas manos, protección del balón y primer pase de salida rápida.",
+                    videoUrl = "",
+                    muscles = "Espalda, Hombros, Piernas",
+                    difficulty = "INTERMEDIO",
+                    equipment = "Balón y aro",
+                    recommendedSets = 4,
+                    recommendedReps = "8-10",
+                    restSeconds = 60,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Tiro de Media Distancia",
+                    category = "Básquetbol",
+                    description = "Lanzamientos desde distintos puntos del perímetro tras recepción o autopase, cuidando el equilibrio.",
+                    videoUrl = "",
+                    muscles = "Hombros, Tríceps, Piernas",
+                    difficulty = "INTERMEDIO",
+                    equipment = "Balón y aro",
+                    recommendedSets = 5,
+                    recommendedReps = "10 tiros",
+                    restSeconds = 45,
+                    isSystemDefault = true
+                ),
+
+                // === PILATES (37-45) ===
+                ExerciseEntity(
+                    name = "The Hundred",
+                    category = "Pilates",
+                    description = "Tumbado boca arriba, piernas en mesa y tronco elevado, bombea los brazos 100 tiempos coordinando la respiración.",
+                    videoUrl = "",
+                    muscles = "Core profundo, Abdominales",
+                    difficulty = "PRINCIPIANTE",
+                    equipment = "Colchoneta",
+                    recommendedSets = 1,
+                    recommendedReps = "100 tiempos",
+                    restSeconds = 30,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Roll Up",
+                    category = "Pilates",
+                    description = "Desde tumbado, enrolla la columna vértebra a vértebra hasta sentarte y desciende con el mismo control.",
+                    videoUrl = "",
+                    muscles = "Recto abdominal, Columna",
+                    difficulty = "INTERMEDIO",
+                    equipment = "Colchoneta",
+                    recommendedSets = 2,
+                    recommendedReps = "8-10",
+                    restSeconds = 30,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Single Leg Stretch",
+                    category = "Pilates",
+                    description = "Alterna el estiramiento de una pierna mientras la otra se acerca al pecho, manteniendo la zona lumbar apoyada.",
+                    videoUrl = "",
+                    muscles = "Core, Oblicuos, Flexores de cadera",
+                    difficulty = "PRINCIPIANTE",
+                    equipment = "Colchoneta",
+                    recommendedSets = 2,
+                    recommendedReps = "10 por lado",
+                    restSeconds = 30,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Puente de Hombros",
+                    category = "Pilates",
+                    description = "Eleva la cadera desde el suelo desenrollando la columna, aprieta glúteos arriba y baja vértebra a vértebra.",
+                    videoUrl = "",
+                    muscles = "Glúteos, Isquiotibiales, Core",
+                    difficulty = "PRINCIPIANTE",
+                    equipment = "Colchoneta",
+                    recommendedSets = 3,
+                    recommendedReps = "10-12",
+                    restSeconds = 30,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Swan Dive",
+                    category = "Pilates",
+                    description = "Boca abajo, extiende la columna elevando el pecho con los brazos apoyados, sin forzar la zona lumbar.",
+                    videoUrl = "",
+                    muscles = "Erectores espinales, Glúteos",
+                    difficulty = "INTERMEDIO",
+                    equipment = "Colchoneta",
+                    recommendedSets = 2,
+                    recommendedReps = "8-10",
+                    restSeconds = 30,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Side Kick",
+                    category = "Pilates",
+                    description = "De lado, con el cuerpo alineado, lleva la pierna superior adelante y atrás controlando el movimiento desde el core.",
+                    videoUrl = "",
+                    muscles = "Glúteo medio, Oblicuos, Aductores",
+                    difficulty = "PRINCIPIANTE",
+                    equipment = "Colchoneta",
+                    recommendedSets = 2,
+                    recommendedReps = "12 por lado",
+                    restSeconds = 30,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Teaser",
+                    category = "Pilates",
+                    description = "Desde tumbado, sube tronco y piernas formando una V manteniendo el equilibrio sobre los isquiones.",
+                    videoUrl = "",
+                    muscles = "Core completo, Flexores de cadera",
+                    difficulty = "AVANZADO",
+                    equipment = "Colchoneta",
+                    recommendedSets = 2,
+                    recommendedReps = "6-8",
+                    restSeconds = 45,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Estiramiento del Gato",
+                    category = "Pilates",
+                    description = "En cuadrupedia, alterna arquear y redondear la columna al ritmo de la respiración. Movilidad para la espalda.",
+                    videoUrl = "",
+                    muscles = "Columna, Core",
+                    difficulty = "PRINCIPIANTE",
+                    equipment = "Colchoneta",
+                    recommendedSets = 2,
+                    recommendedReps = "10",
+                    restSeconds = 20,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Criss Cross",
+                    category = "Pilates",
+                    description = "Rotación del tronco llevando el codo hacia la rodilla contraria, con movimiento lento y controlado.",
+                    videoUrl = "",
+                    muscles = "Oblicuos, Recto abdominal",
+                    difficulty = "INTERMEDIO",
+                    equipment = "Colchoneta",
+                    recommendedSets = 2,
+                    recommendedReps = "10 por lado",
+                    restSeconds = 30,
+                    isSystemDefault = true
+                ),
+
+                // === FÚTBOL (46-53) ===
+                ExerciseEntity(
+                    name = "Conducción con Balón",
+                    category = "Fútbol",
+                    description = "Recorrido en zigzag entre conos golpeando el balón con el interior y exterior del pie. Mejora el control en carrera.",
+                    videoUrl = "",
+                    muscles = "Cuádriceps, Gemelos, Core",
+                    difficulty = "PRINCIPIANTE",
+                    equipment = "Balón y conos",
+                    recommendedSets = 4,
+                    recommendedReps = "30 seg",
+                    restSeconds = 45,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Pase y Control",
+                    category = "Fútbol",
+                    description = "Pases a corta y media distancia con control orientado, alternando ambos perfiles. Base técnica del juego colectivo.",
+                    videoUrl = "",
+                    muscles = "Piernas, Core",
+                    difficulty = "PRINCIPIANTE",
+                    equipment = "Balón y compañero o pared",
+                    recommendedSets = 4,
+                    recommendedReps = "20 pases",
+                    restSeconds = 45,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Definición a Portería",
+                    category = "Fútbol",
+                    description = "Remates desde el borde del área tras conducción o pase, buscando colocación antes que potencia.",
+                    videoUrl = "",
+                    muscles = "Cuádriceps, Isquiotibiales, Core",
+                    difficulty = "INTERMEDIO",
+                    equipment = "Balón y portería",
+                    recommendedSets = 5,
+                    recommendedReps = "8 remates",
+                    restSeconds = 60,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Sprint con Cambio de Dirección",
+                    category = "Fútbol",
+                    description = "Carreras cortas a máxima intensidad con giros de 90 y 180 grados. Reproduce las acciones reales del partido.",
+                    videoUrl = "",
+                    muscles = "Piernas, Sistema cardiovascular",
+                    difficulty = "INTERMEDIO",
+                    equipment = "Conos",
+                    recommendedSets = 6,
+                    recommendedReps = "20 metros",
+                    restSeconds = 60,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Escalera de Agilidad",
+                    category = "Fútbol",
+                    description = "Series de apoyos rápidos dentro de la escalera, variando el patrón de pisada. Mejora la coordinación y la frecuencia de zancada.",
+                    videoUrl = "",
+                    muscles = "Gemelos, Tibial, Core",
+                    difficulty = "PRINCIPIANTE",
+                    equipment = "Escalera de agilidad",
+                    recommendedSets = 4,
+                    recommendedReps = "3 pasadas",
+                    restSeconds = 45,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Juego de Cabeza",
+                    category = "Fútbol",
+                    description = "Remates de cabeza tras centro o autopase, golpeando con la frente y acompañando con el tronco.",
+                    videoUrl = "",
+                    muscles = "Cuello, Core, Piernas",
+                    difficulty = "INTERMEDIO",
+                    equipment = "Balón",
+                    recommendedSets = 3,
+                    recommendedReps = "10 remates",
+                    restSeconds = 60,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Carrera Continua",
+                    category = "Fútbol",
+                    description = "Trote sostenido a ritmo moderado para construir base aeróbica y recuperar entre sesiones intensas.",
+                    videoUrl = "",
+                    muscles = "Piernas, Sistema cardiovascular",
+                    difficulty = "PRINCIPIANTE",
+                    equipment = "Peso corporal",
+                    recommendedSets = 1,
+                    recommendedReps = "25-35 min",
+                    restSeconds = 0,
+                    isSystemDefault = true
+                ),
+                ExerciseEntity(
+                    name = "Rondo 4 contra 1",
+                    category = "Fútbol",
+                    description = "Juego de posesión en círculo: cuatro jugadores conservan el balón a uno o dos toques mientras uno presiona.",
+                    videoUrl = "",
+                    muscles = "Piernas, Core",
+                    difficulty = "INTERMEDIO",
+                    equipment = "Balón y compañeros",
+                    recommendedSets = 4,
+                    recommendedReps = "3 min",
+                    restSeconds = 60,
+                    isSystemDefault = true
                 )
             )
             dao.insertExercises(exercises)
@@ -500,91 +833,109 @@ abstract class AppDatabase : RoomDatabase() {
          */
         private suspend fun prepopulateRoutines(dao: RoutineDao) {
             if (dao.count() > 0) return
-            
-            // === RUTINA GLOBAL: Básicos para principiantes ===
-            val rutinaPrincipiantes = RoutineEntity(
-                name = "Rutina Full Body - Principiantes",
-                dayInfo = "Lunes, Miércoles, Viernes",
-                ownerId = null, // Pública
-                creatorId = 1   // Admin
-            )
-            val principiantesId = dao.insertRoutine(rutinaPrincipiantes).toInt()
-            dao.insertRoutineExercises(listOf(
-                RoutineExerciseEntity(routineId = principiantesId, exerciseId = 9, order = 1),  // Sentadilla
-                RoutineExerciseEntity(routineId = principiantesId, exerciseId = 1, order = 2),  // Press Banca
-                RoutineExerciseEntity(routineId = principiantesId, exerciseId = 5, order = 3),  // Dominadas
-                RoutineExerciseEntity(routineId = principiantesId, exerciseId = 22, order = 4), // Plancha
-                RoutineExerciseEntity(routineId = principiantesId, exerciseId = 18, order = 5)  // Curl Bíceps
-            ))
 
-            // === RUTINA GLOBAL: Push (Empuje) ===
-            val rutinaPush = RoutineEntity(
-                name = "Push Day - Pecho, Hombros, Tríceps",
-                dayInfo = "Día de Empuje",
-                ownerId = null,
-                creatorId = 2 // Santiago
-            )
-            val pushId = dao.insertRoutine(rutinaPush).toInt()
-            dao.insertRoutineExercises(listOf(
-                RoutineExerciseEntity(routineId = pushId, exerciseId = 1, order = 1),  // Press Banca
-                RoutineExerciseEntity(routineId = pushId, exerciseId = 2, order = 2),  // Press Inclinado
-                RoutineExerciseEntity(routineId = pushId, exerciseId = 14, order = 3), // Press Militar
-                RoutineExerciseEntity(routineId = pushId, exerciseId = 15, order = 4), // Elevaciones Lat
-                RoutineExerciseEntity(routineId = pushId, exerciseId = 20, order = 5), // Extensión Tríceps
-                RoutineExerciseEntity(routineId = pushId, exerciseId = 4, order = 6)   // Fondos
-            ))
+            val semana = listOf("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
 
-            // === RUTINA GLOBAL: Pull (Tirón) ===
-            val rutinaPull = RoutineEntity(
-                name = "Pull Day - Espalda, Bíceps",
-                dayInfo = "Día de Tirón",
-                ownerId = null,
-                creatorId = 2
-            )
-            val pullId = dao.insertRoutine(rutinaPull).toInt()
-            dao.insertRoutineExercises(listOf(
-                RoutineExerciseEntity(routineId = pullId, exerciseId = 8, order = 1),  // Peso Muerto
-                RoutineExerciseEntity(routineId = pullId, exerciseId = 5, order = 2),  // Dominadas
-                RoutineExerciseEntity(routineId = pullId, exerciseId = 6, order = 3),  // Remo Barra
-                RoutineExerciseEntity(routineId = pullId, exerciseId = 7, order = 4),  // Jalón
-                RoutineExerciseEntity(routineId = pullId, exerciseId = 18, order = 5), // Curl Bíceps
-                RoutineExerciseEntity(routineId = pullId, exerciseId = 19, order = 6)  // Curl Martillo
-            ))
+            /** Crea un día con su sesión y ejercicios. Sin ejercicios = día de descanso. */
+            suspend fun dia(
+                routineId: Int,
+                orden: Int,
+                actividad: String,
+                ejercicios: List<Int>,
+                hora: Int? = null
+            ) {
+                val dayId = dao.insertDay(
+                    RoutineDayEntity(
+                        routineId = routineId,
+                        dayLabel = semana[orden],
+                        activityName = actividad,
+                        dayOrder = orden,
+                        reminderHour = hora,
+                        reminderMinute = if (hora != null) 0 else null
+                    )
+                ).toInt()
+                if (ejercicios.isNotEmpty()) {
+                    dao.insertRoutineExercises(
+                        ejercicios.mapIndexed { i, ejercicioId ->
+                            RoutineExerciseEntity(dayId = dayId, exerciseId = ejercicioId, order = i + 1)
+                        }
+                    )
+                }
+            }
 
-            // === RUTINA PRIVADA para Juan (Cliente ID 4) ===
-            val rutinaJuan = RoutineEntity(
-                name = "Plan Hipertrofia - Semana 1",
-                dayInfo = "Lunes - Pecho",
-                ownerId = 4,
-                creatorId = 2,
-                scheduledTime = System.currentTimeMillis() + 86400000
-            )
-            val juanId = dao.insertRoutine(rutinaJuan).toInt()
-            dao.insertRoutineExercises(listOf(
-                RoutineExerciseEntity(routineId = juanId, exerciseId = 1, order = 1),
-                RoutineExerciseEntity(routineId = juanId, exerciseId = 2, order = 2),
-                RoutineExerciseEntity(routineId = juanId, exerciseId = 3, order = 3),
-                RoutineExerciseEntity(routineId = juanId, exerciseId = 4, order = 4)
-            ))
+            // ==================== BÁSQUETBOL ====================
+            // Pretemporada: técnica individual + fuerza + acondicionamiento
+            val basquetId = dao.insertRoutine(
+                RoutineEntity(
+                    name = "Pretemporada de Básquetbol",
+                    dayInfo = "Lunes, Martes, Jueves, Viernes, Sábado",
+                    ownerId = null,
+                    creatorId = 1
+                )
+            ).toInt()
+            dia(basquetId, 0, "Manejo de balón y tiro", listOf(29, 30, 33, 36))
+            dia(basquetId, 1, "Fuerza de tren inferior", listOf(9, 10, 8, 13, 22))
+            dia(basquetId, 2, "", emptyList())
+            dia(basquetId, 3, "Salto y potencia", listOf(31, 26, 13, 35))
+            dia(basquetId, 4, "Defensa y agilidad", listOf(32, 27, 29, 34))
+            dia(basquetId, 5, "Partido y tiro libre", listOf(34, 30, 36, 28))
+            dia(basquetId, 6, "", emptyList())
 
-            // === RUTINA PRIVADA para Ana (Cliente ID 5) ===
-            val rutinaAna = RoutineEntity(
-                name = "Glúteos y Piernas - Intensivo",
-                dayInfo = "Martes y Jueves",
-                ownerId = 5,
-                creatorId = 3, // María
-                scheduledTime = System.currentTimeMillis() + 172800000
-            )
-            val anaId = dao.insertRoutine(rutinaAna).toInt()
-            dao.insertRoutineExercises(listOf(
-                RoutineExerciseEntity(routineId = anaId, exerciseId = 9, order = 1),  // Sentadilla
-                RoutineExerciseEntity(routineId = anaId, exerciseId = 10, order = 2), // Prensa
-                RoutineExerciseEntity(routineId = anaId, exerciseId = 13, order = 3), // Zancadas
-                RoutineExerciseEntity(routineId = anaId, exerciseId = 12, order = 4), // Curl Femoral
-                RoutineExerciseEntity(routineId = anaId, exerciseId = 22, order = 5)  // Plancha
-            ))
+            // ==================== HIPERTROFIA ====================
+            // Rutina clásica de 5 días con división por grupos musculares
+            val hipertrofiaId = dao.insertRoutine(
+                RoutineEntity(
+                    name = "Hipertrofia - 5 días",
+                    dayInfo = "Lunes, Martes, Miércoles, Jueves, Viernes",
+                    ownerId = null,
+                    creatorId = 2
+                )
+            ).toInt()
+            dia(hipertrofiaId, 0, "Pecho y Tríceps", listOf(1, 2, 3, 20, 21))
+            dia(hipertrofiaId, 1, "Espalda y Bíceps", listOf(5, 6, 7, 18, 19))
+            dia(hipertrofiaId, 2, "Piernas", listOf(9, 10, 11, 12, 8))
+            dia(hipertrofiaId, 3, "Hombros y Core", listOf(14, 15, 16, 17, 22))
+            dia(hipertrofiaId, 4, "Full Body y Brazos", listOf(1, 5, 9, 18, 20))
+            dia(hipertrofiaId, 5, "", emptyList())
+            dia(hipertrofiaId, 6, "", emptyList())
 
-            android.util.Log.d(TAG, "Rutinas creadas: 5")
+            // ==================== PILATES ====================
+            // Mat Pilates progresivo: control, fuerza del centro y movilidad
+            val pilatesId = dao.insertRoutine(
+                RoutineEntity(
+                    name = "Pilates Mat - Semana completa",
+                    dayInfo = "Lunes, Miércoles, Viernes, Domingo",
+                    ownerId = null,
+                    creatorId = 3
+                )
+            ).toInt()
+            dia(pilatesId, 0, "Centro y respiración", listOf(37, 38, 39, 45))
+            dia(pilatesId, 1, "", emptyList())
+            dia(pilatesId, 2, "Fuerza y estabilidad", listOf(37, 40, 42, 41))
+            dia(pilatesId, 3, "", emptyList())
+            dia(pilatesId, 4, "Core avanzado", listOf(37, 43, 45, 39))
+            dia(pilatesId, 5, "", emptyList())
+            dia(pilatesId, 6, "Movilidad y estiramiento", listOf(44, 41, 40, 38))
+
+            // ==================== FÚTBOL ====================
+            // Semana tipo: técnica, fuerza, velocidad y partido el fin de semana
+            val futbolId = dao.insertRoutine(
+                RoutineEntity(
+                    name = "Preparación de Fútbol",
+                    dayInfo = "Lunes, Martes, Miércoles, Viernes, Sábado",
+                    ownerId = null,
+                    creatorId = 1
+                )
+            ).toInt()
+            dia(futbolId, 0, "Técnica y pase", listOf(46, 47, 50, 53))
+            dia(futbolId, 1, "Fuerza de piernas", listOf(9, 13, 12, 8, 22))
+            dia(futbolId, 2, "Velocidad y agilidad", listOf(49, 50, 46, 27))
+            dia(futbolId, 3, "", emptyList())
+            dia(futbolId, 4, "Definición y remate", listOf(48, 51, 47, 53))
+            dia(futbolId, 5, "Partido", listOf(53, 48, 49))
+            dia(futbolId, 6, "Recuperación activa", listOf(52, 44))
+
+            android.util.Log.d(TAG, "Rutinas creadas: 4 (Básquetbol, Fútbol, Hipertrofia, Pilates)")
         }
 
         /**

@@ -23,6 +23,120 @@ class WorkoutRepository(private val workoutDao: WorkoutDao) {
      * Inicia una nueva sesión de entrenamiento.
      * @return ID de la sesión creada
      */
+    /**
+     * Reporte mensual calculado desde la base de datos local.
+     * Se usa para usuarios sin cuenta (invitados), que no existen en el backend.
+     * @param mes formato yyyy-MM
+     */
+    suspend fun reporteMensualLocal(userId: Int, mes: String): com.shagox.apptrainingnow.data.remote.dto.MonthlyReportDto {
+        val formato = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+        val cal = java.util.Calendar.getInstance()
+        val partes = mes.split("-")
+        if (partes.size == 2) {
+            cal.set(java.util.Calendar.YEAR, partes[0].toIntOrNull() ?: cal.get(java.util.Calendar.YEAR))
+            cal.set(java.util.Calendar.MONTH, (partes[1].toIntOrNull() ?: 1) - 1)
+        }
+        cal.set(java.util.Calendar.DAY_OF_MONTH, 1)
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        cal.set(java.util.Calendar.MINUTE, 0)
+        cal.set(java.util.Calendar.SECOND, 0)
+        cal.set(java.util.Calendar.MILLISECOND, 0)
+        val inicio = cal.timeInMillis
+        cal.add(java.util.Calendar.MONTH, 1)
+        val fin = cal.timeInMillis
+
+        val sesiones = workoutDao.getRecentSessions(userId, 200)
+            .filter { it.startTime in inicio until fin && it.status == WorkoutSessionStatus.COMPLETED.name }
+
+        // Un registro por día entrenado
+        val porDia = sesiones.groupBy { formato.format(java.util.Date(it.startTime)) }
+        val dias = porDia.entries.sortedBy { it.key }.map { (fecha, lista) ->
+            com.shagox.apptrainingnow.data.remote.dto.AttendanceDayDto(
+                userId = userId,
+                date = fecha,
+                status = "TRAINED",
+                exercisesCompleted = lista.size,
+                createdAt = lista.first().startTime
+            )
+        }
+
+        // Rachas de días consecutivos
+        var mejorRacha = 0
+        var rachaActual = 0
+        var anterior: java.util.Calendar? = null
+        dias.forEach { dia ->
+            val actual = java.util.Calendar.getInstance().apply { time = formato.parse(dia.date) ?: java.util.Date() }
+            val consecutivo = anterior?.let {
+                val siguiente = (it.clone() as java.util.Calendar).apply { add(java.util.Calendar.DAY_OF_YEAR, 1) }
+                siguiente.get(java.util.Calendar.DAY_OF_YEAR) == actual.get(java.util.Calendar.DAY_OF_YEAR)
+            } ?: false
+            rachaActual = if (consecutivo) rachaActual + 1 else 1
+            mejorRacha = maxOf(mejorRacha, rachaActual)
+            anterior = actual
+        }
+
+        val entrenados = dias.size
+        return com.shagox.apptrainingnow.data.remote.dto.MonthlyReportDto(
+            month = mes,
+            daysTrained = entrenados,
+            daysMissed = 0,
+            daysRest = 0,
+            totalExercises = dias.sumOf { it.exercisesCompleted },
+            totalMinutes = 0,
+            adherencePercent = if (entrenados == 0) 0 else 100,
+            longestStreak = mejorRacha,
+            currentStreak = rachaActual,
+            days = dias
+        )
+    }
+
+    /**
+     * Registra un día de entrenamiento ya terminado (marcar todos los ejercicios).
+     * Queda guardado en la base de datos con el nombre de la rutina y la sesión del día,
+     * de modo que el conteo de días entrenados sobrevive al cierre de la app.
+     *
+     * Es idempotente por día: si ya hay una sesión completada hoy para esa rutina, no duplica.
+     */
+    suspend fun registrarDiaCompletado(
+        userId: Int,
+        routineId: Int,
+        nombreRutina: String,
+        nombreSesion: String,
+        ejercicios: Int
+    ): Result<Long> {
+        return try {
+            val inicioDia = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }.timeInMillis
+            val finDia = inicioDia + 24L * 60 * 60 * 1000
+
+            val yaRegistrado = workoutDao.getRecentSessions(userId, 20).any { sesion ->
+                sesion.routineId == routineId &&
+                    sesion.status == WorkoutSessionStatus.COMPLETED.name &&
+                    sesion.startTime in inicioDia until finDia
+            }
+            if (yaRegistrado) return Result.success(0L)
+
+            val ahora = System.currentTimeMillis()
+            val id = workoutDao.insertSession(
+                WorkoutSessionEntity(
+                    userId = userId,
+                    routineId = routineId,
+                    status = WorkoutSessionStatus.COMPLETED.name,
+                    startTime = ahora,
+                    endTime = ahora,
+                    notes = "$nombreRutina · $nombreSesion ($ejercicios ejercicios)"
+                )
+            )
+            Result.success(id)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun startWorkout(
         userId: Int,
         routineId: Int? = null,

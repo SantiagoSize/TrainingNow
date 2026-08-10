@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.sp
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 
 /**
  * Botón "Volver" con estilo Training Now: círculo verde con la flecha
@@ -42,7 +44,7 @@ fun BackButtonTN(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    textColor: Color = Color.White,
+    textColor: Color = TextoPrincipal,
     showLabel: Boolean = true
 ) {
     Row(
@@ -71,7 +73,7 @@ fun BackButtonTN(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Volver",
-                    tint = NegroFondo,
+                    tint = TextoSobreVerde,
                     modifier = Modifier.size(19.dp)
                 )
             }

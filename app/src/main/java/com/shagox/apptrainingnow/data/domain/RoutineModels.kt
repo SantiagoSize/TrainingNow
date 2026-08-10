@@ -24,7 +24,16 @@ data class RoutineDayView(
     val exercises: List<ExerciseEntity>,
     val exerciseCount: Int
 ) {
-    val displayActivity: String get() = activityName.ifBlank { "-" }
+    /** Un día sin ejercicios es día de descanso, tenga o no nombre de sesión. */
+    val esDescanso: Boolean get() = exercises.isEmpty()
+
+    /** Texto a mostrar: el nombre de la sesión o "Descanso" si no tiene ejercicios. */
+    val displayActivity: String
+        get() = when {
+            activityName.isNotBlank() -> activityName
+            esDescanso -> "Descanso"
+            else -> "-"
+        }
 }
 
 /**

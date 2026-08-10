@@ -24,6 +24,7 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
 
 /**
  * Gestión de usuarios: Ver todos, Crear usuario, Suspender/Banear/Eliminar.
@@ -115,7 +116,7 @@ private fun AdminUserCard(
                 Icon(icon, contentDescription = null, tint = VerdeTN, modifier = Modifier.size(26.dp))
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(text = title, color = TextoPrincipal, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
                 Text(text = subtitle, color = GrisTexto, fontSize = 13.sp)
             }

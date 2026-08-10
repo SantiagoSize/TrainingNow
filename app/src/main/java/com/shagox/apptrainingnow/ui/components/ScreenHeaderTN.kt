@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
 
 /**
  * Encabezado unificado para todas las pantallas: subtítulo en gris, título en blanco,
@@ -64,7 +65,7 @@ fun ScreenHeaderTN(
                 )
                 Text(
                     text = title,
-                    color = Color.White,
+                    color = TextoPrincipal,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold
                 )

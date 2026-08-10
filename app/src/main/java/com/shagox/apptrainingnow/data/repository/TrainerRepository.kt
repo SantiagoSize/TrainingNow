@@ -1,6 +1,7 @@
 package com.shagox.apptrainingnow.data.repository
 
 import com.shagox.apptrainingnow.data.local.routine.RoutineDao
+import com.shagox.apptrainingnow.data.local.routine.RoutineDayEntity
 import com.shagox.apptrainingnow.data.local.routine.RoutineEntity
 import com.shagox.apptrainingnow.data.local.routine.RoutineExerciseEntity
 import com.shagox.apptrainingnow.data.local.trainer.TrainerClientDao
@@ -206,12 +207,20 @@ class TrainerRepository(
                 scheduledTime = scheduledTime ?: System.currentTimeMillis()
             )
             val routineId = routineDao.insertRoutine(routine)
-            
-            // Agregar ejercicios a la rutina
+
+            // Los ejercicios cuelgan de un día de la rutina
+            val dayId = routineDao.insertDay(
+                RoutineDayEntity(
+                    routineId = routineId.toInt(),
+                    dayLabel = dayInfo.substringBefore(" - ").ifBlank { "Día 1" },
+                    activityName = if (dayInfo.contains(" - ")) dayInfo.substringAfter(" - ") else "",
+                    dayOrder = 0
+                )
+            ).toInt()
             exerciseIds.forEachIndexed { index, exerciseId ->
                 routineDao.insertRoutineExercise(
                     RoutineExerciseEntity(
-                        routineId = routineId.toInt(),
+                        dayId = dayId,
                         exerciseId = exerciseId,
                         order = index + 1
                     )
@@ -244,11 +253,20 @@ class TrainerRepository(
                 dayInfo = dayInfo
             )
             val routineId = routineDao.insertRoutine(routine)
-            
+
+            // Los ejercicios cuelgan de un día de la rutina
+            val dayId = routineDao.insertDay(
+                RoutineDayEntity(
+                    routineId = routineId.toInt(),
+                    dayLabel = dayInfo.substringBefore(" - ").ifBlank { "Día 1" },
+                    activityName = if (dayInfo.contains(" - ")) dayInfo.substringAfter(" - ") else "",
+                    dayOrder = 0
+                )
+            ).toInt()
             exerciseIds.forEachIndexed { index, exerciseId ->
                 routineDao.insertRoutineExercise(
                     RoutineExerciseEntity(
-                        routineId = routineId.toInt(),
+                        dayId = dayId,
                         exerciseId = exerciseId,
                         order = index + 1
                     )

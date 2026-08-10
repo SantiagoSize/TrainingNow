@@ -53,6 +53,8 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 
 /**
  * Detalle de un ejercicio: portada con imagen, chips de datos,
@@ -141,7 +143,7 @@ fun ExerciseDetailScreen(
                     .padding(16.dp)
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(NegroFondo.copy(alpha = 0.7f))
+                    .background(TextoSobreVerde.copy(alpha = 0.7f))
                     .border(1.dp, VerdeTN, CircleShape)
                     .clickable(onClick = onClose),
                 contentAlignment = Alignment.Center
@@ -169,7 +171,7 @@ fun ExerciseDetailScreen(
                 )
                 Text(
                     text = ejercicio.name,
-                    color = Color.White,
+                    color = TextoPrincipal,
                     fontSize = 26.sp,
                     fontWeight = FontWeight.ExtraBold,
                     lineHeight = 30.sp
@@ -204,7 +206,7 @@ fun ExerciseDetailScreen(
                         DatoCard("REPS", it, Modifier.weight(1f))
                     }
                     ejercicio.restSeconds?.let {
-                        DatoCard("DESCANSO", "${'$'}{it}s", Modifier.weight(1f))
+                        DatoCard("DESCANSO", "${it}s", Modifier.weight(1f))
                     }
                 }
             }
@@ -224,7 +226,7 @@ fun ExerciseDetailScreen(
                 ) {
                     Text(
                         text = ejercicio.description,
-                        color = Color.White.copy(alpha = 0.85f),
+                        color = TextoPrincipal.copy(alpha = 0.85f),
                         fontSize = 14.sp,
                         lineHeight = 21.sp
                     )
@@ -253,7 +255,7 @@ fun ExerciseDetailScreen(
                                         .background(VerdeTN)
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Text(musculo, color = Color.White, fontSize = 14.sp)
+                                Text(musculo, color = TextoPrincipal, fontSize = 14.sp)
                             }
                         }
                 }
@@ -282,8 +284,8 @@ fun ExerciseDetailScreen(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = "${'$'}{index + 1}",
-                                        color = NegroFondo,
+                                        text = "${index + 1}",
+                                        color = TextoSobreVerde,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.ExtraBold
                                     )
@@ -291,7 +293,7 @@ fun ExerciseDetailScreen(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(
                                     text = paso,
-                                    color = Color.White.copy(alpha = 0.9f),
+                                    color = TextoPrincipal.copy(alpha = 0.9f),
                                     fontSize = 14.sp,
                                     lineHeight = 20.sp
                                 )
@@ -332,7 +334,7 @@ fun ExerciseDetailScreen(
                         .height(52.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = VerdeTN,
-                        contentColor = NegroFondo
+                        contentColor = TextoSobreVerde
                     ),
                     shape = RoundedCornerShape(14.dp)
                 ) {
@@ -408,7 +410,7 @@ private fun ListaConIcono(
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = texto,
-                    color = Color.White.copy(alpha = 0.88f),
+                    color = TextoPrincipal.copy(alpha = 0.88f),
                     fontSize = 13.sp,
                     lineHeight = 19.sp
                 )

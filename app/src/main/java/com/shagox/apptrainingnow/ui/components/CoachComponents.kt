@@ -28,6 +28,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.GrisFondo
+import com.shagox.apptrainingnow.ui.theme.GrisBorde
 
 /**
  * Tarjeta de cliente para la lista del coach.
@@ -41,9 +44,9 @@ fun CoachClientCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+        colors = CardDefaults.cardColors(containerColor = GrisFondo),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, Color(0xFF2A2A2A))
+        border = BorderStroke(1.dp, GrisBorde)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -67,7 +70,7 @@ fun CoachClientCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = name,
-                    color = Color.White,
+                    color = TextoPrincipal,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 16.sp
                 )

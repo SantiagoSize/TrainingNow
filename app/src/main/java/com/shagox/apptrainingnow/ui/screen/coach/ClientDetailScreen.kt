@@ -28,6 +28,7 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
 import com.shagox.apptrainingnow.ui.viewmodel.CoachViewModel
 import java.util.*
 
@@ -125,7 +126,7 @@ fun ClientDetailScreen(
                             text = "${client.name} ${client.lastName}",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.White
+                            color = TextoPrincipal
                         )
 
                         Spacer(Modifier.height(4.dp))
@@ -189,7 +190,7 @@ private fun DataChip(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(icon, null, Modifier.size(20.dp), tint = VerdeTN)
         Spacer(Modifier.height(4.dp))
-        Text(value, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+        Text(value, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextoPrincipal)
         Text(label, fontSize = 12.sp, color = GrisTexto)
     }
 }

@@ -42,7 +42,7 @@ object RemoteModule {
             val token = authToken
             val request = if (token != null) {
                 chain.request().newBuilder()
-                    .header("Authorization", "Bearer ${'$'}token")
+                    .header("Authorization", "Bearer $token")
                     .build()
             } else chain.request()
             chain.proceed(request)

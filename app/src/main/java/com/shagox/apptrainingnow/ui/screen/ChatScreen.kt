@@ -39,6 +39,8 @@ import com.shagox.apptrainingnow.data.repository.IUserRepository
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 import com.shagox.apptrainingnow.utils.ComposeFileProvider
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -188,7 +190,7 @@ fun ChatScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Salir del chat",
-                        tint = Color.White
+                        tint = TextoPrincipal
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
@@ -214,7 +216,7 @@ fun ChatScreen(
                     } else {
                         Text(
                             text = "${currentTrainer?.name?.firstOrNull() ?: 'T'}",
-                            color = Color.White,
+                            color = TextoPrincipal,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -227,7 +229,7 @@ fun ChatScreen(
                     val currentTrainer = trainer
                     Text(
                         text = "${currentTrainer?.name ?: "Entrenador"} ${currentTrainer?.lastName ?: ""}",
-                        color = Color.White,
+                        color = TextoPrincipal,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -304,8 +306,8 @@ fun ChatScreen(
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("Escribe un mensaje...", color = Color.Gray) },
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
+                        focusedTextColor = TextoPrincipal,
+                        unfocusedTextColor = TextoPrincipal,
                         focusedBorderColor = VerdeTN,
                         unfocusedBorderColor = Color.Gray,
                         focusedContainerColor = NegroFondo,
@@ -343,7 +345,7 @@ fun ChatScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Send,
                         contentDescription = "Enviar",
-                        tint = NegroFondo,
+                        tint = TextoSobreVerde,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -373,7 +375,7 @@ fun MessageBubble(
             ) {
                 Text(
                     text = trainerName.firstOrNull()?.toString() ?: "T",
-                    color = Color.White,
+                    color = TextoPrincipal,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )

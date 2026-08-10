@@ -5,6 +5,10 @@ import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
 import com.shagox.apptrainingnow.data.local.user.UserEntity
 
+/**
+ * Rutina de entrenamiento (ej. "Hipertrofia").
+ * Sus días viven en [RoutineDayEntity]; ownerId null = rutina pública.
+ */
 @Entity(
     tableName = "routines",
     foreignKeys = [
@@ -18,7 +22,8 @@ data class RoutineEntity(
     val ownerId: Int? = null,
     val creatorId: Int,
     val name: String,
-    val dayInfo: String,
+    /** Resumen visible en la lista: "Lunes, Miércoles, Viernes". */
+    val dayInfo: String = "",
     val creationDate: Long = System.currentTimeMillis(),
     val scheduledTime: Long = System.currentTimeMillis()
 )

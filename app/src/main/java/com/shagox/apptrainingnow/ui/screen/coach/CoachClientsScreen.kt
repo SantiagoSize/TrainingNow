@@ -62,6 +62,8 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 import com.shagox.apptrainingnow.ui.viewmodel.CoachUiState
 import com.shagox.apptrainingnow.ui.viewmodel.CoachViewModel
 
@@ -127,8 +129,8 @@ fun CoachClientsScreen(
                 }
             },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
+                focusedTextColor = TextoPrincipal,
+                unfocusedTextColor = TextoPrincipal,
                 focusedBorderColor = VerdeTN,
                 unfocusedBorderColor = GrisTexto,
                 cursorColor = VerdeTN,
@@ -368,7 +370,7 @@ private fun ClientCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "${client.name} ${client.lastName}",
-                    color = Color.White,
+                    color = TextoPrincipal,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -446,7 +448,7 @@ private fun PendingClientCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "${client.name} ${client.lastName}",
-                        color = Color.White,
+                        color = TextoPrincipal,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -464,7 +466,7 @@ private fun PendingClientCard(
                 ) {
                     Text(
                         "NUEVO",
-                        color = NegroFondo,
+                        color = TextoSobreVerde,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -500,9 +502,9 @@ private fun PendingClientCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp), tint = NegroFondo)
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp), tint = TextoSobreVerde)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Aceptar", color = NegroFondo, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Aceptar", color = TextoSobreVerde, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }

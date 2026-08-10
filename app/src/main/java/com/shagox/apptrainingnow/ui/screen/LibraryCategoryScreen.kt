@@ -49,6 +49,8 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 
 /**
  * Ejercicios de una categoría de la biblioteca.
@@ -111,7 +113,7 @@ fun LibraryCategoryScreen(
                             )
                             Text(
                                 text = categoryName.uppercase(),
-                                color = Color.White,
+                                color = TextoPrincipal,
                                 fontSize = 24.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 lineHeight = 27.sp
@@ -126,7 +128,7 @@ fun LibraryCategoryScreen(
                             ) {
                                 Text(
                                     text = "${exercises.size}",
-                                    color = NegroFondo,
+                                    color = TextoSobreVerde,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.ExtraBold
                                 )
@@ -239,7 +241,7 @@ private fun ExerciseListItem(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = exercise.name,
-                color = Color.White,
+                color = TextoPrincipal,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 lineHeight = 19.sp

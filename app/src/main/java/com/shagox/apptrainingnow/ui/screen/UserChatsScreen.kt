@@ -36,6 +36,8 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -120,8 +122,8 @@ fun UserChatsScreen(
                 )
             },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
+                focusedTextColor = TextoPrincipal,
+                unfocusedTextColor = TextoPrincipal,
                 focusedBorderColor = VerdeTN,
                 unfocusedBorderColor = GrisTexto,
                 cursorColor = VerdeTN,
@@ -196,7 +198,7 @@ private fun TrainerDetailDialog(
         title = {
             Text(
                 "${trainer.name} ${trainer.lastName}",
-                color = Color.White,
+                color = TextoPrincipal,
                 fontWeight = FontWeight.SemiBold
             )
         },
@@ -285,7 +287,7 @@ fun TrainerCard(
                 } else {
                     Text(
                         text = "${trainer.name.firstOrNull() ?: 'U'}",
-                        color = Color.White,
+                        color = TextoPrincipal,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -296,7 +298,7 @@ fun TrainerCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "${trainer.name} ${trainer.lastName}",
-                    color = Color.White,
+                    color = TextoPrincipal,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -327,7 +329,7 @@ fun TrainerCard(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = "Enviar mensaje",
-                    tint = NegroFondo,
+                    tint = TextoSobreVerde,
                     modifier = Modifier.size(24.dp)
                 )
             }

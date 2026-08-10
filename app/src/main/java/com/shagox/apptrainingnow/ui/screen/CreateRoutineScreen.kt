@@ -43,6 +43,8 @@ import com.shagox.apptrainingnow.data.repository.DayRoutineInput
 import com.shagox.apptrainingnow.ui.components.ScreenHeaderTN
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.GrisFondo
 
 private val DAYS = listOf(
     "L" to "Lunes", "M" to "Martes", "X" to "Miércoles", "J" to "Jueves",
@@ -127,7 +129,7 @@ fun CreateRoutineScreen(
                         .clickable { selectedDayIndex = index },
                     shape = RoundedCornerShape(10.dp),
                     color = if (isSelected) VerdeTN else NegroFondo,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.5f))
+                    border = androidx.compose.foundation.BorderStroke(1.dp, TextoPrincipal.copy(alpha = 0.5f))
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -149,11 +151,14 @@ fun CreateRoutineScreen(
         // NOMBRE DE LA ACTIVIDAD DEL DÍA
         LabelGreen("NOMBRE DE LA ACTIVIDAD DEL DÍA")
         Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextFieldTN(
-            value = dayActivity,
-            onValueChange = { updateDayActivity(it) },
-            placeholder = "Ej: Full Body, Pecho y triceps, Descanso"
-        )
+        // key() fuerza a recrear el campo al cambiar de día, si no conserva el texto anterior
+        androidx.compose.runtime.key(selectedDayIndex) {
+            OutlinedTextFieldTN(
+                value = dayActivity,
+                onValueChange = { updateDayActivity(it) },
+                placeholder = "Ej: Pecho y Tríceps (vacío = descanso)"
+            )
+        }
 
         Spacer(modifier = Modifier.height(20.dp))
 
@@ -169,8 +174,8 @@ fun CreateRoutineScreen(
             Surface(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp),
-                color = Color(0xFF1E1E1E),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
+                color = GrisFondo,
+                border = androidx.compose.foundation.BorderStroke(1.dp, TextoPrincipal.copy(alpha = 0.4f))
             ) {
                 BasicTextField(
                     value = exerciseName,
@@ -180,7 +185,7 @@ fun CreateRoutineScreen(
                         .padding(horizontal = 14.dp, vertical = 14.dp),
                     singleLine = true,
                     textStyle = androidx.compose.ui.text.TextStyle(
-                        color = Color.White,
+                        color = TextoPrincipal,
                         fontSize = 16.sp
                     ),
                     cursorBrush = SolidColor(VerdeTN),
@@ -215,7 +220,7 @@ fun CreateRoutineScreen(
                     Icon(
                         imageVector = Icons.Filled.Add,
                         contentDescription = "Añadir ejercicio",
-                        tint = Color.White,
+                        tint = TextoPrincipal,
                         modifier = Modifier.size(26.dp)
                     )
                 }
@@ -223,7 +228,7 @@ fun CreateRoutineScreen(
             // Contador 0/10
             Text(
                 text = "${exerciseNames.size}/$maxExercises",
-                color = Color.White,
+                color = TextoPrincipal,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
             )
@@ -241,8 +246,8 @@ fun CreateRoutineScreen(
                                 updateDayExercises(exerciseNames.filterIndexed { i, _ -> i != index })
                             },
                         shape = RoundedCornerShape(12.dp),
-                        color = Color.White.copy(alpha = 0.08f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+                        color = TextoPrincipal.copy(alpha = 0.08f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, TextoPrincipal.copy(alpha = 0.2f))
                     ) {
                         Row(
                             modifier = Modifier
@@ -253,7 +258,7 @@ fun CreateRoutineScreen(
                         ) {
                             Text(
                                 text = "${index + 1}. ${name.ifBlank { "Ejercicio" }}",
-                                color = Color.White,
+                                color = TextoPrincipal,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Medium
                             )
@@ -291,7 +296,7 @@ fun CreateRoutineScreen(
         ) {
             Text(
                 text = "Guardar rutina",
-                color = Color.White,
+                color = TextoPrincipal,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -324,11 +329,11 @@ private fun OutlinedTextFieldTN(
         onValueChange = onValueChange,
         modifier = modifier
             .fillMaxWidth()
-            .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+            .border(1.dp, TextoPrincipal.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
             .padding(horizontal = 16.dp, vertical = 14.dp),
         singleLine = true,
         textStyle = androidx.compose.ui.text.TextStyle(
-            color = Color.White,
+            color = TextoPrincipal,
             fontSize = 16.sp
         ),
         cursorBrush = SolidColor(VerdeTN),

@@ -8,6 +8,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -110,7 +111,9 @@ fun AppNavGraph(
     progressRepository: ProgressRepository? = null,
     notificationRepository: INotificationRepository? = null,
     exerciseRepository: IExerciseRepository? = null,
-    workoutRepository: com.shagox.apptrainingnow.data.repository.WorkoutRepository? = null
+    workoutRepository: com.shagox.apptrainingnow.data.repository.WorkoutRepository? = null,
+    temaClaro: Boolean = false,
+    onCambiarTema: (Boolean) -> Unit = {}
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -134,6 +137,9 @@ fun AppNavGraph(
         }
     }
     val effectiveUserId = if (currentUserId > 0) currentUserId else guestId
+
+    // Aviso al ver el avance mensual sin cuenta
+    var mostrarAvisoAvance by remember { mutableStateOf(false) }
 
     // Ocultar barra en Welcome, detalle y subpantallas de admin
     val hideBottomBarRoutes = listOf(
@@ -491,9 +497,26 @@ fun AppNavGraph(
                 )
             }
 
+            composable(Route.Settings.path) {
+                com.shagox.apptrainingnow.ui.screen.SettingsScreen(
+                    temaClaro = temaClaro,
+                    onCambiarTema = onCambiarTema,
+                    onVerAvanceMensual = {
+                        if (currentUserId > 0) {
+                            navController.navigate(Route.MonthlyReport.path)
+                        } else {
+                            mostrarAvisoAvance = true
+                        }
+                    },
+                    onVerNotificaciones = { navController.navigate(Route.Notifications.path) }
+                )
+            }
+
             composable(Route.MonthlyReport.path) {
                 com.shagox.apptrainingnow.ui.screen.MonthlyReportScreen(
-                    userId = currentUserId,
+                    userId = effectiveUserId,
+                    esInvitado = currentUserId <= 0,
+                    workoutRepository = workoutRepository,
                     onBack = { navController.popBackStack() }
                 )
             }
@@ -586,7 +609,10 @@ fun AppNavGraph(
                 if (notificationRepository != null) {
                     NotificationsScreen(
                         notificationRepository = notificationRepository,
-                        userId = currentUserId
+                        userId = currentUserId,
+                        onBack = if (navController.previousBackStackEntry != null) {
+                            { navController.popBackStack() }
+                        } else null
                     )
                 } else {
                     Text(
@@ -601,7 +627,11 @@ fun AppNavGraph(
                 ProfileScreen(
                     authViewModel = authViewModel,
                     onVerAvanceMensual = {
-                        if (currentUserId > 0) navController.navigate(Route.MonthlyReport.path)
+                        if (currentUserId > 0) {
+                            navController.navigate(Route.MonthlyReport.path)
+                        } else {
+                            mostrarAvisoAvance = true
+                        }
                     }
                 )
             }
@@ -670,6 +700,28 @@ fun AppNavGraph(
                 )
             }
         }
+
+        // Aviso: el avance mensual sin cuenta solo vive en este teléfono
+        if (mostrarAvisoAvance) {
+            com.shagox.apptrainingnow.ui.components.CuentaRecomendadaDialogTN(
+                titulo = "Guarda tu avance",
+                mensaje = "Sin cuenta puedes ver tu avance, pero se guarda solo en este teléfono y se pierde al desinstalar la app. Crea tu cuenta o inicia sesión para conservarlo.",
+                textoNegativo = "VER IGUAL",
+                onCrearCuenta = {
+                    mostrarAvisoAvance = false
+                    navController.navigate(Route.Profile.path) {
+                        popUpTo(safeStartDestination) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                onContinuar = {
+                    mostrarAvisoAvance = false
+                    navController.navigate(Route.MonthlyReport.path)
+                },
+                onDismiss = { mostrarAvisoAvance = false }
+            )
+        }
     }
 }
 
@@ -721,16 +773,25 @@ private fun ChatBlockedScreen(onGoToProfile: () -> Unit) {
         }
     }
 }
-
 /**
- * Pantalla de carga mientras se inicializan los repositorios.
+ * Indicador de carga a pantalla completa, mientras se preparan los repositorios.
  */
 @Composable
 private fun LoadingScreen() {
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(NegroFondo),
         contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator()
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator(color = VerdeTN)
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Cargando...",
+                color = GrisTexto,
+                fontSize = 14.sp
+            )
+        }
     }
 }

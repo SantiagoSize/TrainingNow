@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
@@ -99,6 +100,9 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
     /** Reporte mensual de entrenamiento */
     data object MonthlyReport : Route("monthly_report", "Mi avance", Icons.Filled.DateRange)
 
+    /** Ajustes de la app (usuario) */
+    data object Settings : Route("settings", "Ajustes", Icons.Filled.Settings)
+
     /** Perfil de usuario */
     data object Profile : Route("profile", "Perfil", Icons.Filled.Person)
 
@@ -146,7 +150,7 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
             UserChats,
             Library,
             UserRoutines,
-            Notifications,
+            Settings,
             Profile
         )
 
@@ -217,8 +221,11 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
                         ruta == AdminSanctions.path -> listOf(AdminUserManagement.path)
 
                 // ===== Perfil =====
-                ruta == MonthlyReport.path ||
-                        ruta == Login.path ||
+                ruta == MonthlyReport.path -> listOf(Settings.path, Profile.path)
+
+                ruta == Notifications.path -> listOf(Notifications.path, Settings.path)
+
+                ruta == Login.path ||
                         ruta == Register.path ||
                         ruta == Home.path -> listOf(Profile.path)
 
@@ -246,7 +253,7 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
                     UserChats,
                     Library,
                     UserRoutines,
-                    Notifications,
+                    Settings,
                     Profile
                 )
             }

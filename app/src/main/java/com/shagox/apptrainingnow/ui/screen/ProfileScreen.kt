@@ -71,6 +71,7 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -153,6 +154,28 @@ fun ProfileScreen(
                 )
             }
         } else {
+            // Avance mensual disponible también sin cuenta (datos locales)
+            Button(
+                onClick = onVerAvanceMensual,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = GrisFondo,
+                    contentColor = VerdeTN
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.CalendarToday,
+                    contentDescription = null,
+                    tint = VerdeTN,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("MI AVANCE MENSUAL", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+
             // Logo Training Now! en la zona superior (pantalla de login/registro)
             Box(
                 modifier = Modifier
@@ -494,7 +517,7 @@ private fun ProfileLoggedContent(
                         Icon(
                             imageVector = Icons.Filled.CameraAlt,
                             contentDescription = "Cambiar foto",
-                            tint = NegroFondo,
+                            tint = TextoSobreVerde,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -699,7 +722,7 @@ private fun EditProfileDialog(
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = VerdeTN),
                     shape = RoundedCornerShape(12.dp)
-                ) { Text("Guardar", color = NegroFondo) }
+                ) { Text("Guardar", color = TextoSobreVerde) }
             }
         }
     }
@@ -932,11 +955,11 @@ private fun RegisterTabContent(
             onClick = onSubmit,
             modifier = Modifier.fillMaxWidth(),
             enabled = registerState.canSubmit && !registerState.isSubmitting,
-            colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = NegroFondo),
+            colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = TextoSobreVerde),
             shape = RoundedCornerShape(12.dp)
         ) {
             if (registerState.isSubmitting) {
-                CircularProgressIndicator(modifier = Modifier.height(24.dp), color = NegroFondo)
+                CircularProgressIndicator(modifier = Modifier.height(24.dp), color = TextoSobreVerde)
             } else {
                 Text("REGISTRARSE", fontWeight = FontWeight.SemiBold)
             }
@@ -1100,7 +1123,7 @@ private fun ForgotPasswordDialog(
                     step == 2 -> code.length == 6
                     else -> newPass.length >= 6 && newPass == confirmPass
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = NegroFondo)
+                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = TextoSobreVerde)
             ) {
                 Text(
                     when {

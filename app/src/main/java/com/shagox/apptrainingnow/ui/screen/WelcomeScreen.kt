@@ -58,10 +58,12 @@ import androidx.core.content.ContextCompat
 import com.shagox.apptrainingnow.R
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.GrisFondo
 
 private val VerdeOscuro = Color(0xFF0D3D1A)
 private val VerdeNeon = Color(0xFF22FF5F)
-private val GrisCard = Color(0xFF1A1A1A)
+private val GrisCard = GrisFondo
 
 /**
  * Pantalla de bienvenida que se muestra solo la primera vez.
@@ -151,13 +153,13 @@ fun WelcomeScreen(
 
             Text(
                 text = "Activa lo esencial",
-                color = Color.White,
+                color = TextoPrincipal,
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = "Para una mejor experiencia en TrainingNow",
-                color = Color.White.copy(alpha = 0.85f),
+                color = TextoPrincipal.copy(alpha = 0.85f),
                 fontSize = 15.sp,
                 modifier = Modifier.padding(top = 6.dp)
             )
@@ -260,12 +262,12 @@ fun WelcomeScreen(
         ) {
             Text(
                 text = "© 2025 - 2026 shagox",
-                color = Color.White.copy(alpha = 0.5f),
+                color = TextoPrincipal.copy(alpha = 0.5f),
                 fontSize = 12.sp
             )
             Text(
                 text = "Versión 0.1.0",
-                color = Color.White.copy(alpha = 0.4f),
+                color = TextoPrincipal.copy(alpha = 0.4f),
                 fontSize = 11.sp
             )
         }
@@ -315,7 +317,7 @@ private fun PermissionCard(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = if (isGranted) Color.Gray else Color.White.copy(alpha = 0.8f),
+                    tint = if (isGranted) Color.Gray else TextoPrincipal.copy(alpha = 0.8f),
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -332,7 +334,7 @@ private fun PermissionCard(
                 )
                 Text(
                     text = description,
-                    color = if (isGranted) Color.Gray.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.7f),
+                    color = if (isGranted) Color.Gray.copy(alpha = 0.7f) else TextoPrincipal.copy(alpha = 0.7f),
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 2.dp)
                 )

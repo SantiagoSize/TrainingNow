@@ -43,6 +43,9 @@ import androidx.navigation.compose.rememberNavController
 import com.shagox.apptrainingnow.navigation.Route
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.GrisTexto
+import com.shagox.apptrainingnow.ui.theme.GrisBorde
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 
 private val INDICADOR_SIZE = 56.dp
 
@@ -93,7 +96,7 @@ fun BottomNavigationBarTN(
         modifier = Modifier
             .fillMaxWidth()
             .height(110.dp),
-        color = NegroFondo,
+        color = TextoSobreVerde,
         shadowElevation = 12.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth().height(110.dp)) {
@@ -101,7 +104,7 @@ fun BottomNavigationBarTN(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(2.dp)
-                    .background(Color(0xFF2A2A2A))
+                    .background(GrisBorde)
             )
 
             BoxWithConstraints(
@@ -179,8 +182,9 @@ private fun NavBarItem(
     contentDescription: String?,
     onClick: () -> Unit
 ) {
+    val colorSobreVerde = TextoSobreVerde
     val iconColor by animateColorAsState(
-        targetValue = if (isSelected) Color.Black else Color(0xFF808080),
+        targetValue = if (isSelected) colorSobreVerde else GrisTexto,
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
         label = "iconColor"
     )

@@ -41,6 +41,7 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -94,8 +95,8 @@ fun CoachUsersScreen(
             placeholder = { Text("Buscar por nombre o email...", color = GrisTexto) },
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
+                focusedTextColor = TextoPrincipal,
+                unfocusedTextColor = TextoPrincipal,
                 focusedBorderColor = VerdeTN,
                 unfocusedBorderColor = GrisTexto,
                 cursorColor = VerdeTN
@@ -141,7 +142,7 @@ private fun UserInfoCard(user: UserDto) {
             ) {
                 Text(
                     "${user.name} ${user.lastName}".trim(),
-                    color = Color.White,
+                    color = TextoPrincipal,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 16.sp
                 )

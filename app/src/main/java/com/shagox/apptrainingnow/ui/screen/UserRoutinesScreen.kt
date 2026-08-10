@@ -51,6 +51,8 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 
 
 /**
@@ -134,20 +136,20 @@ private fun UserRoutinesScreenContent(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Crear",
-                        color = NegroFondo.copy(alpha = 0.75f),
+                        color = TextoSobreVerde.copy(alpha = 0.75f),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     )
                     Text(
                         text = "RUTINA",
-                        color = NegroFondo,
+                        color = TextoSobreVerde,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.ExtraBold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Diseña tu plan personalizado",
-                        color = NegroFondo.copy(alpha = 0.7f),
+                        color = TextoSobreVerde.copy(alpha = 0.7f),
                         fontSize = 12.sp
                     )
                 }
@@ -161,7 +163,7 @@ private fun UserRoutinesScreenContent(
                     Icon(
                         imageVector = Icons.Filled.Add,
                         contentDescription = "Crear rutina",
-                        tint = Color.White,
+                        tint = TextoPrincipal,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -242,7 +244,7 @@ private fun UserRoutinesScreenContent(
                             }
                             Text(
                                 text = "Aún no tienes rutinas propias. Crea una o elige una recomendada.",
-                                color = Color.White,
+                                color = TextoPrincipal,
                                 fontSize = 14.sp,
                                 modifier = Modifier.weight(1f)
                             )
@@ -310,7 +312,7 @@ private fun RoutineCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    color = Color.White,
+                    color = TextoPrincipal,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -393,7 +395,7 @@ private fun CuentaRecomendadaDialog(
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
                     text = "Sin cuenta puedes crear tu rutina, pero se guarda solo en este teléfono y se pierde al desinstalar la app.",
-                    color = Color.White.copy(alpha = 0.85f),
+                    color = TextoPrincipal.copy(alpha = 0.85f),
                     fontSize = 13.sp,
                     lineHeight = 18.sp
                 )
@@ -411,7 +413,7 @@ private fun CuentaRecomendadaDialog(
                 ) {
                     Text(
                         text = "NO, CONTINUAR",
-                        color = Color.White,
+                        color = TextoPrincipal,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -426,7 +428,7 @@ private fun CuentaRecomendadaDialog(
                 ) {
                     Text(
                         text = "SÍ, CREAR CUENTA",
-                        color = NegroFondo,
+                        color = TextoSobreVerde,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )

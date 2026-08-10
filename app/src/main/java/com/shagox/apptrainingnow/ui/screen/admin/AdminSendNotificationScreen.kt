@@ -18,6 +18,8 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -82,7 +84,7 @@ fun AdminSendNotificationScreen(
                         label = { Text(label) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = VerdeTN,
-                            selectedLabelColor = NegroFondo
+                            selectedLabelColor = TextoSobreVerde
                         )
                     )
                 }
@@ -95,8 +97,8 @@ fun AdminSendNotificationScreen(
                 label = { Text("Título") },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
+                    focusedTextColor = TextoPrincipal,
+                    unfocusedTextColor = TextoPrincipal,
                     focusedBorderColor = VerdeTN,
                     unfocusedBorderColor = GrisTexto
                 ),
@@ -109,8 +111,8 @@ fun AdminSendNotificationScreen(
                 modifier = Modifier.fillMaxWidth().height(120.dp),
                 label = { Text("Mensaje") },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
+                    focusedTextColor = TextoPrincipal,
+                    unfocusedTextColor = TextoPrincipal,
                     focusedBorderColor = VerdeTN,
                     unfocusedBorderColor = GrisTexto
                 ),
@@ -168,9 +170,9 @@ fun AdminSendNotificationScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = NegroFondo)
+                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = TextoSobreVerde)
             ) {
-                if (isLoading) CircularProgressIndicator(Modifier.size(24.dp), color = NegroFondo)
+                if (isLoading) CircularProgressIndicator(Modifier.size(24.dp), color = TextoSobreVerde)
                 else Text("Enviar")
             }
         }

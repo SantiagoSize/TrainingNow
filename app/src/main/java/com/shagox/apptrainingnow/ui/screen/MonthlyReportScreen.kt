@@ -50,6 +50,7 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
 
 private val AmarilloTN = Color(0xFFFFC107)
 private val RojoTN = Color(0xFFE53935)
@@ -62,6 +63,9 @@ private val RojoTN = Color(0xFFE53935)
 fun MonthlyReportScreen(
     userId: Int,
     onBack: () -> Unit,
+    /** Sin cuenta: el reporte se calcula desde la base local en vez del servidor. */
+    esInvitado: Boolean = false,
+    workoutRepository: com.shagox.apptrainingnow.data.repository.WorkoutRepository? = null,
     repository: AttendanceRepository = remember { AttendanceRepository() }
 ) {
     var monthOffset by remember { mutableIntStateOf(0) }
@@ -71,13 +75,19 @@ fun MonthlyReportScreen(
 
     val monthKey = remember(monthOffset) { AttendanceRepository.monthKeyOffset(monthOffset) }
 
-    LaunchedEffect(monthKey, userId) {
+    LaunchedEffect(monthKey, userId, esInvitado) {
         loading = true
         error = null
-        repository.getMonthlyReport(userId, monthKey).fold(
-            onSuccess = { report = it; loading = false },
-            onFailure = { error = it.message; loading = false }
-        )
+        if (esInvitado && workoutRepository != null) {
+            // Invitado: se usa el historial guardado en el teléfono
+            report = workoutRepository.reporteMensualLocal(userId, monthKey)
+            loading = false
+        } else {
+            repository.getMonthlyReport(userId, monthKey).fold(
+                onSuccess = { report = it; loading = false },
+                onFailure = { error = it.message; loading = false }
+            )
+        }
     }
 
     Column(
@@ -108,7 +118,7 @@ fun MonthlyReportScreen(
             }
             Text(
                 text = AttendanceRepository.monthLabel(monthKey),
-                color = Color.White,
+                color = TextoPrincipal,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -141,7 +151,27 @@ fun MonthlyReportScreen(
                 Text(error!!, color = GrisTexto, fontSize = 14.sp, textAlign = TextAlign.Center)
             }
 
-            report != null -> ReportContent(report!!)
+            report != null -> {
+                if (esInvitado) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(AmarilloTN.copy(alpha = 0.12f))
+                            .border(1.dp, AmarilloTN.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = "Estás sin cuenta: este avance solo se guarda en este teléfono. Crea tu cuenta para conservarlo.",
+                            color = AmarilloTN,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+                ReportContent(report!!)
+            }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -195,9 +225,9 @@ private fun ReportContent(report: MonthlyReportDto) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        MetricCard("ENTRENÓ", "${report.daysTrained}", "días", VerdeTN, Modifier.weight(1f))
-        MetricCard("LO DEJÓ", "${report.daysMissed}", "días", RojoTN, Modifier.weight(1f))
-        MetricCard("DESCANSO", "${report.daysRest}", "días", GrisTexto, Modifier.weight(1f))
+        MetricCard("Entrenaste", "${report.daysTrained}", "días", VerdeTN, Modifier.weight(1f))
+        MetricCard("No entrenaste", "${report.daysMissed}", "días", RojoTN, Modifier.weight(1f))
+        MetricCard("Descansaste", "${report.daysRest}", "días", GrisTexto, Modifier.weight(1f))
     }
 
     Spacer(modifier = Modifier.height(12.dp))
@@ -206,21 +236,29 @@ private fun ReportContent(report: MonthlyReportDto) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        MetricCard("RACHA ACTUAL", "${report.currentStreak}", "días seguidos", AmarilloTN, Modifier.weight(1f))
-        MetricCard("MEJOR RACHA", "${report.longestStreak}", "días seguidos", VerdeTN, Modifier.weight(1f))
+        MetricCard(
+            "Racha",
+            "${report.currentStreak}",
+            if (report.currentStreak == 1) "día seguido" else "días seguidos",
+            AmarilloTN,
+            Modifier.weight(1f)
+        )
+        MetricCard("Ejercicios", "${report.totalExercises}", "completados", VerdeTN, Modifier.weight(1f))
     }
 
-    Spacer(modifier = Modifier.height(12.dp))
+    Spacer(modifier = Modifier.height(22.dp))
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        MetricCard("EJERCICIOS", "${report.totalExercises}", "completados", VerdeTN, Modifier.weight(1f))
-        MetricCard("TIEMPO", "${report.totalMinutes}", "minutos", VerdeTN, Modifier.weight(1f))
-    }
+    // ===== Calendario del mes =====
+    Text(
+        text = "CALENDARIO DEL MES",
+        color = VerdeTN,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(bottom = 10.dp)
+    )
+    CalendarioMensual(report)
 
-    Spacer(modifier = Modifier.height(20.dp))
+    Spacer(modifier = Modifier.height(22.dp))
 
     // Detalle día a día
     Text(
@@ -230,6 +268,10 @@ private fun ReportContent(report: MonthlyReportDto) {
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(bottom = 10.dp)
     )
+
+    // La evaluación acompaña al detalle del mes
+    EvaluacionDelMes(report)
+    Spacer(modifier = Modifier.height(12.dp))
 
     if (report.days.isEmpty()) {
         Box(
@@ -241,7 +283,7 @@ private fun ReportContent(report: MonthlyReportDto) {
             contentAlignment = Alignment.Center
         ) {
             Text(
-                "Aún no hay entrenamientos registrados este mes.\n¡Completa una rutina para empezar!",
+                "Todavía no registras entrenamientos este mes.\nCompleta una rutina y aparecerá aquí.",
                 color = GrisTexto,
                 fontSize = 13.sp,
                 textAlign = TextAlign.Center
@@ -251,8 +293,8 @@ private fun ReportContent(report: MonthlyReportDto) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             report.days.forEach { day ->
                 val (color, etiqueta) = when (day.status) {
-                    "TRAINED" -> VerdeTN to "Entrenó"
-                    "MISSED" -> RojoTN to "No entrenó"
+                    "TRAINED" -> VerdeTN to "Entrenaste"
+                    "MISSED" -> RojoTN to "No entrenaste"
                     else -> GrisTexto to "Descanso"
                 }
                 Row(
@@ -275,7 +317,7 @@ private fun ReportContent(report: MonthlyReportDto) {
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = day.date.takeLast(5).replace("-", "/"),
-                            color = Color.White,
+                            color = TextoPrincipal,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -313,9 +355,216 @@ private fun MetricCard(
             .padding(vertical = 16.dp, horizontal = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(title, color = GrisTexto, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+        Text(title, color = GrisTexto, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
         Spacer(modifier = Modifier.height(6.dp))
         Text(value, color = color, fontSize = 26.sp, fontWeight = FontWeight.Bold)
         Text(unit, color = GrisTexto, fontSize = 10.sp)
+    }
+}
+
+/**
+ * Cuadrícula del mes: una casilla por día, coloreada según lo que ocurrió.
+ * Verde = entrenó · Rojo = no entrenó · Gris = descanso · Vacío = sin registro.
+ */
+@Composable
+private fun CalendarioMensual(report: MonthlyReportDto) {
+    val calendario = remember(report.month) {
+        java.util.Calendar.getInstance().apply {
+            val partes = report.month.split("-")
+            if (partes.size == 2) {
+                set(java.util.Calendar.YEAR, partes[0].toIntOrNull() ?: get(java.util.Calendar.YEAR))
+                set(java.util.Calendar.MONTH, (partes[1].toIntOrNull() ?: 1) - 1)
+            }
+            set(java.util.Calendar.DAY_OF_MONTH, 1)
+        }
+    }
+    val diasDelMes = calendario.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+    // Desplazamiento para que la primera fila empiece en el día correcto (0 = lunes)
+    val primerDiaSemana = (calendario.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7
+
+    val estadoPorDia = remember(report) {
+        report.days.associate { dia ->
+            (dia.date.takeLast(2).toIntOrNull() ?: 0) to dia.status
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(GrisFondo)
+            .border(1.dp, GrisBorde, RoundedCornerShape(16.dp))
+            .padding(14.dp)
+    ) {
+        // Cabecera de días
+        Row(modifier = Modifier.fillMaxWidth()) {
+            listOf("L", "M", "X", "J", "V", "S", "D").forEach { letra ->
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    Text(letra, color = GrisTexto, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Casillas
+        val totalCeldas = primerDiaSemana + diasDelMes
+        val filas = (totalCeldas + 6) / 7
+        repeat(filas) { fila ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 3.dp)
+            ) {
+                repeat(7) { columna ->
+                    val indice = fila * 7 + columna
+                    val numeroDia = indice - primerDiaSemana + 1
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        if (numeroDia in 1..diasDelMes) {
+                            val estado = estadoPorDia[numeroDia]
+                            val color = when (estado) {
+                                "TRAINED" -> VerdeTN
+                                "MISSED" -> RojoTN
+                                "REST" -> GrisTexto
+                                else -> Color.Transparent
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (color == Color.Transparent) Color.Transparent else color)
+                                    .border(
+                                        1.dp,
+                                        if (color == Color.Transparent) GrisBorde else color,
+                                        RoundedCornerShape(8.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "$numeroDia",
+                                    color = if (color == Color.Transparent) GrisTexto else NegroFondo,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (color == Color.Transparent) FontWeight.Normal else FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LeyendaCalendario(VerdeTN, "Entrenaste")
+            LeyendaCalendario(RojoTN, "No entrenaste")
+            LeyendaCalendario(GrisTexto, "Descanso")
+        }
+    }
+}
+
+@Composable
+private fun LeyendaCalendario(color: Color, texto: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(9.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(color)
+        )
+        Spacer(modifier = Modifier.width(5.dp))
+        Text(texto, color = GrisTexto, fontSize = 10.sp)
+    }
+}
+
+/**
+ * Evaluación del mes: dice al usuario cómo va y si necesita mejorar,
+ * en función de su adherencia y de los días entrenados.
+ */
+@Composable
+private fun EvaluacionDelMes(report: MonthlyReportDto) {
+    // Cara de texto según el desempeño del mes
+    data class Evaluacion(val cara: String, val titulo: String, val mensaje: String, val color: Color)
+
+    val evaluacion = when {
+        report.daysTrained == 0 -> Evaluacion(
+            ":,(",
+            "Aún sin entrenamientos",
+            "Este mes no hay sesiones registradas. Empieza con dos o tres días a la semana: lo importante es volver a la rutina.",
+            RojoTN
+        )
+        report.adherencePercent >= 90 -> Evaluacion(
+            ":D",
+            "¡Excelente constancia!",
+            "Cumpliste el ${report.adherencePercent}% de tus entrenamientos con ${report.daysTrained} días este mes. Mantén este ritmo y considera subir la carga.",
+            VerdeTN
+        )
+        report.adherencePercent >= 70 -> Evaluacion(
+            ":)",
+            "Vas por buen camino",
+            "Con ${report.adherencePercent}% de cumplimiento y ${report.daysTrained} días entrenados estás sobre el promedio. Recuperar ${report.daysMissed} sesión(es) perdida(s) te acercaría a la excelencia.",
+            VerdeTN
+        )
+        report.adherencePercent >= 50 -> Evaluacion(
+            ":/",
+            "Puedes mejorar",
+            "Cumpliste el ${report.adherencePercent}% de lo planificado y dejaste ${report.daysMissed} sesión(es) sin hacer. Prueba a fijar una hora de recordatorio para cada día.",
+            AmarilloTN
+        )
+        else -> Evaluacion(
+            ":(",
+            "Necesitas retomar el ritmo",
+            "Solo cumpliste el ${report.adherencePercent}% del plan. Reduce el número de días de la rutina para que sea sostenible y ve subiendo poco a poco.",
+            RojoTN
+        )
+    }
+    val (cara, titulo, mensaje, color) = evaluacion
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(color.copy(alpha = 0.10f))
+            .border(1.5.dp, color.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(color.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = cara,
+                    color = color,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = titulo,
+                color = color,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = mensaje,
+            color = TextoPrincipal.copy(alpha = 0.88f),
+            fontSize = 13.sp,
+            lineHeight = 19.sp
+        )
+        if (report.currentStreak >= 3) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = ":D  Llevas ${report.currentStreak} días seguidos entrenando.",
+                color = color,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
     }
 }

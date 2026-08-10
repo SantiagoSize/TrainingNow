@@ -37,6 +37,7 @@ import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -49,7 +50,9 @@ import java.util.Locale
 @Composable
 fun NotificationsScreen(
     notificationRepository: INotificationRepository,
-    userId: Int
+    userId: Int,
+    /** Si se abre desde Ajustes, muestra el botón para volver. */
+    onBack: (() -> Unit)? = null
 ) {
     val notifications by notificationRepository.getUserNotifications(userId).collectAsState(initial = emptyList())
 
@@ -59,6 +62,12 @@ fun NotificationsScreen(
             .background(NegroFondo)
             .padding(horizontal = 16.dp)
     ) {
+        if (onBack != null) {
+            com.shagox.apptrainingnow.ui.components.BackButtonTN(
+                text = "Ajustes",
+                onClick = onBack
+            )
+        }
         ScreenHeaderTN(
             subtitle = "Mis",
             title = "NOTIFICACIONES",
@@ -138,7 +147,7 @@ private fun NotificationItem(notification: NotificationEntity) {
             Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
                 Text(
                     text = notification.title,
-                    color = Color.White,
+                    color = TextoPrincipal,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
                 )

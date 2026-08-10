@@ -16,6 +16,8 @@ import com.shagox.apptrainingnow.data.local.user.UserEntity
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -72,8 +74,8 @@ fun AdminCreateUserScreen(
                 .padding(20.dp)
         ) {
             val textFieldColors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
+                focusedTextColor = TextoPrincipal,
+                unfocusedTextColor = TextoPrincipal,
                 focusedBorderColor = VerdeTN,
                 unfocusedBorderColor = GrisTexto
             )
@@ -138,7 +140,7 @@ fun AdminCreateUserScreen(
                     label = { Text("Usuario") },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = VerdeTN,
-                        selectedLabelColor = NegroFondo
+                        selectedLabelColor = TextoSobreVerde
                     )
                 )
                 FilterChip(
@@ -147,7 +149,7 @@ fun AdminCreateUserScreen(
                     label = { Text("Entrenador") },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = VerdeTN,
-                        selectedLabelColor = NegroFondo
+                        selectedLabelColor = TextoSobreVerde
                     )
                 )
                 FilterChip(
@@ -156,7 +158,7 @@ fun AdminCreateUserScreen(
                     label = { Text("Admin") },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = VerdeTN,
-                        selectedLabelColor = NegroFondo
+                        selectedLabelColor = TextoSobreVerde
                     )
                 )
             }
@@ -236,9 +238,9 @@ fun AdminCreateUserScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = NegroFondo)
+                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = TextoSobreVerde)
             ) {
-                if (isLoading) CircularProgressIndicator(Modifier.size(24.dp), color = NegroFondo)
+                if (isLoading) CircularProgressIndicator(Modifier.size(24.dp), color = TextoSobreVerde)
                 else Text("Crear usuario")
             }
         }
