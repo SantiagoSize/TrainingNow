@@ -31,11 +31,14 @@ data class LoginUiState(
 // -------------------- REGISTER UI STATE --------------------
 data class RegisterUiState(
     val name: String = "",
+    val lastName: String = "",
     val email: String = "",
     val phone: String = "",
     val pass: String = "",
     val confirm: String = "",
+    val termsAccepted: Boolean = false,
     val nameError: String? = null,
+    val lastNameError: String? = null,
     val emailError: String? = null,
     val phoneError: String? = null,
     val passError: String? = null,
@@ -70,7 +73,16 @@ class AuthViewModel(
     // ---------- REGISTER ----------
     private val _register = MutableStateFlow(RegisterUiState())
     val register: StateFlow<RegisterUiState> = _register.asStateFlow()
-    
+
+    /** Se pone en true justo después de un registro exitoso (con auto-login), para
+     *  disparar el carousel de bienvenida una sola vez. Se limpia con [consumeJustRegistered]. */
+    private val _justRegistered = MutableStateFlow(false)
+    val justRegistered: StateFlow<Boolean> = _justRegistered.asStateFlow()
+
+    fun consumeJustRegistered() {
+        _justRegistered.value = false
+    }
+
     /** Usuario actualmente logueado (null si no hay sesión) */
     val currentUser: UserEntity?
         get() = _login.value.loggedUser
@@ -157,6 +169,33 @@ class AuthViewModel(
     fun isLoggedIn(): Boolean = _login.value.loggedUser != null
 
     /**
+     * Elimina permanentemente la cuenta del usuario logueado, previa verificación de contraseña
+     * (se reintenta el login con la contraseña ingresada como forma de confirmar identidad).
+     * Si todo sale bien, cierra la sesión y notifica el resultado por [onResult].
+     */
+    fun deleteAccount(password: String, onResult: (success: Boolean, error: String?) -> Unit) {
+        val user = _login.value.loggedUser
+        if (user == null) {
+            onResult(false, "No hay una sesión activa")
+            return
+        }
+        viewModelScope.launch {
+            val verificacion = repository.login(user.email, password.trim())
+            if (verificacion.isFailure) {
+                onResult(false, "Contraseña incorrecta")
+                return@launch
+            }
+            try {
+                repository.deleteUserById(user.id)
+                logout()
+                onResult(true, null)
+            } catch (e: Exception) {
+                onResult(false, e.message ?: "No se pudo eliminar la cuenta")
+            }
+        }
+    }
+
+    /**
      * Actualiza la foto de perfil del usuario en la BD y refresca el usuario logueado.
      */
     fun updateProfilePhoto(userId: Int, photoUrl: String?) {
@@ -188,6 +227,22 @@ class AuthViewModel(
                 nameError = validateNameLettersOnly(trimmedValue)
             )
         }
+        recomputeRegisterCanSubmit()
+    }
+
+    fun onLastNameChange(value: String) {
+        val trimmedValue = value.trim()
+        _register.update {
+            it.copy(
+                lastName = trimmedValue,
+                lastNameError = validateNameLettersOnly(trimmedValue)
+            )
+        }
+        recomputeRegisterCanSubmit()
+    }
+
+    fun onTermsAcceptedChange(value: Boolean) {
+        _register.update { it.copy(termsAccepted = value) }
         recomputeRegisterCanSubmit()
     }
 
@@ -241,6 +296,7 @@ class AuthViewModel(
 
         val noErrors = listOf(
             s.nameError,
+            s.lastNameError,
             s.emailError,
             s.phoneError,
             s.passError,
@@ -249,11 +305,12 @@ class AuthViewModel(
 
         val filled =
             s.name.isNotBlank() &&
+                    s.lastName.isNotBlank() &&
                     s.email.isNotBlank() &&
                     s.pass.isNotBlank()
 
         _register.update {
-            it.copy(canSubmit = noErrors && filled)
+            it.copy(canSubmit = noErrors && filled && s.termsAccepted)
         }
     }
 
@@ -271,6 +328,7 @@ class AuthViewModel(
 
             // Aplicar trim a todos los campos antes de guardar
             val trimmedName = s.name.trim()
+            val trimmedLastName = s.lastName.trim()
             val trimmedEmail = s.email.trim()
             val trimmedPhone = s.phone.trim()
             val trimmedPass = s.pass.trim()
@@ -290,7 +348,7 @@ class AuthViewModel(
             val newUser = UserEntity(
                 role = role,
                 name = trimmedName,
-                lastName = "",
+                lastName = trimmedLastName,
                 email = trimmedEmail,
                 phone = trimmedPhone,
                 password = trimmedPass
@@ -303,6 +361,14 @@ class AuthViewModel(
                         isSubmitting = false,
                         success = true
                     )
+                }
+                // Auto-login para continuar directo a la bienvenida (carousel) sin pedirle
+                // de nuevo las credenciales que recién escribió.
+                val loginResult = repository.login(trimmedEmail, trimmedPass)
+                val loggedInUser = loginResult.getOrNull()
+                if (loggedInUser != null) {
+                    _login.update { it.copy(loggedUser = loggedInUser, success = true) }
+                    _justRegistered.value = true
                 }
             } catch (e: Exception) {
                 _register.update {

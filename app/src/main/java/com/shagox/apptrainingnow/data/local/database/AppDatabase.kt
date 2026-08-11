@@ -135,6 +135,9 @@ abstract class AppDatabase : RoomDatabase() {
                 try {
                     prepopulateExercises(database.exerciseDao())
                     prepopulateRoutines(database.routineDao())
+                    // Limpieza de rutinas predeterminadas descontinuadas (ej: "Full Body Principiante").
+                    // Corre siempre, a diferencia de prepopulateRoutines que solo siembra con la tabla vacía.
+                    database.routineDao().deleteRutinasDescontinuadas()
                     android.util.Log.d(TAG, "Datos base verificados")
                 } catch (e: Exception) {
                     android.util.Log.e(TAG, "Error asegurando datos base", e)

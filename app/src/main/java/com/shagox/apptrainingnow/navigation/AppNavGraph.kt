@@ -43,6 +43,8 @@ import androidx.compose.ui.unit.dp
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 import com.shagox.apptrainingnow.ui.screen.WelcomeScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -508,7 +510,8 @@ fun AppNavGraph(
                             mostrarAvisoAvance = true
                         }
                     },
-                    onVerNotificaciones = { navController.navigate(Route.Notifications.path) }
+                    onVerNotificaciones = { navController.navigate(Route.Notifications.path) },
+                    authViewModel = authViewModel
                 )
             }
 
@@ -625,14 +628,7 @@ fun AppNavGraph(
 
             composable(Route.Profile.path) {
                 ProfileScreen(
-                    authViewModel = authViewModel,
-                    onVerAvanceMensual = {
-                        if (currentUserId > 0) {
-                            navController.navigate(Route.MonthlyReport.path)
-                        } else {
-                            mostrarAvisoAvance = true
-                        }
-                    }
+                    authViewModel = authViewModel
                 )
             }
 
@@ -735,6 +731,7 @@ private fun ChatBlockedScreen(onGoToProfile: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(NegroFondo)
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -751,7 +748,7 @@ private fun ChatBlockedScreen(onGoToProfile: () -> Unit) {
             Spacer(modifier = Modifier.height(20.dp))
             Text(
                 text = "Inicia sesión para continuar",
-                color = Color.White,
+                color = TextoPrincipal,
                 fontSize = 20.sp,
                 textAlign = TextAlign.Center
             )
@@ -765,7 +762,7 @@ private fun ChatBlockedScreen(onGoToProfile: () -> Unit) {
             Spacer(modifier = Modifier.height(28.dp))
             Button(
                 onClick = onGoToProfile,
-                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = Color.White),
+                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = TextoSobreVerde),
                 modifier = Modifier.fillMaxWidth(0.75f)
             ) {
                 Text(text = "Ir a Mi Perfil")

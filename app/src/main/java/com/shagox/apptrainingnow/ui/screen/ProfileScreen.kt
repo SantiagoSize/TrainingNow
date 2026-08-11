@@ -8,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,6 +35,8 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
@@ -72,6 +75,9 @@ import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
 import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
+import com.shagox.apptrainingnow.ui.theme.SuperficieElevada
+import com.shagox.apptrainingnow.ui.theme.LocalTemaClaro
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -90,15 +96,23 @@ import java.util.Locale
 @Composable
 fun ProfileScreen(
     authViewModel: AuthViewModel,
-    modifier: Modifier = Modifier,
-    onVerAvanceMensual: () -> Unit = {}
+    modifier: Modifier = Modifier
 ) {
     val loginState by authViewModel.loginState.collectAsState()
     val registerState by authViewModel.register.collectAsState()
+    val justRegistered by authViewModel.justRegistered.collectAsState()
     val loggedUser = loginState.loggedUser
     var selectedTab by remember { mutableIntStateOf(0) } // 0 = Iniciar sesión, 1 = Registrarse
     var showEditProfile by remember { mutableStateOf(false) }
     var showForgotPassword by remember { mutableStateOf(false) }
+
+    if (justRegistered && loggedUser != null) {
+        WelcomeOnboardingDialog(
+            user = loggedUser,
+            authViewModel = authViewModel,
+            onFinish = { authViewModel.consumeJustRegistered() }
+        )
+    }
 
     Column(
         modifier = modifier
@@ -121,28 +135,6 @@ fun ProfileScreen(
                 onLogout = { authViewModel.logout() }
             )
 
-            // Acceso al reporte mensual de entrenamiento
-            Button(
-                onClick = onVerAvanceMensual,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = GrisFondo,
-                    contentColor = VerdeTN
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.CalendarToday,
-                    contentDescription = null,
-                    tint = VerdeTN,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text("MI AVANCE MENSUAL", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            }
-
             if (showEditProfile) {
                 EditProfileDialog(
                     user = loggedUser,
@@ -154,28 +146,6 @@ fun ProfileScreen(
                 )
             }
         } else {
-            // Avance mensual disponible también sin cuenta (datos locales)
-            Button(
-                onClick = onVerAvanceMensual,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = GrisFondo,
-                    contentColor = VerdeTN
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.CalendarToday,
-                    contentDescription = null,
-                    tint = VerdeTN,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text("MI AVANCE MENSUAL", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            }
-
             // Logo Training Now! en la zona superior (pantalla de login/registro)
             Box(
                 modifier = Modifier
@@ -184,7 +154,9 @@ fun ProfileScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = painterResource(R.drawable.logo_2),
+                    painter = painterResource(
+                        if (LocalTemaClaro.current) R.drawable.logo_claro else R.drawable.logo_2
+                    ),
                     contentDescription = "Training Now!",
                     modifier = Modifier.fillMaxWidth(0.62f)
                 )
@@ -249,10 +221,12 @@ fun ProfileScreen(
                 RegisterTabContent(
                     registerState = registerState,
                     onNameChange = { authViewModel.onNameChange(it) },
+                    onLastNameChange = { authViewModel.onLastNameChange(it) },
                     onEmailChange = { authViewModel.onRegisterEmailChange(it) },
                     onPhoneChange = { authViewModel.onPhoneChange(it) },
                     onPassChange = { authViewModel.onRegisterPassChange(it) },
                     onConfirmChange = { authViewModel.onConfirmChange(it) },
+                    onTermsAcceptedChange = { authViewModel.onTermsAcceptedChange(it) },
                     onSubmit = { authViewModel.submitRegister() }
                 )
             }
@@ -360,7 +334,7 @@ private fun ProfileDataRow(
             Text(label, color = GrisTexto, fontSize = 12.sp)
             Text(
                 value,
-                color = androidx.compose.ui.graphics.Color.White,
+                color = TextoPrincipal,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold
             )
@@ -419,7 +393,7 @@ private fun ProfileLoggedContent(
     if (showPhotoOptions) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showPhotoOptions = false },
-            title = { Text("Foto de perfil", color = androidx.compose.ui.graphics.Color.White) },
+            title = { Text("Foto de perfil", color = TextoPrincipal) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Elige una opción", color = GrisTexto)
@@ -572,7 +546,7 @@ private fun ProfileLoggedContent(
         ProfileDataRow(
             icon = Icons.Filled.Email,
             label = "Email",
-            value = user.email
+            value = maskEmail(user.email)
         )
         Spacer(modifier = Modifier.height(10.dp))
         ProfileDataRow(
@@ -636,6 +610,17 @@ private fun parseBirthDateToMillis(str: String?): Long? {
     } catch (_: Exception) { null }
 }
 
+/** Enmascara el correo mostrando solo los primeros 3 caracteres, ej: "usu•••@gmail.com". */
+private fun maskEmail(email: String): String {
+    val atIndex = email.indexOf('@')
+    if (atIndex <= 0) return email
+    val local = email.substring(0, atIndex)
+    val domain = email.substring(atIndex)
+    val visible = local.take(3)
+    val hiddenLength = (local.length - visible.length).coerceAtLeast(3)
+    return "$visible${"•".repeat(hiddenLength)}$domain"
+}
+
 @Composable
 private fun EditProfileDialog(
     user: UserEntity,
@@ -654,8 +639,8 @@ private fun EditProfileDialog(
     var weightStr by remember(user) { mutableStateOf(user.weight?.toString() ?: "") }
     var specializations by remember(user) { mutableStateOf(user.specializations ?: "") }
     val textFieldColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor = androidx.compose.ui.graphics.Color.White,
-        unfocusedTextColor = androidx.compose.ui.graphics.Color.White,
+        focusedTextColor = TextoPrincipal,
+        unfocusedTextColor = TextoPrincipal,
         focusedBorderColor = VerdeTN,
         unfocusedBorderColor = GrisTexto,
         cursorColor = VerdeTN,
@@ -703,7 +688,7 @@ private fun EditProfileDialog(
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = GrisFondo),
                     shape = RoundedCornerShape(12.dp)
-                ) { Text("Cancelar", color = androidx.compose.ui.graphics.Color.White) }
+                ) { Text("Cancelar", color = TextoPrincipal) }
                 Button(
                     onClick = {
                         val updated = user.copy(
@@ -743,24 +728,6 @@ private fun LoginTabContent(
             .verticalScroll(rememberScrollState())
             .padding(top = 8.dp)
     ) {
-        // Logo arriba (logo_2, sin texto)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            androidx.compose.foundation.Image(
-                painter = painterResource(R.drawable.logo_2),
-                contentDescription = "Logo Training NOW!",
-                modifier = Modifier
-                    .fillMaxWidth(0.55f)
-                    .height(100.dp),
-                contentScale = ContentScale.Fit
-            )
-        }
-        Spacer(modifier = Modifier.height(20.dp))
-
         OutlinedTextField(
             value = loginState.email,
             onValueChange = onEmailChange,
@@ -768,8 +735,8 @@ private fun LoginTabContent(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = androidx.compose.ui.graphics.Color.White,
-                unfocusedTextColor = androidx.compose.ui.graphics.Color.White,
+                focusedTextColor = TextoPrincipal,
+                unfocusedTextColor = TextoPrincipal,
                 focusedBorderColor = VerdeTN,
                 unfocusedBorderColor = GrisTexto,
                 cursorColor = VerdeTN,
@@ -793,8 +760,8 @@ private fun LoginTabContent(
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = androidx.compose.ui.graphics.Color.White,
-                unfocusedTextColor = androidx.compose.ui.graphics.Color.White,
+                focusedTextColor = TextoPrincipal,
+                unfocusedTextColor = TextoPrincipal,
                 focusedBorderColor = VerdeTN,
                 unfocusedBorderColor = GrisTexto,
                 cursorColor = VerdeTN,
@@ -811,7 +778,7 @@ private fun LoginTabContent(
             onClick = onSubmit,
             modifier = Modifier.fillMaxWidth(),
             enabled = loginState.canSubmit && !loginState.isSubmitting,
-            colors = ButtonDefaults.buttonColors(containerColor = GrisFondo, contentColor = androidx.compose.ui.graphics.Color.White),
+            colors = ButtonDefaults.buttonColors(containerColor = GrisFondo, contentColor = TextoPrincipal),
             shape = RoundedCornerShape(12.dp)
         ) {
             if (loginState.isSubmitting) {
@@ -849,15 +816,18 @@ private fun LoginTabContent(
 private fun RegisterTabContent(
     registerState: com.shagox.apptrainingnow.ui.viewmodel.RegisterUiState,
     onNameChange: (String) -> Unit,
+    onLastNameChange: (String) -> Unit,
     onEmailChange: (String) -> Unit,
     onPhoneChange: (String) -> Unit,
     onPassChange: (String) -> Unit,
     onConfirmChange: (String) -> Unit,
+    onTermsAcceptedChange: (Boolean) -> Unit,
     onSubmit: () -> Unit
 ) {
+    var showTerms by remember { mutableStateOf(false) }
     val textFieldColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor = androidx.compose.ui.graphics.Color.White,
-        unfocusedTextColor = androidx.compose.ui.graphics.Color.White,
+        focusedTextColor = TextoPrincipal,
+        unfocusedTextColor = TextoPrincipal,
         focusedBorderColor = VerdeTN,
         unfocusedBorderColor = GrisTexto,
         cursorColor = VerdeTN,
@@ -872,33 +842,28 @@ private fun RegisterTabContent(
             .verticalScroll(rememberScrollState())
             .padding(top = 8.dp)
     ) {
-        // Logo arriba (logo_2, sin texto)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            androidx.compose.foundation.Image(
-                painter = painterResource(R.drawable.logo_2),
-                contentDescription = "Logo Training NOW!",
-                modifier = Modifier
-                    .fillMaxWidth(0.55f)
-                    .height(100.dp),
-                contentScale = ContentScale.Fit
-            )
-        }
-        Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             value = registerState.name,
             onValueChange = onNameChange,
-            label = { Text("Nombre", color = GrisTexto) },
+            label = { Text("Nombres", color = GrisTexto) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             colors = textFieldColors,
             shape = RoundedCornerShape(12.dp)
         )
         if (registerState.nameError != null) Text(registerState.nameError, color = androidx.compose.ui.graphics.Color(0xFFE53935), fontSize = 12.sp)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedTextField(
+            value = registerState.lastName,
+            onValueChange = onLastNameChange,
+            label = { Text("Apellidos", color = GrisTexto) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            colors = textFieldColors,
+            shape = RoundedCornerShape(12.dp)
+        )
+        if (registerState.lastNameError != null) Text(registerState.lastNameError, color = androidx.compose.ui.graphics.Color(0xFFE53935), fontSize = 12.sp)
         Spacer(modifier = Modifier.height(12.dp))
 
         OutlinedTextField(
@@ -949,7 +914,29 @@ private fun RegisterTabContent(
             shape = RoundedCornerShape(12.dp)
         )
         if (registerState.confirmError != null) Text(registerState.confirmError, color = androidx.compose.ui.graphics.Color(0xFFE53935), fontSize = 12.sp)
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Checkbox(
+                checked = registerState.termsAccepted,
+                onCheckedChange = onTermsAcceptedChange,
+                colors = CheckboxDefaults.colors(
+                    checkedColor = VerdeTN,
+                    uncheckedColor = GrisTexto,
+                    checkmarkColor = TextoSobreVerde
+                )
+            )
+            Text(
+                text = "Acepto los Términos y Condiciones",
+                color = TextoPrincipal,
+                fontSize = 13.sp,
+                modifier = Modifier.clickable { showTerms = true }
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
 
         Button(
             onClick = onSubmit,
@@ -973,6 +960,455 @@ private fun RegisterTabContent(
             Text("Registro exitoso. Inicia sesión.", color = VerdeTN, fontSize = 14.sp)
         }
     }
+
+    if (showTerms) {
+        AlertDialog(
+            onDismissRequest = { showTerms = false },
+            containerColor = GrisFondo,
+            title = { Text("Términos y Condiciones", color = TextoPrincipal, fontWeight = FontWeight.SemiBold) },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text(
+                        text = TERMINOS_Y_CONDICIONES_TN,
+                        color = TextoPrincipal,
+                        fontSize = 13.sp
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onTermsAcceptedChange(true)
+                    showTerms = false
+                }) {
+                    Text("ACEPTAR", color = VerdeTN, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTerms = false }) {
+                    Text("CERRAR", color = GrisTexto)
+                }
+            }
+        )
+    }
+}
+
+/** Términos y condiciones de uso de TrainingNow (contenido de referencia para el proyecto académico). */
+private const val TERMINOS_Y_CONDICIONES_TN = """
+1. ACEPTACIÓN DE LOS TÉRMINOS
+Al registrarte en TrainingNow aceptas estos Términos y Condiciones y nuestra Política de Privacidad. Si no estás de acuerdo, no debes utilizar la aplicación.
+
+2. USO DE LA APLICACIÓN
+TrainingNow es una plataforma de entrenamiento físico que permite crear y seguir rutinas de ejercicio, registrar tu progreso y comunicarte con entrenadores. El uso de la app es responsabilidad exclusiva del usuario.
+
+3. DATOS PERSONALES
+Los datos ingresados (nombre, apellidos, correo, teléfono y datos físicos) se almacenan de forma segura y se utilizan únicamente para el funcionamiento de la app: gestión de tu cuenta, seguimiento de rutinas y comunicación con tu entrenador. No se comparten con terceros sin tu consentimiento.
+
+4. RESPONSABILIDAD SOBRE LA ACTIVIDAD FÍSICA
+TrainingNow no reemplaza la evaluación de un profesional de la salud. Consulta a un médico antes de iniciar cualquier rutina de ejercicio, especialmente si tienes alguna condición médica preexistente.
+
+5. CUENTA DE USUARIO
+Eres responsable de mantener la confidencialidad de tu contraseña y de toda actividad realizada desde tu cuenta. Debes notificar cualquier uso no autorizado.
+
+6. CONDUCTA DEL USUARIO
+Está prohibido usar la app con fines fraudulentos, difundir contenido ofensivo en el chat o suplantar la identidad de otros usuarios o entrenadores.
+
+7. MODIFICACIONES
+TrainingNow puede actualizar estos términos en cualquier momento. El uso continuado de la app tras una actualización implica la aceptación de los nuevos términos.
+
+8. CONTACTO
+Para dudas sobre estos términos, puedes escribir al equipo de soporte a través de la app.
+"""
+
+/**
+ * Carousel de bienvenida a pantalla completa, mostrado justo después de crear la cuenta
+ * (con auto-login). 4 diapositivas: bienvenida, chat, sincronización de rutinas y,
+ * como último paso, datos opcionales (fecha de nacimiento, altura, peso, foto).
+ */
+@Composable
+private fun WelcomeOnboardingDialog(
+    user: UserEntity,
+    authViewModel: AuthViewModel,
+    onFinish: () -> Unit
+) {
+    val context = LocalContext.current
+    var currentPage by remember { mutableStateOf(0) }
+    val totalPages = 5
+
+    var birthDateStr by remember { mutableStateOf("") }
+    var heightStr by remember { mutableStateOf("") }
+    var weightStr by remember { mutableStateOf("") }
+    var avatarDataUri by remember { mutableStateOf<String?>(null) }
+
+    val avatarPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            avatarDataUri = com.shagox.apptrainingnow.utils.ImageCompressor.compressToDataUri(
+                context = context,
+                uri = it,
+                maxDimension = 400,
+                targetBytes = 60 * 1024
+            )
+        }
+    }
+
+    fun finalizar() {
+        val nuevaFecha = parseBirthDateToMillis(birthDateStr)
+        val nuevaAltura = heightStr.toFloatOrNull()
+        val nuevoPeso = weightStr.toFloatOrNull()
+        if (nuevaFecha != null || nuevaAltura != null || nuevoPeso != null) {
+            authViewModel.updateUser(
+                user.copy(
+                    birthDate = nuevaFecha ?: user.birthDate,
+                    height = nuevaAltura ?: user.height,
+                    weight = nuevoPeso ?: user.weight
+                )
+            )
+        }
+        if (avatarDataUri != null) {
+            authViewModel.updateProfilePhoto(user.id, avatarDataUri)
+        }
+        onFinish()
+    }
+
+    Dialog(
+        onDismissRequest = onFinish,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(NegroFondo)
+        ) {
+            // Botón cerrar (arriba a la derecha), disponible en todas las diapositivas
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(20.dp)
+                    .clip(CircleShape)
+                    .background(SuperficieElevada)
+                    .clickable { onFinish() }
+                    .padding(10.dp)
+            ) {
+                Text("✕", color = TextoPrincipal, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 28.dp)
+                    .padding(top = 80.dp, bottom = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    when (currentPage) {
+                        0 -> OnboardingWelcomePage(userName = user.name)
+                        1 -> OnboardingChatPage()
+                        2 -> OnboardingSyncPage()
+                        3 -> OnboardingProfileDataPage(
+                            birthDateStr = birthDateStr,
+                            onBirthDateChange = { birthDateStr = it },
+                            heightStr = heightStr,
+                            onHeightChange = { heightStr = it },
+                            weightStr = weightStr,
+                            onWeightChange = { weightStr = it },
+                            avatarDataUri = avatarDataUri,
+                            onPickAvatar = { avatarPickerLauncher.launch("image/*") }
+                        )
+                        else -> OnboardingThanksPage()
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Indicador de diapositivas
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    repeat(totalPages) { index ->
+                        Box(
+                            modifier = Modifier
+                                .size(if (index == currentPage) 10.dp else 8.dp)
+                                .clip(CircleShape)
+                                .background(if (index == currentPage) VerdeTN else GrisBorde)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = {
+                        if (currentPage < totalPages - 1) currentPage++ else finalizar()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = TextoSobreVerde),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        if (currentPage < totalPages - 1) "SIGUIENTE" else "FINALIZAR",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingWelcomePage(userName: String) {
+    Spacer(modifier = Modifier.height(40.dp))
+    Text(text = ":D", fontSize = 96.sp, fontWeight = FontWeight.Bold, color = VerdeTN)
+    Spacer(modifier = Modifier.height(32.dp))
+    Text(
+        text = "¡Muchas gracias por crear tu cuenta!",
+        color = TextoPrincipal,
+        fontSize = 24.sp,
+        fontWeight = FontWeight.Bold,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    )
+    Spacer(modifier = Modifier.height(12.dp))
+    Text(
+        text = "Bienvenido(a) a TrainingNow, ${userName.trim().ifBlank { "" }}. Estamos felices de que te unas a nosotros para entrenar mejor cada día.",
+        color = GrisTexto,
+        fontSize = 15.sp,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    )
+}
+
+@Composable
+private fun OnboardingChatPage() {
+    Spacer(modifier = Modifier.height(40.dp))
+    Icon(
+        imageVector = androidx.compose.material.icons.Icons.Filled.Person,
+        contentDescription = null,
+        tint = VerdeTN,
+        modifier = Modifier.size(72.dp)
+    )
+    Spacer(modifier = Modifier.height(32.dp))
+    Text(
+        text = "Chatea con tu entrenador",
+        color = TextoPrincipal,
+        fontSize = 22.sp,
+        fontWeight = FontWeight.Bold,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    )
+    Spacer(modifier = Modifier.height(12.dp))
+    Text(
+        text = "Desde la sección de Chat puedes escribirte directamente con tu entrenador, resolver dudas sobre tus ejercicios y recibir seguimiento personalizado.",
+        color = GrisTexto,
+        fontSize = 15.sp,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    )
+    Spacer(modifier = Modifier.height(24.dp))
+
+    // Mini vista previa del chat
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(GrisFondo)
+            .border(1.dp, GrisBorde, RoundedCornerShape(16.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 14.dp, bottomStart = 14.dp, bottomEnd = 14.dp))
+                    .background(SuperficieElevada)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Text("¡Hola! ¿Cómo vas con la rutina de hoy?", color = TextoPrincipal, fontSize = 13.sp)
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 4.dp, bottomStart = 14.dp, bottomEnd = 14.dp))
+                    .background(VerdeTN)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Text("¡Muy bien! Ya llevo 3 ejercicios", color = TextoSobreVerde, fontSize = 13.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingSyncPage() {
+    Spacer(modifier = Modifier.height(40.dp))
+    Icon(
+        imageVector = androidx.compose.material.icons.Icons.Filled.CalendarToday,
+        contentDescription = null,
+        tint = VerdeTN,
+        modifier = Modifier.size(72.dp)
+    )
+    Spacer(modifier = Modifier.height(32.dp))
+    Text(
+        text = "Tus rutinas, siempre contigo",
+        color = TextoPrincipal,
+        fontSize = 22.sp,
+        fontWeight = FontWeight.Bold,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    )
+    Spacer(modifier = Modifier.height(12.dp))
+    Text(
+        text = "Tus rutinas y tu progreso se guardan en tu cuenta para siempre. Si inicias sesión desde otro dispositivo, ahí estarán esperándote, sin perder nada.",
+        color = GrisTexto,
+        fontSize = 15.sp,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    )
+    Spacer(modifier = Modifier.height(24.dp))
+
+    // Mini vista previa de una rutina
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(VerdeTN.copy(alpha = 0.12f))
+            .border(1.dp, VerdeTN, RoundedCornerShape(16.dp))
+            .padding(14.dp)
+    ) {
+        Text("LUNES · Pecho y Tríceps", color = TextoPrincipal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Spacer(modifier = Modifier.height(10.dp))
+        listOf("Press banca 4x10", "Fondos en paralelas 3x12", "Extensión de tríceps 3x15").forEach { ejercicio ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(vertical = 3.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(VerdeTN)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(ejercicio, color = TextoPrincipal, fontSize = 13.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingThanksPage() {
+    Spacer(modifier = Modifier.height(60.dp))
+    Text(text = ";)", fontSize = 96.sp, fontWeight = FontWeight.Bold, color = VerdeTN)
+    Spacer(modifier = Modifier.height(32.dp))
+    Text(
+        text = "Muchas gracias ;)",
+        color = TextoPrincipal,
+        fontSize = 26.sp,
+        fontWeight = FontWeight.Bold,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    )
+    Spacer(modifier = Modifier.height(12.dp))
+    Text(
+        text = "Todo listo. Ahora sí, a entrenar.",
+        color = GrisTexto,
+        fontSize = 15.sp,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    )
+}
+
+@Composable
+private fun OnboardingProfileDataPage(
+    birthDateStr: String,
+    onBirthDateChange: (String) -> Unit,
+    heightStr: String,
+    onHeightChange: (String) -> Unit,
+    weightStr: String,
+    onWeightChange: (String) -> Unit,
+    avatarDataUri: String?,
+    onPickAvatar: () -> Unit
+) {
+    val textFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = TextoPrincipal,
+        unfocusedTextColor = TextoPrincipal,
+        focusedBorderColor = VerdeTN,
+        unfocusedBorderColor = GrisTexto,
+        cursorColor = VerdeTN,
+        focusedLabelColor = VerdeTN,
+        unfocusedLabelColor = GrisTexto,
+        focusedContainerColor = GrisFondo,
+        unfocusedContainerColor = GrisFondo
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text = "Un último paso (opcional)",
+        color = TextoPrincipal,
+        fontSize = 22.sp,
+        fontWeight = FontWeight.Bold,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text = "Puedes completar estos datos ahora o hacerlo más tarde desde tu perfil.",
+        color = GrisTexto,
+        fontSize = 14.sp,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    )
+    Spacer(modifier = Modifier.height(20.dp))
+
+    Box(
+        modifier = Modifier
+            .size(96.dp)
+            .clip(CircleShape)
+            .background(GrisFondo)
+            .clickable { onPickAvatar() },
+        contentAlignment = Alignment.Center
+    ) {
+        if (avatarDataUri != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current).data(avatarDataUri).build(),
+                contentDescription = "Foto de perfil",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Filled.CameraAlt,
+                contentDescription = "Elegir foto",
+                tint = GrisTexto,
+                modifier = Modifier.size(32.dp)
+            )
+        }
+    }
+    Spacer(modifier = Modifier.height(24.dp))
+
+    OutlinedTextField(
+        value = birthDateStr,
+        onValueChange = onBirthDateChange,
+        label = { Text("Fecha de nacimiento (dd/MM/yyyy)", color = GrisTexto) },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        colors = textFieldColors,
+        shape = RoundedCornerShape(12.dp)
+    )
+    Spacer(modifier = Modifier.height(12.dp))
+    OutlinedTextField(
+        value = heightStr,
+        onValueChange = onHeightChange,
+        label = { Text("Altura (cm)", color = GrisTexto) },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        colors = textFieldColors,
+        shape = RoundedCornerShape(12.dp)
+    )
+    Spacer(modifier = Modifier.height(12.dp))
+    OutlinedTextField(
+        value = weightStr,
+        onValueChange = onWeightChange,
+        label = { Text("Peso (kg)", color = GrisTexto) },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        colors = textFieldColors,
+        shape = RoundedCornerShape(12.dp)
+    )
 }
 
 
@@ -1002,8 +1438,8 @@ private fun ForgotPasswordDialog(
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = VerdeTN,
         unfocusedBorderColor = GrisTexto,
-        focusedTextColor = androidx.compose.ui.graphics.Color.White,
-        unfocusedTextColor = androidx.compose.ui.graphics.Color.White,
+        focusedTextColor = TextoPrincipal,
+        unfocusedTextColor = TextoPrincipal,
         cursorColor = VerdeTN,
         focusedLabelColor = VerdeTN,
         unfocusedLabelColor = GrisTexto,
@@ -1049,7 +1485,7 @@ private fun ForgotPasswordDialog(
                     success -> {
                         Text(
                             "Tu contraseña fue actualizada. Ya puedes iniciar sesión.",
-                            color = androidx.compose.ui.graphics.Color.White
+                            color = TextoPrincipal
                         )
                     }
                     step == 1 -> {
@@ -1141,7 +1577,7 @@ private fun ForgotPasswordDialog(
                 Button(
                     onClick = onDismiss,
                     enabled = !loading,
-                    colors = ButtonDefaults.buttonColors(containerColor = GrisBorde, contentColor = androidx.compose.ui.graphics.Color.White)
+                    colors = ButtonDefaults.buttonColors(containerColor = GrisBorde, contentColor = TextoPrincipal)
                 ) { Text("Cancelar") }
             }
         }

@@ -91,26 +91,23 @@ class WorkoutRepository(private val workoutDao: WorkoutDao) {
     }
 
     /**
-     * Registra un día de entrenamiento ya terminado (marcar todos los ejercicios).
-     * Queda guardado en la base de datos con el nombre de la rutina y la sesión del día,
-     * de modo que el conteo de días entrenados sobrevive al cierre de la app.
+     * Registra como completado el día de rutina cuya fecha (dentro de la semana) es [inicioDia].
+     * Antes se estampaba siempre con la hora real de "ahora", así que marcar el checklist de
+     * cualquier día (ej. Martes) quedaba registrado bajo el día real del sistema (ej. Lunes) y
+     * la franja semanal mostraba verde el día equivocado. Ahora se guarda bajo la fecha del
+     * propio día seleccionado.
      *
-     * Es idempotente por día: si ya hay una sesión completada hoy para esa rutina, no duplica.
+     * Es idempotente por día: si ya hay una sesión completada ese día para esa rutina, no duplica.
      */
     suspend fun registrarDiaCompletado(
         userId: Int,
         routineId: Int,
         nombreRutina: String,
         nombreSesion: String,
-        ejercicios: Int
+        ejercicios: Int,
+        inicioDia: Long = inicioDeHoy()
     ): Result<Long> {
         return try {
-            val inicioDia = java.util.Calendar.getInstance().apply {
-                set(java.util.Calendar.HOUR_OF_DAY, 0)
-                set(java.util.Calendar.MINUTE, 0)
-                set(java.util.Calendar.SECOND, 0)
-                set(java.util.Calendar.MILLISECOND, 0)
-            }.timeInMillis
             val finDia = inicioDia + 24L * 60 * 60 * 1000
 
             val yaRegistrado = workoutDao.getRecentSessions(userId, 20).any { sesion ->
@@ -120,14 +117,16 @@ class WorkoutRepository(private val workoutDao: WorkoutDao) {
             }
             if (yaRegistrado) return Result.success(0L)
 
-            val ahora = System.currentTimeMillis()
+            // La marca de tiempo queda dentro de la ventana del día seleccionado (mediodía,
+            // para evitar bordes por redondeo), no la hora real de "ahora".
+            val marcaTiempo = inicioDia + 12L * 60 * 60 * 1000
             val id = workoutDao.insertSession(
                 WorkoutSessionEntity(
                     userId = userId,
                     routineId = routineId,
                     status = WorkoutSessionStatus.COMPLETED.name,
-                    startTime = ahora,
-                    endTime = ahora,
+                    startTime = marcaTiempo,
+                    endTime = marcaTiempo,
                     notes = "$nombreRutina · $nombreSesion ($ejercicios ejercicios)"
                 )
             )
@@ -136,6 +135,32 @@ class WorkoutRepository(private val workoutDao: WorkoutDao) {
             Result.failure(e)
         }
     }
+
+    /**
+     * Revierte el registro de completado de un día (al desmarcar algún ejercicio ya marcado).
+     * Sin esto, un día quedaba verde para siempre aunque luego se desmarcaran sus ejercicios.
+     */
+    suspend fun desregistrarDiaCompletado(
+        userId: Int,
+        routineId: Int,
+        inicioDia: Long
+    ) {
+        val finDia = inicioDia + 24L * 60 * 60 * 1000
+        workoutDao.getRecentSessions(userId, 20)
+            .filter { sesion ->
+                sesion.routineId == routineId &&
+                    sesion.status == WorkoutSessionStatus.COMPLETED.name &&
+                    sesion.startTime in inicioDia until finDia
+            }
+            .forEach { workoutDao.deleteSessionById(it.id) }
+    }
+
+    private fun inicioDeHoy(): Long = java.util.Calendar.getInstance().apply {
+        set(java.util.Calendar.HOUR_OF_DAY, 0)
+        set(java.util.Calendar.MINUTE, 0)
+        set(java.util.Calendar.SECOND, 0)
+        set(java.util.Calendar.MILLISECOND, 0)
+    }.timeInMillis
 
     suspend fun startWorkout(
         userId: Int,

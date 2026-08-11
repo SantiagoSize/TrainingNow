@@ -48,6 +48,14 @@ interface RoutineDao {
     @Query("DELETE FROM routines WHERE id = :routineId")
     suspend fun deleteRoutineById(routineId: Int)
 
+    /**
+     * Elimina rutinas globales (ownerId nulo) cuyo nombre coincida con planes
+     * predeterminados descontinuados, aunque ya existan otras rutinas en la tabla.
+     * Limpieza de residuos que la siembra normal (solo corre con la tabla vacía) no toca.
+     */
+    @Query("DELETE FROM routines WHERE ownerId IS NULL AND name LIKE '%Full Body%Principiante%'")
+    suspend fun deleteRutinasDescontinuadas()
+
     // ==================== RUTINAS - QUERIES GENERALES ====================
 
     /**

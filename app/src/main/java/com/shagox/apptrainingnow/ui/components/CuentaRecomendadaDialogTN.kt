@@ -30,9 +30,9 @@ import androidx.compose.ui.window.Dialog
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
 import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
-import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 
 private val RojoAviso = Color(0xFFE53935)
+private val AmarilloAviso = Color(0xFFFFC107)
 
 /**
  * Aviso reutilizable que invita a crear cuenta antes de continuar sin ella.
@@ -61,20 +61,20 @@ fun CuentaRecomendadaDialogTN(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(VerdeTN.copy(alpha = 0.15f)),
+                            .background(AmarilloAviso.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Warning,
                             contentDescription = null,
-                            tint = VerdeTN,
+                            tint = AmarilloAviso,
                             modifier = Modifier.size(20.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = titulo,
-                        color = VerdeTN,
+                        color = AmarilloAviso,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.ExtraBold
                     )
@@ -98,7 +98,7 @@ fun CuentaRecomendadaDialogTN(
                         .padding(vertical = 14.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(textoNegativo, color = TextoPrincipal, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(textoNegativo, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
                 Box(
                     modifier = Modifier
@@ -108,7 +108,7 @@ fun CuentaRecomendadaDialogTN(
                         .padding(vertical = 14.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("SÍ, CREAR CUENTA", color = TextoSobreVerde, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("SÍ, CREAR CUENTA", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

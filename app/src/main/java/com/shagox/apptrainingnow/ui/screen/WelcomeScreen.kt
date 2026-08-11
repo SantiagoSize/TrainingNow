@@ -60,10 +60,10 @@ import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
 import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
+import com.shagox.apptrainingnow.ui.theme.GrisTexto
+import com.shagox.apptrainingnow.ui.theme.LocalTemaClaro
 
 private val VerdeOscuro = Color(0xFF0D3D1A)
-private val VerdeNeon = Color(0xFF22FF5F)
-private val GrisCard = GrisFondo
 
 /**
  * Pantalla de bienvenida que se muestra solo la primera vez.
@@ -132,7 +132,9 @@ fun WelcomeScreen(
 
             // Logo
             androidx.compose.foundation.Image(
-                painter = painterResource(R.drawable.logo_2),
+                painter = painterResource(
+                    if (LocalTemaClaro.current) R.drawable.logo_claro else R.drawable.logo_2
+                ),
                 contentDescription = "Training NOW!",
                 modifier = Modifier
                     .height(72.dp)
@@ -295,10 +297,10 @@ private fun PermissionCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(if (isGranted) GrisCard.copy(alpha = 0.45f) else GrisCard.copy(alpha = 0.9f))
+            .background(if (isGranted) GrisFondo.copy(alpha = 0.45f) else GrisFondo.copy(alpha = 0.9f))
             .border(
                 width = 1.5.dp,
-                color = if (isGranted) Color.Gray.copy(alpha = 0.5f) else VerdeTN.copy(alpha = borderColor),
+                color = if (isGranted) GrisTexto.copy(alpha = 0.5f) else VerdeTN.copy(alpha = borderColor),
                 shape = RoundedCornerShape(16.dp)
             )
             .padding(18.dp)
@@ -317,7 +319,7 @@ private fun PermissionCard(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = if (isGranted) Color.Gray else TextoPrincipal.copy(alpha = 0.8f),
+                    tint = if (isGranted) GrisTexto else TextoPrincipal.copy(alpha = 0.8f),
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -328,13 +330,13 @@ private fun PermissionCard(
             ) {
                 Text(
                     text = title,
-                    color = if (isGranted) Color.Gray else Color.White,
+                    color = if (isGranted) GrisTexto else TextoPrincipal,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
                     text = description,
-                    color = if (isGranted) Color.Gray.copy(alpha = 0.7f) else TextoPrincipal.copy(alpha = 0.7f),
+                    color = if (isGranted) GrisTexto.copy(alpha = 0.7f) else TextoPrincipal.copy(alpha = 0.7f),
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 2.dp)
                 )
@@ -344,13 +346,13 @@ private fun PermissionCard(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(Color.Gray.copy(alpha = 0.25f)),
+                        .background(GrisTexto.copy(alpha = 0.25f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Check,
                         contentDescription = "Activado",
-                        tint = Color.Gray,
+                        tint = GrisTexto,
                         modifier = Modifier.size(20.dp)
                     )
                 }

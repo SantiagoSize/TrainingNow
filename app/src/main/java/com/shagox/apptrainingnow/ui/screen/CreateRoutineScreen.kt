@@ -3,6 +3,7 @@ package com.shagox.apptrainingnow.ui.screen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -264,12 +265,17 @@ fun CreateRoutineScreen(
                             )
                             Text(
                                 text = "Quitar",
-                                color = VerdeTN,
+                                color = Color.White,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Medium,
-                                modifier = Modifier.clickable {
-                                    updateDayExercises(exerciseNames.filterIndexed { i, _ -> i != index })
-                                }
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(1.dp, Color(0xFFE53935), RoundedCornerShape(8.dp))
+                                    .background(Color(0xFFE53935))
+                                    .clickable {
+                                        updateDayExercises(exerciseNames.filterIndexed { i, _ -> i != index })
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
                             )
                         }
                     }
@@ -311,7 +317,7 @@ fun CreateRoutineScreen(
 private fun LabelGreen(text: String) {
     Text(
         text = text,
-        color = VerdeTN,
+        color = TextoPrincipal,
         fontSize = 14.sp,
         fontWeight = FontWeight.SemiBold
     )

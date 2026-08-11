@@ -13,7 +13,9 @@ data class UserDto(
     val name: String = "",
     val lastName: String = "",
     val email: String = "",
-    val phone: String = "",
+    /** Nullable a propósito: Gson puede asignar null aquí si el backend devuelve el campo
+     *  como JSON null (ej. cuentas semilla sin teléfono), sin que el valor por defecto proteja. */
+    val phone: String? = null,
     val password: String = "",
     @SerializedName("profilePhotoUrl") val profilePhotoUrl: String? = null,
     @SerializedName("birthDate") val birthDate: Long? = null,
@@ -37,7 +39,7 @@ data class UserDto(
         name = name,
         lastName = lastName,
         email = email,
-        phone = phone,
+        phone = phone ?: "",
         password = password,
         profilePhotoUrl = profilePhotoUrl,
         birthDate = birthDate,

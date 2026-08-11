@@ -170,9 +170,6 @@ fun RoutineActiveScreen(
         val index = if (matchByLabel >= 0) matchByLabel else todayDayIndex.coerceIn(0, days.size - 1)
         selectedDayRoutineId = days[index].routineId
     }
-    if (selectedDayRoutineId == null && days.isNotEmpty()) {
-        selectedDayRoutineId = days.first().routineId
-    }
     val selectedDay: RoutineDayView? = days.find { it.routineId == selectedDayRoutineId } ?: days.firstOrNull()
     val routineName = routineWithDays?.routineName ?: initialRoutineName
     val todayDateLabel = run {
@@ -202,6 +199,9 @@ fun RoutineActiveScreen(
     val selectedIndexForProgress = days.indexOfFirst { it.routineId == selectedDayRoutineId }
     val ejerciciosDelDia = selectedDay?.exercises?.size ?: 0
     val nombreSesionDelDia = selectedDay?.displayActivity ?: "Entrenamiento"
+    // Fecha (00:00) del día de la semana seleccionado, no la de "hoy": si se marca el
+    // checklist del Martes, debe registrarse como Martes aunque hoy sea Lunes.
+    val inicioDelDiaSeleccionado = weekStart + selectedIndexForProgress.coerceAtLeast(0) * (24L * 60 * 60 * 1000)
     androidx.compose.runtime.LaunchedEffect(allExercisesChecked, selectedIndexForProgress) {
         if (selectedIndexForProgress >= 0) {
             val nuevo = if (allExercisesChecked) completedDays + selectedIndexForProgress
@@ -210,7 +210,6 @@ fun RoutineActiveScreen(
                 completedDays = nuevo
                 weekProgress.save(nuevo)
             }
-            // Registrar el entrenamiento completado
             if (allExercisesChecked && userId > 0) {
                 // 1) En la base de datos local, con el nombre de la rutina y de la sesión
                 workoutRepository?.registrarDiaCompletado(
@@ -218,13 +217,22 @@ fun RoutineActiveScreen(
                     routineId = routineId,
                     nombreRutina = routineName,
                     nombreSesion = nombreSesionDelDia,
-                    ejercicios = ejerciciosDelDia
+                    ejercicios = ejerciciosDelDia,
+                    inicioDia = inicioDelDiaSeleccionado
                 )
                 // 2) En el backend, para el reporte mensual
                 attendanceRepository.registerTrainedToday(
                     userId = userId,
                     routineId = routineId,
                     exercisesCompleted = ejerciciosDelDia
+                )
+            } else if (!allExercisesChecked && userId > 0) {
+                // Se desmarcó algo después de haber completado el día: revertir el registro
+                // local para que la franja semanal deje de mostrarlo como completado.
+                workoutRepository?.desregistrarDiaCompletado(
+                    userId = userId,
+                    routineId = routineId,
+                    inicioDia = inicioDelDiaSeleccionado
                 )
             }
         }
@@ -280,7 +288,7 @@ fun RoutineActiveScreen(
                     ) {
                         Text(
                             text = todayDateLabel,
-                            color = TextoSobreVerde,
+                            color = Color.Black,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -289,17 +297,17 @@ fun RoutineActiveScreen(
                                 .width(1.dp)
                                 .height(32.dp)
                                 .padding(horizontal = 16.dp)
-                                .background(TextoSobreVerde.copy(alpha = 0.5f))
+                                .background(Color.Black.copy(alpha = 0.5f))
                         )
                         Column(modifier = Modifier.weight(1f).padding(start = 16.dp)) {
                             Text(
                                 text = "Actividad de hoy:",
-                                color = TextoSobreVerde,
+                                color = Color.Black,
                                 fontSize = 14.sp
                             )
                             Text(
                                 text = selectedDay?.displayActivity ?: "-",
-                                color = TextoSobreVerde,
+                                color = Color.Black,
                                 fontSize = 14.sp
                             )
                         }
@@ -679,7 +687,7 @@ private fun ExerciseListSection(
         exercises.forEachIndexed { index, ex ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF252525)),
+                colors = CardDefaults.cardColors(containerColor = VerdeTN.copy(alpha = 0.15f)),
                 shape = RoundedCornerShape(12.dp),
                 border = androidx.compose.foundation.BorderStroke(1.5.dp, VerdeTN)
             ) {

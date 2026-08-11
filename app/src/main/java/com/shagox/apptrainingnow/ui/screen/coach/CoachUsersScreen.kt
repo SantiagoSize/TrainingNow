@@ -150,7 +150,7 @@ private fun UserInfoCard(user: UserDto) {
             }
             Spacer(Modifier.height(6.dp))
             Text(user.email, color = GrisTexto, fontSize = 13.sp)
-            if (user.phone.isNotBlank()) {
+            if (!user.phone.isNullOrBlank()) {
                 Text("Tel: ${user.phone}", color = GrisTexto, fontSize = 13.sp)
             }
             Spacer(Modifier.height(4.dp))

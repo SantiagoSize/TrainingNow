@@ -353,8 +353,9 @@ fun ExerciseDetailScreen(
                     .height(50.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = GrisFondo,
-                    contentColor = Color.White
+                    contentColor = TextoPrincipal
                 ),
+                border = androidx.compose.foundation.BorderStroke(1.dp, GrisBorde),
                 shape = RoundedCornerShape(14.dp)
             ) {
                 Text("CERRAR", fontWeight = FontWeight.SemiBold)
