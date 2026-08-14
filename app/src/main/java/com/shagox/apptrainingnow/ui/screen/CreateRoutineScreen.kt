@@ -47,9 +47,11 @@ import com.shagox.apptrainingnow.ui.theme.VerdeTN
 import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
 
+// Semana Domingo→Sábado (a pedido: así el domingo ya se puede ver/planificar la semana
+// que viene). El orden acá define el dayOrder que se guarda (índice 0..6 = Domingo..Sábado).
 private val DAYS = listOf(
-    "L" to "Lunes", "M" to "Martes", "X" to "Miércoles", "J" to "Jueves",
-    "V" to "Viernes", "S" to "Sábado", "D" to "Domingo"
+    "D" to "Domingo", "L" to "Lunes", "M" to "Martes", "X" to "Miércoles",
+    "J" to "Jueves", "V" to "Viernes", "S" to "Sábado"
 )
 
 /** Estado de un día: nombre de actividad y lista de ejercicios (0–10). */

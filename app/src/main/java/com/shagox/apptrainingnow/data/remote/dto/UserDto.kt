@@ -23,12 +23,16 @@ data class UserDto(
     val weight: Float? = null,
     val gender: String? = null,
     val specializations: String? = null,
+    /** Descripción/bio libre que el entrenador puede escribir para su perfil público. */
+    val bio: String? = null,
     @SerializedName("suspendedUntil") val suspendedUntil: Long? = null,
     @SerializedName("suspendReason") val suspendReason: String? = null,
     @SerializedName("isBanned") val isBanned: Boolean = false,
     @SerializedName("banReason") val banReason: String? = null,
     @SerializedName("createdAt") val createdAt: Long? = null,
     @SerializedName("updatedAt") val updatedAt: Long? = null,
+    /** Último "heartbeat" (ping de presencia) del usuario; usado para saber si está conectado. */
+    @SerializedName("lastActiveAt") val lastActiveAt: Long? = null,
     /** Token JWT: solo viene en la respuesta del login. */
     val token: String? = null
 ) {
@@ -47,9 +51,11 @@ data class UserDto(
         weight = weight,
         gender = gender,
         specializations = specializations,
+        bio = bio,
         suspendedUntil = suspendedUntil,
         suspendReason = suspendReason,
         isBanned = isBanned,
-        banReason = banReason
+        banReason = banReason,
+        lastActiveAt = lastActiveAt
     )
 }

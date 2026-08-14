@@ -31,6 +31,20 @@ object ComposeFileProvider {
         return getImageUriForFile(context, file)
     }
 
+    /** Crea el archivo temporal de video en el mismo cache-path declarado en file_paths.xml. */
+    fun createTempVideoFile(context: Context): File {
+        val directory = File(context.cacheDir, "images").apply {
+            if (!exists()) mkdirs()
+        }
+        return File.createTempFile("selected_video_", ".mp4", directory)
+    }
+
+    /** Crea archivo temporal y devuelve su Uri lista para CaptureVideo (chat). */
+    fun getVideoUri(context: Context): Uri {
+        val file = createTempVideoFile(context)
+        return getImageUriForFile(context, file)
+    }
+
     /** Archivo de foto de perfil del usuario (persistente en filesDir). */
     fun getProfilePhotoFile(context: Context, userId: Int): File {
         val dir = File(context.filesDir, "profile_photos").apply { if (!exists()) mkdirs() }

@@ -86,7 +86,8 @@ class RoutineRepository(
                 id = routine.id,
                 name = routine.name,
                 ownerId = routine.ownerId,
-                creatorId = routine.creatorId
+                creatorId = routine.creatorId,
+                creationDate = routine.creationDate
             ),
             days = dayViews
         )

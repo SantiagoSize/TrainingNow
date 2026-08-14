@@ -1,8 +1,11 @@
 package com.shagox.apptrainingnow.ui.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.shagox.apptrainingnow.data.local.user.SessionManager
 import com.shagox.apptrainingnow.data.local.user.UserEntity
+import com.shagox.apptrainingnow.data.remote.RemoteModule
 import com.shagox.apptrainingnow.data.repository.IUserRepository
 import com.shagox.apptrainingnow.domain.validation.validateConfirm
 import com.shagox.apptrainingnow.domain.validation.validateEmail
@@ -60,15 +63,41 @@ data class RegisterUiState(
  * - Validación de formularios
  */
 class AuthViewModel(
-    private val repository: IUserRepository
+    private val repository: IUserRepository,
+    private val context: Context
 ) : ViewModel() {
 
     // ---------- LOGIN ----------
     private val _login = MutableStateFlow(LoginUiState())
     val login: StateFlow<LoginUiState> = _login.asStateFlow()
-    
+
     /** Estado del login para acceso desde navegación */
     val loginState: StateFlow<LoginUiState> = _login.asStateFlow()
+
+    /**
+     * Restaura la sesión guardada (si había una) apenas se crea el ViewModel, para que la
+     * app no muestre el login de nuevo solo porque se cerró/mató el proceso. Se restaura
+     * primero desde la caché local (instantáneo) y después se refresca contra el backend
+     * por si los datos cambiaron mientras tanto (ej. una sanción aplicada); si no hay
+     * conexión, se queda con la copia en caché sin romper nada.
+     */
+    init {
+        val usuarioGuardado = SessionManager.cargarUsuario(context)
+        if (usuarioGuardado != null) {
+            _login.update { it.copy(loggedUser = usuarioGuardado, success = true) }
+            viewModelScope.launch {
+                try {
+                    val actualizado = repository.getUserById(usuarioGuardado.id)
+                    if (actualizado != null) {
+                        _login.update { it.copy(loggedUser = actualizado) }
+                        SessionManager.actualizarUsuario(context, actualizado)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("AuthViewModel", "No se pudo refrescar la sesión guardada: ${e.message}")
+                }
+            }
+        }
+    }
 
     // ---------- REGISTER ----------
     private val _register = MutableStateFlow(RegisterUiState())
@@ -137,6 +166,8 @@ class AuthViewModel(
             _login.update {
                 if (result.isSuccess) {
                     val user = result.getOrNull()
+                    // Sesión persistida: sobrevive a cerrar la app o apagar el teléfono.
+                    if (user != null) SessionManager.guardar(context, RemoteModule.authToken, user)
                     it.copy(
                         isSubmitting = false,
                         success = true,
@@ -155,11 +186,20 @@ class AuthViewModel(
     
     /**
      * Cierra la sesión del usuario actual.
+     *
+     * También reinicia el modo invitado a un estado limpio (sin los entrenamientos
+     * personalizados que se acaban de transferir a la cuenta, ver [GuestSession.migrarRutinasA])
+     * ANTES de marcar la sesión como cerrada, para que no haya una ventana en la que la
+     * pantalla ya está en modo invitado pero todavía viendo al invitado viejo.
      */
     fun logout() {
-        com.shagox.apptrainingnow.data.remote.RemoteModule.authToken = null
-        _login.update { 
-            LoginUiState() // Reset completo del estado
+        RemoteModule.authToken = null
+        SessionManager.limpiar(context)
+        viewModelScope.launch {
+            com.shagox.apptrainingnow.data.local.user.GuestSession.reiniciar(context)
+            _login.update {
+                LoginUiState() // Reset completo del estado
+            }
         }
     }
     
@@ -197,45 +237,95 @@ class AuthViewModel(
 
     /**
      * Actualiza la foto de perfil del usuario en la BD y refresca el usuario logueado.
+     * Blindado con try/catch: si falla la llamada al backend (ej. sin conexión, servidor
+     * caído), antes esto tumbaba toda la app con un crash silencioso. Ahora solo se
+     * ignora el error y el usuario puede reintentar más tarde desde su perfil.
      */
     fun updateProfilePhoto(userId: Int, photoUrl: String?) {
         viewModelScope.launch {
-            val updated = repository.updateProfilePhoto(userId, photoUrl)
-            if (updated != null) {
-                _login.update { it.copy(loggedUser = updated) }
+            try {
+                val updated = repository.updateProfilePhoto(userId, photoUrl)
+                if (updated != null) {
+                    _login.update { it.copy(loggedUser = updated) }
+                    SessionManager.actualizarUsuario(context, updated)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("AuthViewModel", "No se pudo actualizar la foto de perfil: ${e.message}")
             }
         }
     }
 
     /**
      * Actualiza los datos del usuario en la BD y refresca el usuario logueado.
+     * Mismo blindaje que [updateProfilePhoto]: una falla de red aquí ya no debe tumbar la app.
+     *
+     * [onDone] se llama SIEMPRE al terminar (haya ido bien o mal), para que quien llama pueda
+     * esperar a que el guardado termine antes de seguir (ej. cerrar el carrusel de bienvenida
+     * recién después de guardar, no antes).
+     *
+     * Después de guardar, se vuelve a pedir el usuario al backend en vez de confiar en el
+     * objeto [user] que se mandó a guardar: así el perfil queda reflejando EXACTAMENTE lo que
+     * quedó guardado en el servidor, no una copia local que podría haber quedado desactualizada.
      */
-    fun updateUser(user: UserEntity) {
+    fun updateUser(user: UserEntity, onDone: () -> Unit = {}) {
         viewModelScope.launch {
-            repository.updateUser(user)
-            _login.update { it.copy(loggedUser = user) }
+            try {
+                repository.updateUser(user)
+                val actualizado = repository.getUserById(user.id) ?: user
+                _login.update { it.copy(loggedUser = actualizado) }
+                SessionManager.actualizarUsuario(context, actualizado)
+            } catch (e: Exception) {
+                android.util.Log.w("AuthViewModel", "No se pudo actualizar el usuario: ${e.message}")
+            } finally {
+                onDone()
+            }
         }
     }
 
     // ================= REGISTER LOGIC =================
 
+    /**
+     * Límite máximo de caracteres (tope) de cada campo del registro.
+     * Cada número se eligió según el tipo de dato: un nombre real no necesita más de 40
+     * caracteres, un teléfono con código de país no pasa de 16, etc. Sirven para que el
+     * usuario no pueda escribir textos absurdamente largos.
+     */
+    companion object {
+        private const val MAX_NAME_LENGTH = 40
+        private const val MAX_EMAIL_LENGTH = 60
+        private const val MAX_PHONE_LENGTH = 16
+        private const val MAX_PASSWORD_LENGTH = 40
+    }
+
+    /**
+     * Saneo: ESPACIOS DOBLES → UN ESPACIO.
+     * Qué hace: si el usuario escribe 2 o más espacios seguidos, los deja en 1 solo.
+     * Ojo: a propósito NO usa trim() aquí, porque trim() borra el espacio final apenas
+     * se escribe y no dejaría escribir un nombre compuesto como "Juan Carlos" (el espacio
+     * desaparecía antes de poder escribir la siguiente palabra). El trim() final se hace
+     * recién al enviar el formulario, en [submitRegister].
+     */
+    private fun colapsarEspacios(value: String): String = value.replace(Regex(" {2,}"), " ")
+
+    /** Campo NOMBRES: colapsa espacios dobles + tope de [MAX_NAME_LENGTH] caracteres. */
     fun onNameChange(value: String) {
-        val trimmedValue = value.trim()
+        val limpio = colapsarEspacios(value).take(MAX_NAME_LENGTH)
         _register.update {
             it.copy(
-                name = trimmedValue,
-                nameError = validateNameLettersOnly(trimmedValue)
+                name = limpio,
+                nameError = validateNameLettersOnly(limpio.trim())
             )
         }
         recomputeRegisterCanSubmit()
     }
 
+    /** Campo APELLIDOS: mismo saneo que Nombres (espacios colapsados + tope de caracteres). */
     fun onLastNameChange(value: String) {
-        val trimmedValue = value.trim()
+        val limpio = colapsarEspacios(value).take(MAX_NAME_LENGTH)
         _register.update {
             it.copy(
-                lastName = trimmedValue,
-                lastNameError = validateNameLettersOnly(trimmedValue)
+                lastName = limpio,
+                lastNameError = validateNameLettersOnly(limpio.trim())
             )
         }
         recomputeRegisterCanSubmit()
@@ -246,8 +336,9 @@ class AuthViewModel(
         recomputeRegisterCanSubmit()
     }
 
+    /** Campo CORREO: quita todos los espacios (un email nunca lleva) + tope de [MAX_EMAIL_LENGTH]. */
     fun onRegisterEmailChange(value: String) {
-        val trimmedValue = value.trim()
+        val trimmedValue = value.replace(" ", "").take(MAX_EMAIL_LENGTH)
         _register.update {
             it.copy(
                 email = trimmedValue,
@@ -257,8 +348,12 @@ class AuthViewModel(
         recomputeRegisterCanSubmit()
     }
 
+    /**
+     * Campo TELÉFONO: deja pasar solo dígitos (filtra "+", espacios y cualquier otro
+     * símbolo apenas se escriben) + tope de [MAX_PHONE_LENGTH] (código de país + número).
+     */
     fun onPhoneChange(value: String) {
-        val trimmedValue = value.trim()
+        val trimmedValue = value.filter { it.isDigit() }.take(MAX_PHONE_LENGTH)
         _register.update {
             it.copy(
                 phone = trimmedValue,
@@ -268,24 +363,30 @@ class AuthViewModel(
         recomputeRegisterCanSubmit()
     }
 
+    /**
+     * Campo CONTRASEÑA: tope de [MAX_PASSWORD_LENGTH] caracteres.
+     * A propósito NO se le hace trim ni se le tocan los espacios mientras se escribe,
+     * para permitir espacios internos si el usuario los quiere en su contraseña.
+     */
     fun onRegisterPassChange(value: String) {
-        // No hacer trim a la contraseña mientras se escribe (para permitir espacios si el usuario los quiere)
+        val limitado = value.take(MAX_PASSWORD_LENGTH)
         _register.update {
             it.copy(
-                pass = value,
-                passError = validateStringPassword(value)
+                pass = limitado,
+                passError = validateStringPassword(limitado)
             )
         }
         recomputeRegisterCanSubmit()
     }
 
+    /** Campo CONFIRMAR CONTRASEÑA: mismo tope que Contraseña, sin tocar espacios. */
     fun onConfirmChange(value: String) {
-        // No hacer trim a la confirmación mientras se escribe
+        val limitado = value.take(MAX_PASSWORD_LENGTH)
         val pass = _register.value.pass
         _register.update {
             it.copy(
-                confirm = value,
-                confirmError = validateConfirm(pass, value)
+                confirm = limitado,
+                confirmError = validateConfirm(pass, limitado)
             )
         }
         recomputeRegisterCanSubmit()
@@ -368,6 +469,7 @@ class AuthViewModel(
                 val loggedInUser = loginResult.getOrNull()
                 if (loggedInUser != null) {
                     _login.update { it.copy(loggedUser = loggedInUser, success = true) }
+                    SessionManager.guardar(context, RemoteModule.authToken, loggedInUser)
                     _justRegistered.value = true
                 }
             } catch (e: Exception) {

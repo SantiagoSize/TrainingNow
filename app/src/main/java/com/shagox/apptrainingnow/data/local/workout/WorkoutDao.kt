@@ -42,6 +42,14 @@ interface WorkoutDao {
     @Query("DELETE FROM workout_sessions WHERE id = :sessionId")
     suspend fun deleteSessionById(sessionId: Int)
 
+    /**
+     * Traspasa TODAS las sesiones de entrenamiento (historial) de un usuario a otro.
+     * Se usa al pasar de invitado a cuenta (y viceversa al resetear el invitado), igual que
+     * se hace con las rutinas en GuestSession.
+     */
+    @Query("UPDATE workout_sessions SET userId = :nuevoUserId WHERE userId = :userIdActual")
+    suspend fun reasignarUsuario(userIdActual: Int, nuevoUserId: Int)
+
     // ==================== WORKOUT SESSIONS - QUERIES ====================
 
     /**

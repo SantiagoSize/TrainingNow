@@ -19,6 +19,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -42,7 +43,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.Calendar
 
 @Composable
 fun UserChatsScreen(
@@ -170,62 +170,25 @@ fun UserChatsScreen(
         }
     }
 
-    // Diálogo con datos del entrenador (al mantener 3 s en la tarjeta)
+    // Diálogo con el perfil del entrenador (al mantener 3 s en la tarjeta)
     trainerDetailDialog?.let { trainer ->
-        TrainerDetailDialog(
-            trainer = trainer,
-            onDismiss = { trainerDetailDialog = null }
+        val preferencia by chatRepository.observarPreferencia(currentUserId, trainer.id)
+            .collectAsState(initial = null)
+        com.shagox.apptrainingnow.ui.components.PerfilContactoDialog(
+            usuario = trainer,
+            onDismiss = { trainerDetailDialog = null },
+            bloqueado = preferencia?.bloqueado ?: false,
+            silenciado = preferencia?.silenciado ?: false,
+            onBloquear = { scope.launch { chatRepository.bloquearContacto(currentUserId, trainer.id) } },
+            onDesbloquear = { scope.launch { chatRepository.desbloquearContacto(currentUserId, trainer.id) } },
+            onSilenciar = { scope.launch { chatRepository.silenciarContacto(currentUserId, trainer.id) } },
+            onDesilenciar = { scope.launch { chatRepository.desilenciarContacto(currentUserId, trainer.id) } },
+            onEliminarConversacion = {
+                scope.launch { chatRepository.eliminarConversacion(currentUserId, trainer.id) }
+                trainerDetailDialog = null
+            }
         )
     }
-}
-
-private fun ageFromBirthDate(birthDate: Long?): String {
-    if (birthDate == null) return "No registrado"
-    val cal = Calendar.getInstance()
-    val now = cal.get(Calendar.YEAR)
-    cal.timeInMillis = birthDate
-    val year = cal.get(Calendar.YEAR)
-    return (now - year).toString()
-}
-
-@Composable
-private fun TrainerDetailDialog(
-    trainer: UserEntity,
-    onDismiss: () -> Unit
-) {
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                "${trainer.name} ${trainer.lastName}",
-                color = TextoPrincipal,
-                fontWeight = FontWeight.SemiBold
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("ID: ${trainer.id}", color = GrisTexto)
-                Text("Edad: ${ageFromBirthDate(trainer.birthDate)} años", color = GrisTexto)
-                Text(
-                    "Peso: ${trainer.weight?.toInt()?.toString()?.plus(" kg") ?: "No registrado"}",
-                    color = GrisTexto
-                )
-                Text(
-                    "Altura: ${trainer.height?.toInt()?.toString()?.plus(" cm") ?: "No registrado"}",
-                    color = GrisTexto
-                )
-                if (trainer.role == "TRAINER" && !trainer.specializations.isNullOrBlank()) {
-                    Text("Especialización: ${trainer.specializations}", color = VerdeTN)
-                }
-            }
-        },
-        confirmButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text("Cerrar", color = VerdeTN)
-            }
-        },
-        containerColor = GrisFondo
-    )
 }
 
 @Composable
@@ -271,6 +234,7 @@ fun TrainerCard(
             Box(
                 modifier = Modifier
                     .size(56.dp)
+                    .shadow(elevation = 4.dp, shape = CircleShape)
                     .clip(CircleShape)
                     .background(GrisTexto.copy(alpha = 0.3f)),
                 contentAlignment = Alignment.Center
@@ -301,12 +265,6 @@ fun TrainerCard(
                     color = TextoPrincipal,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "ID: ${trainer.id}",
-                    color = GrisTexto,
-                    fontSize = 12.sp
                 )
                 if (trainer.specializations != null && trainer.specializations.isNotBlank()) {
                     Spacer(modifier = Modifier.height(4.dp))

@@ -31,4 +31,7 @@ interface IUserRepository {
     suspend fun banUser(userId: Int, reason: String)
     suspend fun unbanUser(userId: Int)
     suspend fun deleteUserById(userId: Int)
+
+    /** Ping de presencia ("sigo conectado"). Por defecto no hace nada (ej. modo Room local). */
+    suspend fun heartbeat(userId: Int) {}
 }

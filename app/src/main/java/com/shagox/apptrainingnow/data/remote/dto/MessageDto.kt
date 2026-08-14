@@ -9,5 +9,9 @@ data class MessageDto(
     @SerializedName("receiverId") val receiverId: Int = 0,
     val content: String = "",
     val timestamp: Long? = null,
-    @SerializedName("isRead") val isRead: Boolean = false
+    @SerializedName("isRead") val isRead: Boolean = false,
+    /** URL relativa del adjunto (ej. "/uploads/chat/xxx.jpg"). Null si es solo texto. */
+    val attachmentUrl: String? = null,
+    /** "IMAGE" o "VIDEO". Null si es solo texto. */
+    val attachmentType: String? = null
 )

@@ -56,8 +56,8 @@ class ReminderReceiver : BroadcastReceiver() {
                         )
                     } else null
                 } else {
-                    // Alarma general: se busca el día de hoy
-                    val indiceHoy = (Calendar.getInstance().get(Calendar.DAY_OF_WEEK) + 5) % 7
+                    // Alarma general: se busca el día de hoy (0 = domingo ... 6 = sábado)
+                    val indiceHoy = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
                     val rutinas = routineDao.getRoutinesByOwnerOnce(userId)
                         .ifEmpty { routineDao.getGlobalRoutinesOnce() }
 

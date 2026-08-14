@@ -5,6 +5,7 @@ import com.shagox.apptrainingnow.data.local.workout.WorkoutDao
 import com.shagox.apptrainingnow.data.local.workout.WorkoutSessionEntity
 import com.shagox.apptrainingnow.data.local.workout.WorkoutSessionStatus
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /**
  * Repositorio para gestión de sesiones de entrenamiento.
@@ -153,6 +154,79 @@ class WorkoutRepository(private val workoutDao: WorkoutDao) {
                     sesion.startTime in inicioDia until finDia
             }
             .forEach { workoutDao.deleteSessionById(it.id) }
+    }
+
+    /**
+     * Obtiene (o crea si no existe) la sesión de entrenamiento del día [inicioDia] para esta
+     * rutina. A diferencia de [registrarDiaCompletado] (que solo crea una sesión COMPLETED
+     * cuando se marca TODO el día), esto permite ir guardando series sueltas de un ejercicio
+     * aunque el día no esté terminado todavía. Idempotente: si ya existe una sesión ese día
+     * para esa rutina (completada o no), la reutiliza en vez de crear otra.
+     */
+    suspend fun obtenerOCrearSesionDelDia(
+        userId: Int,
+        routineId: Int,
+        inicioDia: Long
+    ): Int {
+        val finDia = inicioDia + 24L * 60 * 60 * 1000
+        val existente = workoutDao.getRecentSessions(userId, 50).firstOrNull { sesion ->
+            sesion.routineId == routineId && sesion.startTime in inicioDia until finDia
+        }
+        if (existente != null) return existente.id
+
+        val marcaTiempo = inicioDia + 12L * 60 * 60 * 1000 // mediodía del día, evita bordes por redondeo
+        val id = workoutDao.insertSession(
+            WorkoutSessionEntity(
+                userId = userId,
+                routineId = routineId,
+                status = WorkoutSessionStatus.IN_PROGRESS.name,
+                startTime = marcaTiempo
+            )
+        )
+        return id.toInt()
+    }
+
+    /**
+     * Agrega una serie (repeticiones + carga) de un ejercicio dentro de una sesión. Cada
+     * serie queda como su propia fila; el número de serie ("Serie 1", "Serie 2"...) se
+     * calcula automáticamente según cuántas ya había guardadas para ese ejercicio.
+     * @param cargaKg carga SIEMPRE en kg (formato canónico); la UI convierte antes de llamar
+     * si el usuario tiene elegido libras (ver UnitsPreference).
+     */
+    suspend fun agregarSerie(sessionId: Int, exerciseId: Int, reps: Int, cargaKg: Double?): Long {
+        val yaGuardadas = workoutDao.getLogsForSessionSync(sessionId).count { it.exerciseId == exerciseId }
+        val log = ExerciseLogEntity(
+            sessionId = sessionId,
+            exerciseId = exerciseId,
+            orderInSession = yaGuardadas, // reutilizado como índice de serie DENTRO de este ejercicio
+            completedSets = 1,
+            actualReps = reps.toString(),
+            weightKg = cargaKg
+        )
+        return workoutDao.insertExerciseLog(log)
+    }
+
+    /** Borra una serie ya registrada (para poder corregir un error de tipeo). */
+    suspend fun borrarSerie(log: ExerciseLogEntity) {
+        workoutDao.deleteExerciseLog(log)
+    }
+
+    /** Series ya registradas de un ejercicio puntual dentro de una sesión, en orden. */
+    fun getSeriesDeEjercicio(sessionId: Int, exerciseId: Int): Flow<List<ExerciseLogEntity>> =
+        workoutDao.getLogsForSession(sessionId).map { lista ->
+            lista.filter { it.exerciseId == exerciseId }.sortedBy { it.orderInSession }
+        }
+
+    /**
+     * Detalle de series registradas en un día concreto (usado por el detalle del día del
+     * calendario mensual en Ajustes): agrupa por ejercicio todas las series guardadas en
+     * cualquier sesión de ese día, sin importar la rutina.
+     */
+    suspend fun obtenerDetalleDelDia(userId: Int, inicioDia: Long): Map<Int, List<ExerciseLogEntity>> {
+        val finDia = inicioDia + 24L * 60 * 60 * 1000
+        val sesiones = workoutDao.getRecentSessions(userId, 100).filter { it.startTime in inicioDia until finDia }
+        val logs = sesiones.flatMap { workoutDao.getLogsForSessionSync(it.id) }
+        return logs.groupBy { it.exerciseId }.mapValues { (_, lista) -> lista.sortedBy { it.orderInSession } }
     }
 
     private fun inicioDeHoy(): Long = java.util.Calendar.getInstance().apply {

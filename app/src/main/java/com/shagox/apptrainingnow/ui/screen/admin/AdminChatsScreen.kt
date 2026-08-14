@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -144,6 +145,7 @@ private fun AdminChatUserCard(
             Box(
                 modifier = Modifier
                     .size(56.dp)
+                    .shadow(elevation = 4.dp, shape = CircleShape)
                     .clip(CircleShape)
                     .background(GrisTexto.copy(alpha = 0.3f)),
                 contentAlignment = Alignment.Center
@@ -172,7 +174,7 @@ private fun AdminChatUserCard(
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(text = user.email, color = GrisTexto, fontSize = 13.sp)
-                Text(text = "ID: ${user.id} • ${user.role}", color = GrisTexto, fontSize = 12.sp)
+                Text(text = user.role, color = GrisTexto, fontSize = 12.sp)
             }
         }
     }

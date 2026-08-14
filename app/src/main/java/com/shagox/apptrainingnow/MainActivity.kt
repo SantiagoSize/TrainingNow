@@ -49,7 +49,7 @@ class MainActivity : ComponentActivity() {
             AppTrainingNowTheme(temaClaro = temaClaro) {
                 val navController = rememberNavController()
                 val authViewModel: AuthViewModel = viewModel(
-                    factory = AuthViewModelFactory(app.userRepository)
+                    factory = AuthViewModelFactory(app.userRepository, app)
                 )
                 AppNavGraph(
                     navController = navController,

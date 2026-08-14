@@ -26,10 +26,16 @@ data class UserEntity(
 
     // Específicos de Entrenador
     val specializations: String? = null,
+    /** Descripción/bio libre que el entrenador puede escribir para su perfil público. */
+    val bio: String? = null,
 
     // Sanciones (admin): motivo y tiempo de suspensión / baneo
     val suspendedUntil: Long? = null,
     val suspendReason: String? = null,
     val isBanned: Boolean = false,
-    val banReason: String? = null
+    val banReason: String? = null,
+
+    /** Último "heartbeat" (epoch millis) recibido del backend para este usuario.
+     *  Se usa para mostrar "Conectado"/"Desconectado" en el chat. */
+    val lastActiveAt: Long? = null
 )

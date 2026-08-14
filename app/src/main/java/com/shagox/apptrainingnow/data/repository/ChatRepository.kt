@@ -1,10 +1,17 @@
 package com.shagox.apptrainingnow.data.repository
 
 import com.shagox.apptrainingnow.data.local.chat.ChatDao
+import com.shagox.apptrainingnow.data.local.chat.ContactoPreferenciaDao
+import com.shagox.apptrainingnow.data.local.chat.ContactoPreferenciaEntity
 import com.shagox.apptrainingnow.data.local.chat.MessageEntity
 import com.shagox.apptrainingnow.data.remote.RemoteModule
+import com.shagox.apptrainingnow.data.remote.dto.ConversationSummaryDto
 import com.shagox.apptrainingnow.data.remote.dto.MessageDto
+import com.shagox.apptrainingnow.data.remote.dto.UploadResponseDto
 import kotlinx.coroutines.flow.Flow
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
  * Repositorio de chat híbrido:
@@ -12,7 +19,56 @@ import kotlinx.coroutines.flow.Flow
  * - Cada envío se publica también en TrainNow-Comunicaciones (best-effort).
  * - syncConversation() baja los mensajes del backend que falten localmente.
  */
-class ChatRepository(private val chatDao: ChatDao) {
+class ChatRepository(
+    private val chatDao: ChatDao,
+    private val contactoPreferenciaDao: ContactoPreferenciaDao
+) {
+
+    // ==================== BLOQUEAR / SILENCIAR / ELIMINAR (preferencias locales) ====================
+
+    /** Preferencia (bloqueado/silenciado) de un contacto, reactiva. Null = valores por defecto (false/false). */
+    fun observarPreferencia(ownerId: Int, contactId: Int): Flow<ContactoPreferenciaEntity?> {
+        return contactoPreferenciaDao.observarPreferencia(ownerId, contactId)
+    }
+
+    suspend fun bloquearContacto(ownerId: Int, contactId: Int) {
+        val actual = contactoPreferenciaDao.getPreferencia(ownerId, contactId)
+        contactoPreferenciaDao.upsert(
+            (actual ?: ContactoPreferenciaEntity(ownerId, contactId)).copy(bloqueado = true)
+        )
+    }
+
+    suspend fun desbloquearContacto(ownerId: Int, contactId: Int) {
+        val actual = contactoPreferenciaDao.getPreferencia(ownerId, contactId)
+        contactoPreferenciaDao.upsert(
+            (actual ?: ContactoPreferenciaEntity(ownerId, contactId)).copy(bloqueado = false)
+        )
+    }
+
+    suspend fun silenciarContacto(ownerId: Int, contactId: Int) {
+        val actual = contactoPreferenciaDao.getPreferencia(ownerId, contactId)
+        contactoPreferenciaDao.upsert(
+            (actual ?: ContactoPreferenciaEntity(ownerId, contactId)).copy(silenciado = true)
+        )
+    }
+
+    suspend fun desilenciarContacto(ownerId: Int, contactId: Int) {
+        val actual = contactoPreferenciaDao.getPreferencia(ownerId, contactId)
+        contactoPreferenciaDao.upsert(
+            (actual ?: ContactoPreferenciaEntity(ownerId, contactId)).copy(silenciado = false)
+        )
+    }
+
+    /** IDs de contactos silenciados por este usuario (para no resaltar no leídos en las listas). */
+    fun observarSilenciados(ownerId: Int): Flow<List<Int>> = contactoPreferenciaDao.observarSilenciados(ownerId)
+
+    /** IDs de contactos bloqueados por este usuario. */
+    fun observarBloqueados(ownerId: Int): Flow<List<Int>> = contactoPreferenciaDao.observarBloqueados(ownerId)
+
+    /** Borra todo el historial local de la conversación (no afecta al backend). */
+    suspend fun eliminarConversacion(myId: Int, otherId: Int) {
+        chatDao.deleteConversation(myId, otherId)
+    }
 
     suspend fun sendMessage(message: MessageEntity) {
         chatDao.insertMessage(message)
@@ -24,11 +80,45 @@ class ChatRepository(private val chatDao: ChatDao) {
                     receiverId = message.receiverId,
                     content = message.content,
                     timestamp = message.timestamp,
-                    isRead = message.isRead
+                    isRead = message.isRead,
+                    attachmentUrl = message.attachmentUrl,
+                    attachmentType = message.attachmentType
                 )
             )
         } catch (_: Exception) {
             // Sin conexión: se conserva localmente.
+        }
+    }
+
+    /**
+     * Sube un adjunto de chat (imagen o video) ya comprimido por el llamador y devuelve la
+     * URL relativa + tipo asignados por el backend, o null si falla (sin conexión, archivo
+     * demasiado pesado, etc.). La compresión la decide la UI según el tipo de archivo
+     * (imagen → ImageCompressor, video → límite de tamaño de la captura).
+     */
+    suspend fun subirAdjunto(bytes: ByteArray, mimeType: String, nombreArchivo: String): UploadResponseDto? {
+        return try {
+            val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
+            val part = MultipartBody.Part.createFormData("file", nombreArchivo, requestBody)
+            val response = RemoteModule.chatApi().uploadAttachment(part)
+            if (response.isSuccessful) response.body() else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** URL completa y descargable de un adjunto (la app solo guarda la ruta relativa). */
+    fun urlCompletaDeAdjunto(attachmentUrl: String): String {
+        val base = RemoteModule.chatBaseUrl().trimEnd('/')
+        return base + attachmentUrl
+    }
+
+    /** Resumen de conversaciones (último mensaje + no leídos) para la lista de chats. */
+    suspend fun obtenerResumenConversaciones(userId: Int): List<ConversationSummaryDto> {
+        return try {
+            RemoteModule.chatApi().getConversationsSummary(userId)
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 
@@ -60,7 +150,9 @@ class ChatRepository(private val chatDao: ChatDao) {
                             receiverId = m.receiverId,
                             content = m.content,
                             timestamp = m.timestamp ?: System.currentTimeMillis(),
-                            isRead = m.isRead
+                            isRead = m.isRead,
+                            attachmentUrl = m.attachmentUrl,
+                            attachmentType = m.attachmentType
                         )
                     )
                 } catch (_: Exception) {

@@ -92,7 +92,7 @@ object ReminderHelper {
 
     /**
      * Programa el recordatorio de un día concreto de la semana.
-     * @param dayOrder 0 = lunes ... 6 = domingo
+     * @param dayOrder 0 = domingo ... 6 = sábado
      * Se repite cada semana a la hora indicada.
      */
     fun scheduleForDay(context: Context, userId: Int, dayId: Int, dayOrder: Int, hour: Int, minute: Int) {
@@ -121,15 +121,12 @@ object ReminderHelper {
 
     /**
      * Próxima ocurrencia de un día de la semana a cierta hora.
-     * @param dayOrder 0 = lunes ... 6 = domingo
+     * @param dayOrder 0 = domingo ... 6 = sábado
      */
     fun nextTriggerForWeekday(dayOrder: Int, hour: Int, minute: Int): Long {
         val cal = Calendar.getInstance()
-        // Calendar.MONDAY = 2 ... DOMINGO = 1
-        val objetivo = when (dayOrder.coerceIn(0, 6)) {
-            6 -> Calendar.SUNDAY
-            else -> Calendar.MONDAY + dayOrder
-        }
+        // Calendar.SUNDAY = 1, así que dayOrder 0..6 mapea directo a SUNDAY..SATURDAY
+        val objetivo = Calendar.SUNDAY + dayOrder.coerceIn(0, 6)
         cal.set(Calendar.HOUR_OF_DAY, hour.coerceIn(0, 23))
         cal.set(Calendar.MINUTE, minute.coerceIn(0, 59))
         cal.set(Calendar.SECOND, 0)

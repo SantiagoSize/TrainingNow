@@ -29,8 +29,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.flowOf
 import com.shagox.apptrainingnow.data.repository.IExerciseRepository
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AlertDialog
@@ -41,7 +44,10 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -61,6 +67,7 @@ import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -86,18 +93,19 @@ import java.util.Locale
 /** Variante TN verde más suave para tab Notificaciones seleccionado (mismo tono TN). */
 private val VerdeTNMuted = VerdeTN.copy(alpha = 0.85f)
 
-/** Nombres de días en español para coincidir con el día actual. */
-private val DIAS_SEMANA_ES = listOf("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
+/** Nombres de días en español, semana empezando en Domingo (a pedido: así el domingo ya
+ *  se puede planificar/ver la semana que viene, en vez de quedar "colgado" al final). */
+private val DIAS_SEMANA_ES = listOf("Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado")
 
 private fun nombreDiaHoy(): String {
     val cal = Calendar.getInstance()
-    val index = (cal.get(Calendar.DAY_OF_WEEK) + 5) % 7 // 0=Lunes, 6=Domingo
+    val index = cal.get(Calendar.DAY_OF_WEEK) - 1 // 0=Domingo, 6=Sábado (Calendar.DAY_OF_WEEK: Domingo=1)
     return DIAS_SEMANA_ES[index]
 }
 
-/** Índice del día actual en la semana (0 = Lunes, 6 = Domingo). */
+/** Índice del día actual en la semana (0 = Domingo, 6 = Sábado). */
 private fun indiceDiaHoy(): Int {
-    return (Calendar.getInstance().get(Calendar.DAY_OF_WEEK) + 5) % 7
+    return Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
 }
 
 /**
@@ -172,13 +180,6 @@ fun RoutineActiveScreen(
     }
     val selectedDay: RoutineDayView? = days.find { it.routineId == selectedDayRoutineId } ?: days.firstOrNull()
     val routineName = routineWithDays?.routineName ?: initialRoutineName
-    val todayDateLabel = run {
-        val cal = Calendar.getInstance()
-        val locale = Locale.forLanguageTag("es")
-        SimpleDateFormat("EEEE d", locale).format(cal.time).replaceFirstChar {
-            if (it.isLowerCase()) it.titlecase(locale) else it.toString()
-        }
-    }
 
     var showNotificationTimeDialog by remember { mutableStateOf(false) }
     var notificationHour by remember { mutableStateOf(ReminderHelper.getHour(context)) }
@@ -202,6 +203,15 @@ fun RoutineActiveScreen(
     // Fecha (00:00) del día de la semana seleccionado, no la de "hoy": si se marca el
     // checklist del Martes, debe registrarse como Martes aunque hoy sea Lunes.
     val inicioDelDiaSeleccionado = weekStart + selectedIndexForProgress.coerceAtLeast(0) * (24L * 60 * 60 * 1000)
+    // Fecha mostrada en el card verde: la del día tocado en la franja semanal, no siempre
+    // "hoy" (antes se mostraba fija en la fecha real aunque tocaras otro día).
+    val todayDateLabel = run {
+        val cal = Calendar.getInstance().apply { timeInMillis = inicioDelDiaSeleccionado }
+        val locale = Locale.forLanguageTag("es")
+        SimpleDateFormat("EEEE d", locale).format(cal.time).replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase(locale) else it.toString()
+        }
+    }
     androidx.compose.runtime.LaunchedEffect(allExercisesChecked, selectedIndexForProgress) {
         if (selectedIndexForProgress >= 0) {
             val nuevo = if (allExercisesChecked) completedDays + selectedIndexForProgress
@@ -239,13 +249,24 @@ fun RoutineActiveScreen(
     }
     // Estado del seguimiento del día seleccionado, con el mismo criterio de colores de la franja
     val indiceSeleccionado = days.indexOfFirst { it.routineId == selectedDayRoutineId }
-    val estadoDelDia: DayStatus = computeDayStates(days, completedDays, weekSessions, weekStart, todayDayIndex)
-        .getOrElse(indiceSeleccionado.coerceAtLeast(0)) { DayStatus.DESCANSO }
+    val estadoDelDia: DayStatus = computeDayStates(
+        days, completedDays, weekSessions, weekStart, todayDayIndex,
+        creationDate = routineWithDays?.header?.creationDate ?: 0L
+    ).getOrElse(indiceSeleccionado.coerceAtLeast(0)) { DayStatus.DESCANSO }
     val seguimientoStatus = when {
         allExercisesChecked -> DayStatus.COMPLETADO.label
         else -> estadoDelDia.label
     }
     val seguimientoColor = if (allExercisesChecked) DayStatus.COMPLETADO.color else estadoDelDia.color
+
+    // Sesión de Room asociada al día seleccionado, para registrar series (reps/carga) por
+    // ejercicio. Se crea perezosamente (solo cuando el usuario realmente agrega una serie).
+    var sessionIdActual by remember(selectedDayRoutineId) { mutableStateOf<Int?>(null) }
+    val obtenerSessionId: suspend () -> Int = {
+        sessionIdActual ?: (workoutRepository?.obtenerOCrearSesionDelDia(userId, routineId, inicioDelDiaSeleccionado) ?: -1)
+            .also { sessionIdActual = it }
+    }
+    val unidadesImperiales = com.shagox.apptrainingnow.utils.UnitsPreference.esImperial(context)
 
     Box(
         modifier = Modifier
@@ -318,7 +339,10 @@ fun RoutineActiveScreen(
 
                 // Franja semanal: estado de cada día (completado / pendiente / descanso)
                 WeekStrip(
-                    dayStates = computeDayStates(days, completedDays, weekSessions, weekStart, todayDayIndex),
+                    dayStates = computeDayStates(
+                        days, completedDays, weekSessions, weekStart, todayDayIndex,
+                        creationDate = routineWithDays?.header?.creationDate ?: 0L
+                    ),
                     selectedIndex = days.indexOfFirst { it.routineId == selectedDayRoutineId },
                     onDayClick = { index ->
                         days.getOrNull(index)?.let { selectedDayRoutineId = it.routineId }
@@ -465,7 +489,10 @@ fun RoutineActiveScreen(
                                 checkedExerciseIds = if (checked) checkedExerciseIds + id
                                 else checkedExerciseIds - id
                             },
-                            onAddClick = { showAddExerciseDialog = true }
+                            onAddClick = { showAddExerciseDialog = true },
+                            workoutRepository = workoutRepository,
+                            obtenerSessionId = obtenerSessionId,
+                            unidadesImperiales = unidadesImperiales
                         )
                     }
                 } ?: ExerciseListPlaceholder()
@@ -678,41 +705,25 @@ private fun ExerciseListSection(
     canAddMore: Boolean,
     checkedIds: Set<Int>,
     onCheckChange: (Int, Boolean) -> Unit,
-    onAddClick: () -> Unit
+    onAddClick: () -> Unit,
+    workoutRepository: com.shagox.apptrainingnow.data.repository.WorkoutRepository? = null,
+    obtenerSessionId: suspend () -> Int = { -1 },
+    unidadesImperiales: Boolean = false
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         exercises.forEachIndexed { index, ex ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = VerdeTN.copy(alpha = 0.15f)),
-                shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(1.5.dp, VerdeTN)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "${index + 1}. ${ex.name}",
-                        color = TextoPrincipal,
-                        fontSize = 15.sp,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Checkbox(
-                        checked = ex.id in checkedIds,
-                        onCheckedChange = { onCheckChange(ex.id, it) },
-                        colors = CheckboxDefaults.colors(
-                            checkedColor = VerdeTN,
-                            uncheckedColor = Color.Gray
-                        )
-                    )
-                }
-            }
+            FilaEjercicio(
+                ex = ex,
+                index = index,
+                checked = ex.id in checkedIds,
+                onCheckChange = { checked -> onCheckChange(ex.id, checked) },
+                workoutRepository = workoutRepository,
+                obtenerSessionId = obtenerSessionId,
+                unidadesImperiales = unidadesImperiales
+            )
         }
         if (canAddMore) {
             Text(
@@ -731,6 +742,278 @@ private fun ExerciseListSection(
                 fontSize = 12.sp,
                 modifier = Modifier.padding(top = 4.dp)
             )
+        }
+    }
+}
+
+/**
+ * Fila de un ejercicio dentro del checklist del día: nombre, botón "+" para registrar series
+ * (reps/carga) y el checkbox de completado. Al tocar "+" se abre un diálogo a pantalla
+ * completa con el mismo estilo visual que el carrusel de bienvenida (fondo negro, título
+ * centrado, campos redondeados y botón verde inferior) donde se agregan líneas numeradas
+ * ("Serie 1", "Serie 2"...) que se guardan en Room al instante.
+ */
+@Composable
+private fun FilaEjercicio(
+    ex: ExerciseEntity,
+    index: Int,
+    checked: Boolean,
+    onCheckChange: (Boolean) -> Unit,
+    workoutRepository: com.shagox.apptrainingnow.data.repository.WorkoutRepository?,
+    obtenerSessionId: suspend () -> Int,
+    unidadesImperiales: Boolean
+) {
+    val scope = rememberCoroutineScope()
+    var sessionId by remember(ex.id) { mutableStateOf<Int?>(null) }
+    var mostrarDialogoSeries by remember(ex.id) { mutableStateOf(false) }
+    val series by (
+        if (workoutRepository != null && sessionId != null)
+            workoutRepository.getSeriesDeEjercicio(sessionId!!, ex.id)
+        else flowOf(emptyList())
+    ).collectAsState(initial = emptyList())
+
+    suspend fun agregarSerieNueva() {
+        val sid = sessionId ?: obtenerSessionId().also { sessionId = it }
+        if (sid >= 0) workoutRepository?.agregarSerie(sid, ex.id, reps = 0, cargaKg = null)
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = VerdeTN.copy(alpha = 0.15f)),
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, VerdeTN)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "${index + 1}. ${ex.name}",
+                    color = TextoPrincipal,
+                    fontSize = 15.sp
+                )
+                if (series.isNotEmpty()) {
+                    Text(
+                        text = if (series.size == 1) "1 serie registrada" else "${series.size} series registradas",
+                        color = VerdeTN,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+            IconButton(onClick = {
+                scope.launch {
+                    if (series.isEmpty()) agregarSerieNueva()
+                    mostrarDialogoSeries = true
+                }
+            }) {
+                Icon(Icons.Filled.Add, contentDescription = "Registrar serie", tint = VerdeTN)
+            }
+            Checkbox(
+                checked = checked,
+                onCheckedChange = onCheckChange,
+                colors = CheckboxDefaults.colors(
+                    checkedColor = VerdeTN,
+                    uncheckedColor = Color.Gray
+                )
+            )
+        }
+    }
+
+    if (mostrarDialogoSeries) {
+        SeriesDialogEjercicio(
+            nombreEjercicio = ex.name,
+            series = series,
+            unidadesImperiales = unidadesImperiales,
+            onAgregarSerie = { scope.launch { agregarSerieNueva() } },
+            onEditarSerie = { log, reps, cargaKg ->
+                scope.launch { workoutRepository?.updateExerciseLog(log.copy(actualReps = reps, weightKg = cargaKg)) }
+            },
+            onBorrarSerie = { log -> scope.launch { workoutRepository?.borrarSerie(log) } },
+            onDismiss = { mostrarDialogoSeries = false }
+        )
+    }
+}
+
+/**
+ * Diálogo para registrar las series (reps/carga) de un ejercicio, con la misma estética que
+ * el carrusel de bienvenida: fondo negro a pantalla completa, botón "✕" circular arriba a la
+ * derecha, título centrado, campos redondeados con los colores estándar de la app y un botón
+ * verde de ancho completo al final.
+ */
+@Composable
+private fun SeriesDialogEjercicio(
+    nombreEjercicio: String,
+    series: List<com.shagox.apptrainingnow.data.local.workout.ExerciseLogEntity>,
+    unidadesImperiales: Boolean,
+    onAgregarSerie: () -> Unit,
+    onEditarSerie: (com.shagox.apptrainingnow.data.local.workout.ExerciseLogEntity, String, Double?) -> Unit,
+    onBorrarSerie: (com.shagox.apptrainingnow.data.local.workout.ExerciseLogEntity) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = TextoPrincipal,
+        unfocusedTextColor = TextoPrincipal,
+        focusedBorderColor = VerdeTN,
+        unfocusedBorderColor = GrisTexto,
+        cursorColor = VerdeTN,
+        focusedLabelColor = VerdeTN,
+        unfocusedLabelColor = GrisTexto,
+        focusedContainerColor = GrisFondo,
+        unfocusedContainerColor = GrisFondo
+    )
+    val etiquetaPeso = if (unidadesImperiales) "Carga (lb)" else "Carga (kg)"
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(NegroFondo)
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(20.dp)
+                    .clip(CircleShape)
+                    .background(SuperficieElevada)
+                    .clickable { onDismiss() }
+                    .padding(10.dp)
+            ) {
+                Text("✕", color = TextoPrincipal, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 28.dp)
+                    .padding(top = 80.dp, bottom = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = nombreEjercicio,
+                        color = TextoPrincipal,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Registra las repeticiones y la carga de cada serie.",
+                        color = GrisTexto,
+                        fontSize = 14.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    series.forEachIndexed { i, log ->
+                        var repsTexto by remember(log.id) { mutableStateOf(log.actualReps ?: "") }
+                        var cargaTexto by remember(log.id) {
+                            mutableStateOf(
+                                log.weightKg?.let { kg ->
+                                    val valor = if (unidadesImperiales)
+                                        com.shagox.apptrainingnow.utils.UnitsPreference.kgALibras(kg)
+                                    else kg
+                                    if (valor == valor.toInt().toDouble()) valor.toInt().toString()
+                                    else String.format(Locale.US, "%.1f", valor)
+                                } ?: ""
+                            )
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "Serie ${i + 1}",
+                                color = VerdeTN,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.widthIn(min = 58.dp)
+                            )
+                            OutlinedTextField(
+                                value = repsTexto,
+                                onValueChange = { nuevo ->
+                                    repsTexto = nuevo
+                                    val reps = nuevo.toIntOrNull() ?: 0
+                                    val cargaKg = cargaTexto.replace(",", ".").toDoubleOrNull()?.let {
+                                        if (unidadesImperiales) com.shagox.apptrainingnow.utils.UnitsPreference.librasAKg(it) else it
+                                    }
+                                    onEditarSerie(log, reps.toString(), cargaKg)
+                                },
+                                label = { Text("Reps", color = GrisTexto) },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                colors = fieldColors,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.weight(1f)
+                            )
+                            OutlinedTextField(
+                                value = cargaTexto,
+                                onValueChange = { nuevo ->
+                                    cargaTexto = nuevo
+                                    val valor = nuevo.replace(",", ".").toDoubleOrNull()
+                                    val cargaKg = valor?.let {
+                                        if (unidadesImperiales) com.shagox.apptrainingnow.utils.UnitsPreference.librasAKg(it) else it
+                                    }
+                                    onEditarSerie(log, repsTexto.ifBlank { "0" }, cargaKg)
+                                },
+                                label = { Text(etiquetaPeso, color = GrisTexto) },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true,
+                                colors = fieldColors,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick = { onBorrarSerie(log) },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(Icons.Filled.Close, contentDescription = "Borrar serie", tint = GrisTexto)
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "+  Agregar otra serie",
+                        color = VerdeTN,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp)
+                            .clickable { onAgregarSerie() }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = TextoSobreVerde),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("LISTO", fontWeight = FontWeight.SemiBold)
+                }
+            }
         }
     }
 }
@@ -780,9 +1063,9 @@ private fun TabChip(
 
 // ==================== PROGRESO SEMANAL ====================
 
-/** Nombres largos de los días, de lunes a domingo. */
+/** Nombres largos de los días, de domingo a sábado. */
 private val DIAS_SEMANA_LARGOS = listOf(
-    "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"
+    "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"
 )
 
 /** Estado de un día en la semana de entrenamiento. */
@@ -797,11 +1080,11 @@ enum class DayStatus(val label: String, val color: Color) {
     DESCANSO("Descanso", Color(0xFF9E9E9E))
 }
 
-/** Lunes 00:00 de la semana actual, en epoch millis. */
+/** Domingo 00:00 de la semana actual, en epoch millis (semana Domingo→Sábado). */
 private fun startOfWeekMillis(): Long {
     val cal = java.util.Calendar.getInstance()
-    cal.firstDayOfWeek = java.util.Calendar.MONDAY
-    cal.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.MONDAY)
+    cal.firstDayOfWeek = java.util.Calendar.SUNDAY
+    cal.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.SUNDAY)
     cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
     cal.set(java.util.Calendar.MINUTE, 0)
     cal.set(java.util.Calendar.SECOND, 0)
@@ -848,20 +1131,38 @@ class WeekProgressStore(
     }
 }
 
+/** 00:00 del día que contiene [millis]. Se usa para comparar solo por fecha, sin hora. */
+private fun startOfDayMillis(millis: Long): Long {
+    val cal = java.util.Calendar.getInstance()
+    cal.timeInMillis = millis
+    cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+    cal.set(java.util.Calendar.MINUTE, 0)
+    cal.set(java.util.Calendar.SECOND, 0)
+    cal.set(java.util.Calendar.MILLISECOND, 0)
+    return cal.timeInMillis
+}
+
 /**
  * Calcula el estado de los 7 días:
  * - COMPLETADO: marcado en caché o con sesión COMPLETED registrada esa jornada.
  * - PENDIENTE: el día tiene ejercicios asignados pero no se completó.
- * - DESCANSO: no hay ejercicios para ese día.
+ * - DESCANSO: no hay ejercicios para ese día (o el día es anterior a la creación de la rutina/cuenta).
+ * - NO_ENTRENADO: día pasado con ejercicios pendientes, SOLO si la rutina ya existía ese día.
+ *
+ * [creationDate] evita el bug de mostrar "No entrenado" en días previos a que el usuario
+ * creara su cuenta o la rutina (ej: cuenta creada un miércoles no debe mostrar lunes/martes
+ * en rojo, ya que es obvio que no pudo entrenar en días que no existía la cuenta).
  */
 private fun computeDayStates(
     days: List<RoutineDayView>,
     completedDays: Set<Int>,
     weekSessions: List<com.shagox.apptrainingnow.data.local.workout.WorkoutSessionEntity>,
     weekStart: Long,
-    indiceHoy: Int = indiceDiaHoy()
+    indiceHoy: Int = indiceDiaHoy(),
+    creationDate: Long = 0L
 ): List<DayStatus> {
     val dayMillis = 24L * 60 * 60 * 1000
+    val creationDayStart = if (creationDate > 0) startOfDayMillis(creationDate) else 0L
     return (0..6).map { index ->
         val dayView = days.getOrNull(index)
         val tieneEjercicios = dayView != null && dayView.exercises.isNotEmpty()
@@ -869,8 +1170,12 @@ private fun computeDayStates(
             s.status == "COMPLETED" &&
                     (s.startTime - weekStart) in (index * dayMillis) until ((index + 1) * dayMillis)
         }
+        val inicioDeEsteDia = weekStart + index * dayMillis
+        val esAntesDeExistirLaRutina = creationDayStart > 0 && inicioDeEsteDia < creationDayStart
         when {
             index in completedDays || sesionCompletada -> DayStatus.COMPLETADO
+            // Día anterior a que existiera la rutina/cuenta: no cuenta como "no entrenado"
+            esAntesDeExistirLaRutina -> DayStatus.DESCANSO
             // Días ya pasados de esta semana con plan sin cumplir
             tieneEjercicios && index < indiceHoy -> DayStatus.NO_ENTRENADO
             tieneEjercicios -> DayStatus.PENDIENTE
@@ -890,8 +1195,8 @@ private fun WeekStrip(
     selectedIndex: Int,
     onDayClick: (Int) -> Unit
 ) {
-    val iniciales = listOf("L", "M", "X", "J", "V", "S", "D")
-    val hoy = (java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7
+    val iniciales = listOf("D", "L", "M", "X", "J", "V", "S")
+    val hoy = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK) - 1
     var tooltipIndex by remember { mutableStateOf<Int?>(null) }
 
     Column(modifier = Modifier.fillMaxWidth()) {

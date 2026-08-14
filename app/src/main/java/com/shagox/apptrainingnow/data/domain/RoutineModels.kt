@@ -10,7 +10,10 @@ data class RoutineHeader(
     val id: Int,
     val name: String,
     val ownerId: Int?,
-    val creatorId: Int
+    val creatorId: Int,
+    /** Fecha de creación de la rutina (epoch millis). Se usa para no marcar como
+     *  "No entrenado" los días previos a que la rutina/cuenta existiera. */
+    val creationDate: Long = 0L
 )
 
 /**

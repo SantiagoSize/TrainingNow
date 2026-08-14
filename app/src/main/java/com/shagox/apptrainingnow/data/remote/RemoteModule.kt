@@ -73,6 +73,9 @@ object RemoteModule {
     fun notificationApi(): NotificationApi = notificationRetrofit.create(NotificationApi::class.java)
     fun chatApi(): ChatApi = notificationRetrofit.create(ChatApi::class.java)
 
+    /** Base URL de tn-comunicaciones, para armar la URL completa de un adjunto de chat (ej. NOTIFICATION_BASE_URL + "/uploads/chat/xxx.jpg"). */
+    fun chatBaseUrl(): String = NOTIFICATION_BASE_URL
+
     /** Genérico por si se necesita otro servicio sobre alguna base URL. */
     fun <T> create(baseUrl: String, service: Class<T>): T = retrofit(baseUrl).create(service)
 }

@@ -140,6 +140,17 @@ fun AppNavGraph(
     }
     val effectiveUserId = if (currentUserId > 0) currentUserId else guestId
 
+    // "Heartbeat" de presencia: mientras haya una cuenta logueada y la app esté en primer
+    // plano (esta pantalla compuesta viva), se avisa cada 20s al backend "sigo conectado".
+    // Así el chat puede mostrar "Conectado"/"Desconectado" del otro usuario.
+    LaunchedEffect(currentUserId) {
+        if (currentUserId <= 0) return@LaunchedEffect
+        while (true) {
+            userRepository.heartbeat(currentUserId)
+            kotlinx.coroutines.delay(20_000L)
+        }
+    }
+
     // Aviso al ver el avance mensual sin cuenta
     var mostrarAvisoAvance by remember { mutableStateOf(false) }
 
@@ -423,15 +434,19 @@ fun AppNavGraph(
             }
 
             composable(Route.CoachChats.path) {
-                // Chats del entrenador (muestra clientes con mensajes)
-                UserChatsScreen(
-                    userRepository = userRepository,
-                    chatRepository = chatRepository,
-                    currentUserId = currentUserId,
-                    onNavigateToChat = { clientId ->
-                        navController.navigate(Route.ChatDetail.createRoute(clientId))
-                    }
-                )
+                // Chats del entrenador: SUS clientes (no la lista de otros entrenadores).
+                if (trainerRepository != null) {
+                    com.shagox.apptrainingnow.ui.screen.CoachChatsScreen(
+                        trainerRepository = trainerRepository,
+                        chatRepository = chatRepository,
+                        currentUserId = currentUserId,
+                        onNavigateToChat = { clientId ->
+                            navController.navigate(Route.ChatDetail.createRoute(clientId))
+                        }
+                    )
+                } else {
+                    LoadingScreen()
+                }
             }
 
             // ==================== PANTALLAS DE ADMIN ====================
@@ -520,6 +535,7 @@ fun AppNavGraph(
                     userId = effectiveUserId,
                     esInvitado = currentUserId <= 0,
                     workoutRepository = workoutRepository,
+                    exerciseRepository = exerciseRepository,
                     onBack = { navController.popBackStack() }
                 )
             }

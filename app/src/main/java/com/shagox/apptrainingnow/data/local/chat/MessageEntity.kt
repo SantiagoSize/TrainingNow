@@ -19,7 +19,11 @@ data class MessageEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val senderId: Int,   // Quien lo envía
     val receiverId: Int, // Quien lo recibe
-    val content: String, // El texto
+    val content: String, // El texto (o una leyenda tipo "📷 Foto" si es un adjunto)
     val timestamp: Long = System.currentTimeMillis(), // Hora
-    val isRead: Boolean = false // ¿Lo leyeron?
+    val isRead: Boolean = false, // ¿Lo leyeron?
+    /** URL relativa del adjunto (ej. "/uploads/chat/xxx.jpg"), servida por tn-comunicaciones. */
+    val attachmentUrl: String? = null,
+    /** "IMAGE" o "VIDEO". Null si el mensaje es solo texto. */
+    val attachmentType: String? = null
 )

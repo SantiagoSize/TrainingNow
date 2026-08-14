@@ -22,6 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,9 +32,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.firstOrNull
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,8 +45,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.shagox.apptrainingnow.data.local.exercise.ExerciseEntity
+import com.shagox.apptrainingnow.data.local.workout.ExerciseLogEntity
 import com.shagox.apptrainingnow.data.remote.dto.MonthlyReportDto
 import com.shagox.apptrainingnow.data.repository.AttendanceRepository
+import com.shagox.apptrainingnow.data.repository.IExerciseRepository
 import com.shagox.apptrainingnow.ui.components.BackButtonTN
 import com.shagox.apptrainingnow.ui.components.ScreenHeaderTN
 import com.shagox.apptrainingnow.ui.theme.GrisBorde
@@ -66,6 +73,7 @@ fun MonthlyReportScreen(
     /** Sin cuenta: el reporte se calcula desde la base local en vez del servidor. */
     esInvitado: Boolean = false,
     workoutRepository: com.shagox.apptrainingnow.data.repository.WorkoutRepository? = null,
+    exerciseRepository: IExerciseRepository? = null,
     repository: AttendanceRepository = remember { AttendanceRepository() }
 ) {
     var monthOffset by remember { mutableIntStateOf(0) }
@@ -170,7 +178,7 @@ fun MonthlyReportScreen(
                         )
                     }
                 }
-                ReportContent(report!!)
+                ReportContent(report!!, userId, workoutRepository, exerciseRepository)
             }
         }
 
@@ -179,7 +187,12 @@ fun MonthlyReportScreen(
 }
 
 @Composable
-private fun ReportContent(report: MonthlyReportDto) {
+private fun ReportContent(
+    report: MonthlyReportDto,
+    userId: Int,
+    workoutRepository: com.shagox.apptrainingnow.data.repository.WorkoutRepository?,
+    exerciseRepository: IExerciseRepository?
+) {
     // Anillo de adherencia
     Box(
         modifier = Modifier
@@ -256,7 +269,7 @@ private fun ReportContent(report: MonthlyReportDto) {
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(bottom = 10.dp)
     )
-    CalendarioMensual(report)
+    CalendarioMensual(report, userId, workoutRepository, exerciseRepository)
 
     Spacer(modifier = Modifier.height(22.dp))
 
@@ -367,7 +380,12 @@ private fun MetricCard(
  * Verde = entrenó · Rojo = no entrenó · Gris = descanso · Vacío = sin registro.
  */
 @Composable
-private fun CalendarioMensual(report: MonthlyReportDto) {
+private fun CalendarioMensual(
+    report: MonthlyReportDto,
+    userId: Int,
+    workoutRepository: com.shagox.apptrainingnow.data.repository.WorkoutRepository?,
+    exerciseRepository: IExerciseRepository?
+) {
     val calendario = remember(report.month) {
         java.util.Calendar.getInstance().apply {
             val partes = report.month.split("-")
@@ -376,17 +394,25 @@ private fun CalendarioMensual(report: MonthlyReportDto) {
                 set(java.util.Calendar.MONTH, (partes[1].toIntOrNull() ?: 1) - 1)
             }
             set(java.util.Calendar.DAY_OF_MONTH, 1)
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
         }
     }
     val diasDelMes = calendario.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
-    // Desplazamiento para que la primera fila empiece en el día correcto (0 = lunes)
-    val primerDiaSemana = (calendario.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7
+    // Desplazamiento para que la primera fila empiece en el día correcto (0 = domingo,
+    // igual que la franja semanal de RoutineActiveScreen).
+    val primerDiaSemana = calendario.get(java.util.Calendar.DAY_OF_WEEK) - 1
 
     val estadoPorDia = remember(report) {
         report.days.associate { dia ->
             (dia.date.takeLast(2).toIntOrNull() ?: 0) to dia.status
         }
     }
+
+    // Día tocado por el usuario (número de día del mes, 1..diasDelMes) para abrir su detalle.
+    var diaSeleccionado by remember { mutableStateOf<Int?>(null) }
 
     Column(
         modifier = Modifier
@@ -398,7 +424,7 @@ private fun CalendarioMensual(report: MonthlyReportDto) {
     ) {
         // Cabecera de días
         Row(modifier = Modifier.fillMaxWidth()) {
-            listOf("L", "M", "X", "J", "V", "S", "D").forEach { letra ->
+            listOf("D", "L", "M", "X", "J", "V", "S").forEach { letra ->
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     Text(letra, color = GrisTexto, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
@@ -436,7 +462,8 @@ private fun CalendarioMensual(report: MonthlyReportDto) {
                                         1.dp,
                                         if (color == Color.Transparent) GrisBorde else color,
                                         RoundedCornerShape(8.dp)
-                                    ),
+                                    )
+                                    .clickable { diaSeleccionado = numeroDia },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -459,6 +486,117 @@ private fun CalendarioMensual(report: MonthlyReportDto) {
             LeyendaCalendario(GrisTexto, "Descanso")
         }
     }
+
+    diaSeleccionado?.let { dia ->
+        val inicioDia = remember(dia) {
+            (calendario.clone() as java.util.Calendar).apply {
+                set(java.util.Calendar.DAY_OF_MONTH, dia)
+            }.timeInMillis
+        }
+        DetalleDiaDialog(
+            numeroDia = dia,
+            inicioDia = inicioDia,
+            userId = userId,
+            workoutRepository = workoutRepository,
+            exerciseRepository = exerciseRepository,
+            onDismiss = { diaSeleccionado = null }
+        )
+    }
+}
+
+/**
+ * Diálogo con el detalle de un día del calendario mensual: ejercicios realizados ese día y,
+ * por cada uno, sus series con repeticiones y carga (kg o lb, según la unidad preferida).
+ */
+@Composable
+private fun DetalleDiaDialog(
+    numeroDia: Int,
+    inicioDia: Long,
+    userId: Int,
+    workoutRepository: com.shagox.apptrainingnow.data.repository.WorkoutRepository?,
+    exerciseRepository: IExerciseRepository?,
+    onDismiss: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val unidadesImperiales = remember { com.shagox.apptrainingnow.utils.UnitsPreference.esImperial(context) }
+    var cargando by remember(inicioDia) { mutableStateOf(true) }
+    var detalle by remember(inicioDia) { mutableStateOf<Map<Int, List<ExerciseLogEntity>>>(emptyMap()) }
+    val ejercicios = remember { mutableStateMapOf<Int, ExerciseEntity>() }
+
+    LaunchedEffect(inicioDia) {
+        cargando = true
+        detalle = workoutRepository?.obtenerDetalleDelDia(userId, inicioDia) ?: emptyMap()
+        detalle.keys.forEach { exerciseId ->
+            if (exerciseRepository != null && exerciseId !in ejercicios) {
+                val ex = exerciseRepository.observeExercise(exerciseId).firstOrNull()
+                if (ex != null) ejercicios[exerciseId] = ex
+            }
+        }
+        cargando = false
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = GrisFondo,
+        title = {
+            Text("Día $numeroDia", color = TextoPrincipal, fontWeight = FontWeight.Bold)
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                when {
+                    cargando -> Box(
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) { CircularProgressIndicator(color = VerdeTN) }
+
+                    detalle.isEmpty() -> Text(
+                        "No hay series registradas este día.",
+                        color = GrisTexto,
+                        fontSize = 13.sp
+                    )
+
+                    else -> detalle.forEach { (exerciseId, series) ->
+                        Column {
+                            Text(
+                                text = ejercicios[exerciseId]?.name ?: "Ejercicio",
+                                color = VerdeTN,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            series.forEachIndexed { i, log ->
+                                val reps = log.actualReps ?: "-"
+                                val carga = log.weightKg?.let { kg ->
+                                    val valor = if (unidadesImperiales)
+                                        com.shagox.apptrainingnow.utils.UnitsPreference.kgALibras(kg)
+                                    else kg
+                                    val unidad = if (unidadesImperiales) "lb" else "kg"
+                                    val numero = if (valor == valor.toInt().toDouble()) valor.toInt().toString()
+                                        else String.format(java.util.Locale.US, "%.1f", valor)
+                                    "$numero $unidad"
+                                } ?: "sin carga"
+                                Text(
+                                    text = "Serie ${i + 1}: $reps reps · $carga",
+                                    color = TextoPrincipal.copy(alpha = 0.88f),
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Filled.Close, contentDescription = "Cerrar", tint = VerdeTN)
+            }
+        }
+    )
 }
 
 @Composable

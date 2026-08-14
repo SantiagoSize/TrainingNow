@@ -6,6 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.shagox.apptrainingnow.data.local.chat.ChatDao
+import com.shagox.apptrainingnow.data.local.chat.ContactoPreferenciaDao
+import com.shagox.apptrainingnow.data.local.chat.ContactoPreferenciaEntity
 import com.shagox.apptrainingnow.data.local.chat.MessageEntity
 import com.shagox.apptrainingnow.data.local.exercise.ExerciseDao
 import com.shagox.apptrainingnow.data.local.exercise.ExerciseEntity
@@ -49,22 +51,27 @@ import kotlinx.coroutines.launch
  * - Relaciones entrenador-cliente
  * 
  * @version 9 - Días de rutina con hora de recordatorio propia
+ * @version 10 - UserEntity.lastActiveAt (heartbeat de presencia para el chat)
+ * @version 11 - MessageEntity.attachmentUrl/attachmentType (adjuntos de imagen/video en el chat)
+ * @version 12 - UserEntity.bio (descripción de perfil del entrenador)
+ * @version 13 - ContactoPreferenciaEntity (bloquear/silenciar contactos del chat)
  */
 @Database(
     entities = [
         // Usuarios y autenticación
         UserEntity::class,
-        
+
         // Ejercicios y rutinas
         ExerciseEntity::class,
         RoutineEntity::class,
         RoutineDayEntity::class,
         RoutineExerciseEntity::class,
-        
+
         // Comunicación
         MessageEntity::class,
         NotificationEntity::class,
-        
+        ContactoPreferenciaEntity::class,
+
         // Entrenador-Cliente
         TrainerClientEntity::class,
         
@@ -77,7 +84,7 @@ import kotlinx.coroutines.launch
         GoalEntity::class,
         PersonalRecordEntity::class
     ],
-    version = 9,
+    version = 13,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -95,6 +102,9 @@ abstract class AppDatabase : RoomDatabase() {
     
     /** DAO para sistema de chat */
     abstract fun chatDao(): ChatDao
+
+    /** DAO para preferencias de contacto del chat (bloqueado/silenciado) */
+    abstract fun contactoPreferenciaDao(): ContactoPreferenciaDao
     
     /** DAO para notificaciones */
     abstract fun notificationDao(): NotificationDao
@@ -852,7 +862,11 @@ abstract class AppDatabase : RoomDatabase() {
                         routineId = routineId,
                         dayLabel = semana[orden],
                         activityName = actividad,
-                        dayOrder = orden,
+                        // "orden" acá sigue siendo 0=Lunes...6=Domingo (no se tocan los ~21
+                        // llamados a dia() de abajo). Se convierte a dayOrder Domingo-primero
+                        // (0=Domingo...6=Sábado) solo al guardar, para que coincida con el
+                        // nuevo orden de la franja semanal (WeekStrip).
+                        dayOrder = (orden + 1) % 7,
                         reminderHour = hora,
                         reminderMinute = if (hora != null) 0 else null
                     )

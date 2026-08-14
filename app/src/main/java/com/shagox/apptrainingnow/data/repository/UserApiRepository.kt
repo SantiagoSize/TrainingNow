@@ -149,6 +149,18 @@ class UserApiRepository(
         if (!response.isSuccessful) throw HttpException(response)
     }
 
+    /**
+     * Ping de presencia: PATCH /api/users/{id}/heartbeat. A propósito no lanza excepción si
+     * falla (sin conexión, servidor caído, etc.) — es un "mejor esfuerzo", no algo crítico.
+     */
+    override suspend fun heartbeat(userId: Int) {
+        try {
+            api.heartbeat(userId)
+        } catch (_: Exception) {
+            // Silencioso a propósito: si falla, simplemente el usuario se verá "desconectado".
+        }
+    }
+
     /** Usuarios normales con toda su información (incluye createdAt). */
     override suspend fun getAllClientsInfo(): List<UserDto> = try {
         api.getClients()

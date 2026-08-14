@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -49,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -85,6 +87,10 @@ fun SettingsScreen(
     var mostrarComoFunciona by remember { mutableStateOf(false) }
     val loginState by authViewModel.loginState.collectAsState()
     val loggedUser = loginState.loggedUser
+    val context = LocalContext.current
+    var unidadesImperiales by remember {
+        mutableStateOf(com.shagox.apptrainingnow.utils.UnitsPreference.esImperial(context))
+    }
 
     Column(
         modifier = modifier
@@ -142,6 +148,45 @@ fun SettingsScreen(
         }
         Text(
             text = "Elige cómo quieres ver la app. El modo nocturno cuida la vista al entrenar de noche.",
+            color = GrisTexto,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // ==================== UNIDADES ====================
+        SeccionTitulo("UNIDADES")
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OpcionTema(
+                icono = Icons.Filled.Straighten,
+                etiqueta = "Métrico (kg/cm)",
+                seleccionado = !unidadesImperiales,
+                onClick = {
+                    unidadesImperiales = false
+                    com.shagox.apptrainingnow.utils.UnitsPreference.guardar(context, false)
+                },
+                modifier = Modifier.weight(1f)
+            )
+            OpcionTema(
+                icono = Icons.Filled.Straighten,
+                etiqueta = "Imperial (lb/in)",
+                seleccionado = unidadesImperiales,
+                onClick = {
+                    unidadesImperiales = true
+                    com.shagox.apptrainingnow.utils.UnitsPreference.guardar(context, true)
+                },
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Text(
+            text = "Se usa para tu peso/altura y para registrar las series de tus entrenamientos.",
             color = GrisTexto,
             fontSize = 12.sp,
             lineHeight = 16.sp,

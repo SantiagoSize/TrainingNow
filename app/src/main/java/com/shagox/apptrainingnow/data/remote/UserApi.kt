@@ -57,6 +57,10 @@ interface UserApi {
     @DELETE("api/users/{id}")
     suspend fun deleteUser(@Path("id") id: Int): Response<Unit>
 
+    /** Ping de presencia: se llama periódicamente mientras la app está en primer plano. */
+    @PATCH("api/users/{id}/heartbeat")
+    suspend fun heartbeat(@Path("id") id: Int): Response<Unit>
+
     @GET("api/users/trainers")
     suspend fun getTrainers(): List<UserDto>
 

@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -60,8 +61,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -295,6 +298,28 @@ private fun formatBirthDate(birthDate: Long?): String {
         SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(birthDate))
     } catch (_: Exception) {
         "No registrado"
+    }
+}
+
+/** Muestra la altura (guardada siempre en cm) en la unidad elegida por el usuario. */
+private fun formatearAltura(context: android.content.Context, cm: Float): String {
+    val imperial = com.shagox.apptrainingnow.utils.UnitsPreference.esImperial(context)
+    return if (imperial) {
+        val pulgadas = com.shagox.apptrainingnow.utils.UnitsPreference.cmAPulgadas(cm.toDouble())
+        "${"%.1f".format(pulgadas)} in"
+    } else {
+        "${cm.toInt()} cm"
+    }
+}
+
+/** Muestra el peso (guardado siempre en kg) en la unidad elegida por el usuario. */
+private fun formatearPeso(context: android.content.Context, kg: Float): String {
+    val imperial = com.shagox.apptrainingnow.utils.UnitsPreference.esImperial(context)
+    return if (imperial) {
+        val libras = com.shagox.apptrainingnow.utils.UnitsPreference.kgALibras(kg.toDouble())
+        "${"%.1f".format(libras)} lb"
+    } else {
+        "${kg.toInt()} kg"
     }
 }
 
@@ -570,13 +595,13 @@ private fun ProfileLoggedContent(
         ProfileDataRow(
             icon = Icons.Filled.Person,
             label = "Altura",
-            value = user.height?.let { "${it.toInt()} cm" } ?: "No registrado"
+            value = user.height?.let { formatearAltura(context, it) } ?: "No registrado"
         )
         Spacer(modifier = Modifier.height(10.dp))
         ProfileDataRow(
             icon = Icons.Filled.Person,
             label = "Peso",
-            value = user.weight?.let { "${it.toInt()} kg" } ?: "No registrado"
+            value = user.weight?.let { formatearPeso(context, it) } ?: "No registrado"
         )
 
         Spacer(modifier = Modifier.height(28.dp))
@@ -610,6 +635,21 @@ private fun parseBirthDateToMillis(str: String?): Long? {
     } catch (_: Exception) { null }
 }
 
+/**
+ * Autoformatea la fecha de nacimiento mientras se escribe: el usuario solo escribe números
+ * (día, mes, año seguidos) y las "/" se agregan solas cada 2 dígitos, quedando "dd/MM/yyyy".
+ * Antes había que escribir las barras a mano, lo que era incómodo y fácil de escribir mal.
+ */
+private fun autoFormatearFecha(texto: String): String {
+    val digitos = texto.filter { it.isDigit() }.take(8) // ddMMyyyy = 8 dígitos como máximo
+    val sb = StringBuilder()
+    for (i in digitos.indices) {
+        if (i == 2 || i == 4) sb.append('/')
+        sb.append(digitos[i])
+    }
+    return sb.toString()
+}
+
 /** Enmascara el correo mostrando solo los primeros 3 caracteres, ej: "usu•••@gmail.com". */
 private fun maskEmail(email: String): String {
     val atIndex = email.indexOf('@')
@@ -619,6 +659,173 @@ private fun maskEmail(email: String): String {
     val visible = local.take(3)
     val hiddenLength = (local.length - visible.length).coerceAtLeast(3)
     return "$visible${"•".repeat(hiddenLength)}$domain"
+}
+
+/** Código de país telefónico (solo América), para que el usuario no tenga que escribirlo a mano. */
+private data class PaisTelefono(val nombre: String, val bandera: String, val codigo: String)
+
+private val PAISES_AMERICA = listOf(
+    PaisTelefono("Chile", "🇨🇱", "+56"),
+    PaisTelefono("Argentina", "🇦🇷", "+54"),
+    PaisTelefono("Bolivia", "🇧🇴", "+591"),
+    PaisTelefono("Brasil", "🇧🇷", "+55"),
+    PaisTelefono("Canadá", "🇨🇦", "+1"),
+    PaisTelefono("Colombia", "🇨🇴", "+57"),
+    PaisTelefono("Costa Rica", "🇨🇷", "+506"),
+    PaisTelefono("Cuba", "🇨🇺", "+53"),
+    PaisTelefono("Ecuador", "🇪🇨", "+593"),
+    PaisTelefono("Estados Unidos", "🇺🇸", "+1"),
+    PaisTelefono("El Salvador", "🇸🇻", "+503"),
+    PaisTelefono("Guatemala", "🇬🇹", "+502"),
+    PaisTelefono("Honduras", "🇭🇳", "+504"),
+    PaisTelefono("México", "🇲🇽", "+52"),
+    PaisTelefono("Nicaragua", "🇳🇮", "+505"),
+    PaisTelefono("Panamá", "🇵🇦", "+507"),
+    PaisTelefono("Paraguay", "🇵🇾", "+595"),
+    PaisTelefono("Perú", "🇵🇪", "+51"),
+    PaisTelefono("Puerto Rico", "🇵🇷", "+1"),
+    PaisTelefono("República Dominicana", "🇩🇴", "+1"),
+    PaisTelefono("Uruguay", "🇺🇾", "+598"),
+    PaisTelefono("Venezuela", "🇻🇪", "+58")
+)
+
+/**
+ * Detecta la bandera de América según el código con el que empieza el teléfono que el usuario
+ * va escribiendo (ej. "56912345678" → 🇨🇱, sin "+" porque el campo ahora es solo dígitos).
+ * Mientras no escriba un código reconocido, muestra un ícono neutro. Puramente visual:
+ * no modifica lo que el usuario escribió.
+ */
+private fun detectarBanderaTelefono(telefono: String): String {
+    val texto = telefono.trim()
+    if (texto.isBlank()) return "📱"
+    return PAISES_AMERICA
+        .sortedByDescending { it.codigo.length }
+        .firstOrNull { texto.startsWith(it.codigo.removePrefix("+")) }
+        ?.bandera
+        ?: "📱"
+}
+
+/**
+ * Selector de género con dos cuadrados (Mujer / Hombre). Al elegir uno se resalta en
+ * verde y el otro se ve atenuado en gris. [seleccionado] usa "F" o "M" (mismo formato
+ * que ya entendía [formatGender]); null = todavía no eligió ninguno (ambos normales).
+ */
+@Composable
+private fun GenderSelector(
+    seleccionado: String?,
+    onSeleccionar: (String) -> Unit
+) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        GenderOption(
+            emoji = "👩",
+            label = "Mujer",
+            isSelected = seleccionado == "F",
+            haySeleccion = seleccionado != null,
+            modifier = Modifier.weight(1f),
+            onClick = { onSeleccionar("F") }
+        )
+        GenderOption(
+            emoji = "👨",
+            label = "Hombre",
+            isSelected = seleccionado == "M",
+            haySeleccion = seleccionado != null,
+            modifier = Modifier.weight(1f),
+            onClick = { onSeleccionar("M") }
+        )
+    }
+}
+
+@Composable
+private fun GenderOption(
+    emoji: String,
+    label: String,
+    isSelected: Boolean,
+    haySeleccion: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    // Atenuado = hay una opción elegida y no es esta (la contraria queda en gris)
+    val atenuado = haySeleccion && !isSelected
+    Column(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (isSelected) VerdeTN.copy(alpha = 0.15f) else GrisFondo)
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) VerdeTN else GrisBorde,
+                shape = RoundedCornerShape(16.dp)
+            )
+            .alpha(if (atenuado) 0.4f else 1f)
+            .clickable { onClick() }
+            .padding(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(emoji, fontSize = 36.sp)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            label,
+            color = if (isSelected) VerdeTN else TextoPrincipal,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+/**
+ * Selector de unidades: Métrico (kg/cm) o Imperial (lb/in). Dos pastillas, la elegida se
+ * resalta en verde. Se usa en el carrusel de bienvenida y en Ajustes (misma preferencia,
+ * ver [com.shagox.apptrainingnow.utils.UnitsPreference]).
+ */
+@Composable
+private fun UnitsSelector(
+    imperial: Boolean,
+    onCambiar: (Boolean) -> Unit
+) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        UnitOption(
+            label = "Métrico (kg/cm)",
+            isSelected = !imperial,
+            modifier = Modifier.weight(1f),
+            onClick = { onCambiar(false) }
+        )
+        UnitOption(
+            label = "Imperial (lb/in)",
+            isSelected = imperial,
+            modifier = Modifier.weight(1f),
+            onClick = { onCambiar(true) }
+        )
+    }
+}
+
+@Composable
+private fun UnitOption(
+    label: String,
+    isSelected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (isSelected) VerdeTN.copy(alpha = 0.15f) else GrisFondo)
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) VerdeTN else GrisBorde,
+                shape = RoundedCornerShape(10.dp)
+            )
+            .clickable { onClick() }
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            color = if (isSelected) VerdeTN else TextoPrincipal,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
 }
 
 @Composable
@@ -634,10 +841,29 @@ private fun EditProfileDialog(
     var birthDateStr by remember(user) {
         mutableStateOf(user.birthDate?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(it)) } ?: "")
     }
-    var gender by remember(user) { mutableStateOf(user.gender ?: "") }
-    var heightStr by remember(user) { mutableStateOf(user.height?.toString() ?: "") }
-    var weightStr by remember(user) { mutableStateOf(user.weight?.toString() ?: "") }
+    var gender by remember(user) { mutableStateOf(user.gender?.uppercase()?.takeIf { it == "M" || it == "F" }) }
+    val context = LocalContext.current
+    // La altura/peso se guardan siempre en cm/kg; acá solo se muestran/editan convertidos a
+    // la unidad elegida por el usuario (ver Ajustes), y se reconvierten a cm/kg al guardar.
+    val imperial = remember { com.shagox.apptrainingnow.utils.UnitsPreference.esImperial(context) }
+    var heightStr by remember(user) {
+        mutableStateOf(
+            user.height?.let {
+                if (imperial) "%.1f".format(com.shagox.apptrainingnow.utils.UnitsPreference.cmAPulgadas(it.toDouble()))
+                else it.toString()
+            } ?: ""
+        )
+    }
+    var weightStr by remember(user) {
+        mutableStateOf(
+            user.weight?.let {
+                if (imperial) "%.1f".format(com.shagox.apptrainingnow.utils.UnitsPreference.kgALibras(it.toDouble()))
+                else it.toString()
+            } ?: ""
+        )
+    }
     var specializations by remember(user) { mutableStateOf(user.specializations ?: "") }
+    var bio by remember(user) { mutableStateOf(user.bio ?: "") }
     val textFieldColors = OutlinedTextFieldDefaults.colors(
         focusedTextColor = TextoPrincipal,
         unfocusedTextColor = TextoPrincipal,
@@ -668,18 +894,56 @@ private fun EditProfileDialog(
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
             Spacer(modifier = Modifier.height(12.dp))
-            OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("Teléfono", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
+            OutlinedTextField(
+                value = phone,
+                onValueChange = { phone = it.filter { c -> c.isDigit() }.take(16) },
+                label = { Text("Teléfono", color = GrisTexto) },
+                placeholder = { Text("56912345678", color = GrisTexto) },
+                leadingIcon = { Text(detectarBanderaTelefono(phone), fontSize = 20.sp) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = textFieldColors,
+                shape = RoundedCornerShape(12.dp)
+            )
+            Text(
+                "Coloca el código de tu país sin el símbolo + (ej: 56 Chile, 54 Argentina, 1 EE.UU./Canadá)",
+                color = GrisTexto,
+                fontSize = 12.sp
+            )
             Spacer(modifier = Modifier.height(12.dp))
-            OutlinedTextField(value = birthDateStr, onValueChange = { birthDateStr = it }, label = { Text("Fecha nacimiento (dd/MM/yyyy)", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
+            OutlinedTextField(
+                value = birthDateStr,
+                onValueChange = { birthDateStr = autoFormatearFecha(it) },
+                label = { Text("Fecha nacimiento (dd/MM/yyyy)", color = GrisTexto) },
+                placeholder = { Text("Ej: 05061998", color = GrisTexto) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                colors = textFieldColors,
+                shape = RoundedCornerShape(12.dp)
+            )
             Spacer(modifier = Modifier.height(12.dp))
-            OutlinedTextField(value = gender, onValueChange = { gender = it }, label = { Text("Género (M/F)", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
+            Text("Género", color = GrisTexto, fontSize = 12.sp)
+            Spacer(modifier = Modifier.height(6.dp))
+            GenderSelector(seleccionado = gender, onSeleccionar = { gender = it })
             Spacer(modifier = Modifier.height(12.dp))
-            OutlinedTextField(value = heightStr, onValueChange = { heightStr = it }, label = { Text("Altura (cm)", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
+            OutlinedTextField(value = heightStr, onValueChange = { heightStr = it }, label = { Text(if (imperial) "Altura (in)" else "Altura (cm)", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
             Spacer(modifier = Modifier.height(12.dp))
-            OutlinedTextField(value = weightStr, onValueChange = { weightStr = it }, label = { Text("Peso (kg)", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
+            OutlinedTextField(value = weightStr, onValueChange = { weightStr = it }, label = { Text(if (imperial) "Peso (lb)" else "Peso (kg)", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
             if (user.role == "TRAINER") {
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(value = specializations, onValueChange = { specializations = it }, label = { Text("Especializaciones", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = bio,
+                    onValueChange = { bio = it },
+                    label = { Text("Descripción de tu perfil", color = GrisTexto) },
+                    placeholder = { Text("Cuéntales a tus clientes sobre ti...", color = GrisTexto) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 5,
+                    colors = textFieldColors,
+                    shape = RoundedCornerShape(12.dp)
+                )
             }
             Spacer(modifier = Modifier.height(20.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -691,16 +955,25 @@ private fun EditProfileDialog(
                 ) { Text("Cancelar", color = TextoPrincipal) }
                 Button(
                     onClick = {
+                        // Reconvertir a cm/kg (formato canónico) antes de guardar, si el
+                        // usuario editó en pulgadas/libras.
+                        val alturaCm = heightStr.toFloatOrNull()?.let {
+                            if (imperial) com.shagox.apptrainingnow.utils.UnitsPreference.pulgadasACm(it.toDouble()).toFloat() else it
+                        }
+                        val pesoKg = weightStr.toFloatOrNull()?.let {
+                            if (imperial) com.shagox.apptrainingnow.utils.UnitsPreference.librasAKg(it.toDouble()).toFloat() else it
+                        }
                         val updated = user.copy(
                             name = name.trim(),
                             lastName = lastName.trim(),
                             email = email.trim(),
                             phone = phone.trim(),
                             birthDate = parseBirthDateToMillis(birthDateStr),
-                            gender = gender.trim().takeIf { it.isNotBlank() },
-                            height = heightStr.toFloatOrNull(),
-                            weight = weightStr.toFloatOrNull(),
-                            specializations = specializations.trim().takeIf { it.isNotBlank() }
+                            gender = gender,
+                            height = alturaCm,
+                            weight = pesoKg,
+                            specializations = specializations.trim().takeIf { it.isNotBlank() },
+                            bio = bio.trim().takeIf { it.isNotBlank() }
                         )
                         onSave(updated)
                     },
@@ -882,12 +1155,18 @@ private fun RegisterTabContent(
             value = registerState.phone,
             onValueChange = onPhoneChange,
             label = { Text("Teléfono", color = GrisTexto) },
+            placeholder = { Text("56912345678", color = GrisTexto) },
+            leadingIcon = { Text(detectarBanderaTelefono(registerState.phone), fontSize = 20.sp) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             colors = textFieldColors,
             shape = RoundedCornerShape(12.dp)
         )
-        if (registerState.phoneError != null) Text(registerState.phoneError, color = androidx.compose.ui.graphics.Color(0xFFE53935), fontSize = 12.sp)
+        Text(
+            "Coloca el código de tu país sin el símbolo + (ej: 56 Chile, 54 Argentina, 1 EE.UU./Canadá)",
+            color = GrisTexto,
+            fontSize = 12.sp
+        )
         Spacer(modifier = Modifier.height(12.dp))
 
         OutlinedTextField(
@@ -922,7 +1201,11 @@ private fun RegisterTabContent(
         ) {
             Checkbox(
                 checked = registerState.termsAccepted,
-                onCheckedChange = onTermsAcceptedChange,
+                onCheckedChange = { marcar ->
+                    // Al marcar, primero se muestra el cartel de T&C; recién ahí queda aceptado.
+                    // Al desmarcar no hace falta volver a mostrarlo.
+                    if (marcar) showTerms = true else onTermsAcceptedChange(false)
+                },
                 colors = CheckboxDefaults.colors(
                     checkedColor = VerdeTN,
                     uncheckedColor = GrisTexto,
@@ -1037,6 +1320,8 @@ private fun WelcomeOnboardingDialog(
     var birthDateStr by remember { mutableStateOf("") }
     var heightStr by remember { mutableStateOf("") }
     var weightStr by remember { mutableStateOf("") }
+    var gender by remember { mutableStateOf<String?>(null) }
+    var unidadesImperiales by remember { mutableStateOf(com.shagox.apptrainingnow.utils.UnitsPreference.esImperial(context)) }
     var avatarDataUri by remember { mutableStateOf<String?>(null) }
 
     val avatarPickerLauncher = rememberLauncherForActivityResult(
@@ -1052,23 +1337,39 @@ private fun WelcomeOnboardingDialog(
         }
     }
 
+    // OJO: antes esto mandaba updateUser() y updateProfilePhoto() como 2 guardados separados
+    // al mismo tiempo (2 PUT concurrentes). Como cada uno pisa el usuario completo, el que
+    // terminaba último ganaba, y a veces la foto se perdía porque el guardado de datos
+    // terminaba después con una copia vieja (sin la foto nueva). Por eso ahora todo se manda
+    // en UN solo updateUser(), y recién se cierra el carrusel cuando terminó de guardar
+    // (con onDone), para que el perfil quede al día apenas se cierra.
     fun finalizar() {
+        com.shagox.apptrainingnow.utils.UnitsPreference.guardar(context, unidadesImperiales)
         val nuevaFecha = parseBirthDateToMillis(birthDateStr)
-        val nuevaAltura = heightStr.toFloatOrNull()
-        val nuevoPeso = weightStr.toFloatOrNull()
-        if (nuevaFecha != null || nuevaAltura != null || nuevoPeso != null) {
+        // La altura/peso se guardan SIEMPRE en cm/kg (formato canónico); si el usuario eligió
+        // imperial, se convierte lo que escribió (in/lb) antes de guardar.
+        val nuevaAltura = heightStr.toFloatOrNull()?.let {
+            if (unidadesImperiales) com.shagox.apptrainingnow.utils.UnitsPreference.pulgadasACm(it.toDouble()).toFloat() else it
+        }
+        val nuevoPeso = weightStr.toFloatOrNull()?.let {
+            if (unidadesImperiales) com.shagox.apptrainingnow.utils.UnitsPreference.librasAKg(it.toDouble()).toFloat() else it
+        }
+        val hayDatosNuevos = nuevaFecha != null || nuevaAltura != null || nuevoPeso != null ||
+                gender != null || avatarDataUri != null
+        if (hayDatosNuevos) {
             authViewModel.updateUser(
                 user.copy(
                     birthDate = nuevaFecha ?: user.birthDate,
                     height = nuevaAltura ?: user.height,
-                    weight = nuevoPeso ?: user.weight
-                )
+                    weight = nuevoPeso ?: user.weight,
+                    gender = gender ?: user.gender,
+                    profilePhotoUrl = avatarDataUri ?: user.profilePhotoUrl
+                ),
+                onDone = onFinish
             )
+        } else {
+            onFinish()
         }
-        if (avatarDataUri != null) {
-            authViewModel.updateProfilePhoto(user.id, avatarDataUri)
-        }
-        onFinish()
     }
 
     Dialog(
@@ -1118,6 +1419,10 @@ private fun WelcomeOnboardingDialog(
                             onHeightChange = { heightStr = it },
                             weightStr = weightStr,
                             onWeightChange = { weightStr = it },
+                            gender = gender,
+                            onGenderChange = { gender = it },
+                            unidadesImperiales = unidadesImperiales,
+                            onUnidadesChange = { unidadesImperiales = it },
                             avatarDataUri = avatarDataUri,
                             onPickAvatar = { avatarPickerLauncher.launch("image/*") }
                         )
@@ -1322,6 +1627,10 @@ private fun OnboardingProfileDataPage(
     onHeightChange: (String) -> Unit,
     weightStr: String,
     onWeightChange: (String) -> Unit,
+    gender: String?,
+    onGenderChange: (String) -> Unit,
+    unidadesImperiales: Boolean,
+    onUnidadesChange: (Boolean) -> Unit,
     avatarDataUri: String?,
     onPickAvatar: () -> Unit
 ) {
@@ -1382,18 +1691,24 @@ private fun OnboardingProfileDataPage(
 
     OutlinedTextField(
         value = birthDateStr,
-        onValueChange = onBirthDateChange,
+        onValueChange = { onBirthDateChange(autoFormatearFecha(it)) },
         label = { Text("Fecha de nacimiento (dd/MM/yyyy)", color = GrisTexto) },
+        placeholder = { Text("Ej: 05061998", color = GrisTexto) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         colors = textFieldColors,
         shape = RoundedCornerShape(12.dp)
     )
+    Spacer(modifier = Modifier.height(16.dp))
+    Text("Unidades de medida", color = GrisTexto, fontSize = 12.sp, modifier = Modifier.fillMaxWidth())
+    Spacer(modifier = Modifier.height(6.dp))
+    UnitsSelector(imperial = unidadesImperiales, onCambiar = onUnidadesChange)
     Spacer(modifier = Modifier.height(12.dp))
     OutlinedTextField(
         value = heightStr,
         onValueChange = onHeightChange,
-        label = { Text("Altura (cm)", color = GrisTexto) },
+        label = { Text(if (unidadesImperiales) "Altura (in)" else "Altura (cm)", color = GrisTexto) },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         colors = textFieldColors,
@@ -1403,12 +1718,16 @@ private fun OnboardingProfileDataPage(
     OutlinedTextField(
         value = weightStr,
         onValueChange = onWeightChange,
-        label = { Text("Peso (kg)", color = GrisTexto) },
+        label = { Text(if (unidadesImperiales) "Peso (lb)" else "Peso (kg)", color = GrisTexto) },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         colors = textFieldColors,
         shape = RoundedCornerShape(12.dp)
     )
+    Spacer(modifier = Modifier.height(16.dp))
+    Text("Género", color = GrisTexto, fontSize = 12.sp, modifier = Modifier.fillMaxWidth())
+    Spacer(modifier = Modifier.height(6.dp))
+    GenderSelector(seleccionado = gender, onSeleccionar = onGenderChange)
 }
 
 

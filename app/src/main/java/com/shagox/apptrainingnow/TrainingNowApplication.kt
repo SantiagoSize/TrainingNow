@@ -2,7 +2,12 @@ package com.shagox.apptrainingnow
 
 import android.app.Application
 import android.util.Log
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import com.shagox.apptrainingnow.utils.DataUriFetcher
 import com.shagox.apptrainingnow.data.local.database.AppDatabase
+import com.shagox.apptrainingnow.data.local.user.SessionManager
+import com.shagox.apptrainingnow.data.remote.RemoteModule
 import com.shagox.apptrainingnow.data.repository.ChatRepository
 import com.shagox.apptrainingnow.data.repository.ExerciseApiRepository
 import com.shagox.apptrainingnow.data.repository.ExerciseRepository
@@ -18,7 +23,7 @@ import com.shagox.apptrainingnow.data.repository.UserApiRepository
 import com.shagox.apptrainingnow.data.repository.UserRepository
 import com.shagox.apptrainingnow.data.repository.WorkoutRepository
 
-class TrainingNowApplication : Application() {
+class TrainingNowApplication : Application(), ImageLoaderFactory {
     companion object {
         private const val TAG = "TrainingNowApp"
         /** true = usar API trainingnowapi (Spring Boot); false = usar Room local. */
@@ -47,7 +52,7 @@ class TrainingNowApplication : Application() {
             UserRepository(database.userDao()).also { _userRepository = it }
         }
     val chatRepository: ChatRepository
-        get() = _chatRepository ?: ChatRepository(database.chatDao()).also { _chatRepository = it }
+        get() = _chatRepository ?: ChatRepository(database.chatDao(), database.contactoPreferenciaDao()).also { _chatRepository = it }
     val routineRepository: RoutineRepository
         get() = _routineRepository ?: RoutineRepository(database.routineDao(), database.exerciseDao()).also { _routineRepository = it }
     val trainerRepository: TrainerRepository
@@ -83,5 +88,19 @@ class TrainingNowApplication : Application() {
         _database = AppDatabase.getInstance(this)
         // Repuebla ejercicios y rutinas recomendadas si la base quedó vacía
         AppDatabase.asegurarDatosBase(_database!!)
+        // Restaurar el token JWT guardado (si había sesión) ANTES de que cualquier pantalla
+        // haga una llamada a la API, para que ya salga autenticada desde el primer request.
+        RemoteModule.authToken = SessionManager.cargarToken(this)
+    }
+
+    /**
+     * ImageLoader por defecto de Coil para toda la app, con soporte agregado para
+     * "data URI" (fotos de perfil/ejercicios guardadas en base64). Sin esto, todos
+     * los AsyncImage que reciben una data URI se ven en blanco/gris. Ver [DataUriFetcher].
+     */
+    override fun newImageLoader(): ImageLoader {
+        return ImageLoader.Builder(this)
+            .components { add(DataUriFetcher.Factory()) }
+            .build()
     }
 }
