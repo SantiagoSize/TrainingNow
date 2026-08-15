@@ -1,7 +1,6 @@
 package com.shagox.apptrainingnow.ui.screen
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -53,6 +52,7 @@ import com.shagox.apptrainingnow.data.repository.ChatRepository
 import com.shagox.apptrainingnow.data.repository.IUserRepository
 import com.shagox.apptrainingnow.ui.components.MenuOpcionesContactoDialog
 import com.shagox.apptrainingnow.ui.components.PerfilContactoDialog
+import com.shagox.apptrainingnow.ui.components.VideoPlayerDialog
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.LocalTemaClaro
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
@@ -241,14 +241,27 @@ fun ChatScreen(
 
     // Cargar información del entrenador/usuario, y refrescarla cada 15s para poder mostrar
     // si está "Conectado" o "Desconectado" (según su último heartbeat, ver lastActiveAt).
+    // También se cachea localmente en Room (asegurarUsuarioLocal): las cuentas reales vienen
+    // del backend (login vía API) y nunca quedaban guardadas en la tabla local "users", así
+    // que el primer mensaje entre dos cuentas nuevas reventaba la FK de MessageEntity y
+    // crasheaba la app. Se sincroniza ANTES de que el usuario alcance a escribir.
     LaunchedEffect(trainerId) {
         while (true) {
             try {
                 trainer = userRepository.getUserById(trainerId)
+                trainer?.let { chatRepository.asegurarUsuarioLocal(it) }
             } catch (e: Exception) {
                 android.util.Log.e("ChatScreen", "Error al cargar entrenador", e)
             }
             kotlinx.coroutines.delay(15_000L)
+        }
+    }
+
+    LaunchedEffect(currentUserId) {
+        try {
+            userRepository.getUserById(currentUserId)?.let { chatRepository.asegurarUsuarioLocal(it) }
+        } catch (e: Exception) {
+            android.util.Log.e("ChatScreen", "Error al sincronizar mi usuario local", e)
         }
     }
 
@@ -637,6 +650,7 @@ fun MessageBubble(
         (message.content.startsWith("content://") || message.content.startsWith("file://"))
 
     val urlAdjunto = message.attachmentUrl?.let { chatRepository?.urlCompletaDeAdjunto(it) }
+    var mostrarVideo by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -699,11 +713,7 @@ fun MessageBubble(
                                 .clip(RoundedCornerShape(12.dp))
                                 .padding(8.dp)
                                 .background(Color.Black, RoundedCornerShape(12.dp))
-                                .clickable {
-                                    try {
-                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(urlAdjunto)))
-                                    } catch (_: Exception) { /* Sin app para reproducir video */ }
-                                },
+                                .clickable { mostrarVideo = true },
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -754,6 +764,10 @@ fun MessageBubble(
         if (isFromCurrentUser) {
             Spacer(modifier = Modifier.width(8.dp))
         }
+    }
+
+    if (mostrarVideo && urlAdjunto != null) {
+        VideoPlayerDialog(videoUrl = urlAdjunto, onDismiss = { mostrarVideo = false })
     }
 }
 

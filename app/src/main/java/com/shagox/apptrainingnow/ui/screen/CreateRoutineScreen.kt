@@ -60,20 +60,27 @@ private data class DayData(val activityName: String, val exerciseNames: List<Str
 /**
  * Pantalla para crear una nueva rutina.
  * Una rutina tiene nombre y 7 días (cajas); cada día tiene actividad y 0–10 ejercicios.
- * - Si [clientDisplayName] es null: rutina propia (usuario); al guardar se usa onSaveRoutine.
- * - Si [clientDisplayName] no es null: el entrenador crea una rutina para ese cliente; al guardar
- *   la rutina se asigna al cliente (ownerId = cliente) y el usuario la ve en "Mis Rutinas".
+ * - Si [clientDisplayName] es null y [esEntrenadorSinCliente] es false: rutina propia (usuario).
+ * - Si [clientDisplayName] no es null: el entrenador crea una rutina para ese cliente ya
+ *   conectado (se asigna directo, sin paso de aceptación).
+ * - Si [esEntrenadorSinCliente] es true: el entrenador elige arriba si es una plantilla
+ *   reutilizable o si la comparte de una con un usuario (correo o ID) — esa comparte queda
+ *   pendiente de que el usuario la acepte.
  */
 @Composable
 fun CreateRoutineScreen(
     onBack: () -> Unit,
-    onSaveRoutine: (name: String, days: List<DayRoutineInput>) -> Unit = { _, _ -> },
-    clientDisplayName: String? = null
+    onSaveRoutine: (name: String, days: List<DayRoutineInput>, targetEmailOrId: String?, esPlantilla: Boolean) -> Unit = { _, _, _, _ -> },
+    clientDisplayName: String? = null,
+    esEntrenadorSinCliente: Boolean = false
 ) {
     var routineName by remember { mutableStateOf("") }
     var selectedDayIndex by remember { mutableIntStateOf(0) }
     var daysData by remember { mutableStateOf(List(7) { DayData("", emptyList()) }) }
     var exerciseName by remember { mutableStateOf("") }
+    var modoEntrenador by remember { mutableStateOf("PLANTILLA") } // PLANTILLA | COMPARTIR
+    var targetInput by remember { mutableStateOf("") }
+    var errorGuardado by remember { mutableStateOf<String?>(null) }
     val maxExercises = 10
 
     val dayActivity = daysData[selectedDayIndex].activityName
@@ -104,6 +111,48 @@ fun CreateRoutineScreen(
                 actionBackgroundColor = Color(0xFFE53935)
             )
             Spacer(modifier = Modifier.height(24.dp))
+
+        if (esEntrenadorSinCliente) {
+            LabelGreen("¿QUÉ QUIERES HACER?")
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ModoChip(
+                    text = "Plantilla",
+                    selected = modoEntrenador == "PLANTILLA",
+                    modifier = Modifier.weight(1f),
+                    onClick = { modoEntrenador = "PLANTILLA"; errorGuardado = null }
+                )
+                ModoChip(
+                    text = "Compartir con usuario",
+                    selected = modoEntrenador == "COMPARTIR",
+                    modifier = Modifier.weight(1f),
+                    onClick = { modoEntrenador = "COMPARTIR"; errorGuardado = null }
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = if (modoEntrenador == "PLANTILLA")
+                    "Se guarda para ti; luego la compartes con quien quieras desde Gestión de Rutinas."
+                else
+                    "El usuario recibirá una notificación para aceptar o rechazar esta rutina.",
+                color = TextoPrincipal.copy(alpha = 0.6f),
+                fontSize = 12.sp,
+                lineHeight = 16.sp
+            )
+            if (modoEntrenador == "COMPARTIR") {
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextFieldTN(
+                    value = targetInput,
+                    onValueChange = { targetInput = it; errorGuardado = null },
+                    placeholder = "Correo o ID del usuario"
+                )
+            }
+            errorGuardado?.let {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(it, color = Color(0xFFE57373), fontSize = 12.sp)
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+        }
 
         // NOMBRE DE LA RUTINA
         LabelGreen("NOMBRE DE LA RUTINA")
@@ -290,10 +339,20 @@ fun CreateRoutineScreen(
         // Guardar rutina
         Button(
             onClick = {
+                if (esEntrenadorSinCliente && modoEntrenador == "COMPARTIR" && targetInput.isBlank()) {
+                    errorGuardado = "Ingresa el correo o ID del usuario"
+                    return@Button
+                }
+                if (routineName.isBlank()) {
+                    errorGuardado = "Ponle un nombre a la rutina"
+                    return@Button
+                }
                 val days = daysData.zip(DAYS) { d, dayPair ->
                     DayRoutineInput(dayLabel = dayPair.second, activityName = d.activityName, exerciseNames = d.exerciseNames)
                 }
-                onSaveRoutine(routineName, days)
+                val target = if (esEntrenadorSinCliente && modoEntrenador == "COMPARTIR") targetInput.trim() else null
+                val esPlantilla = esEntrenadorSinCliente && modoEntrenador == "PLANTILLA"
+                onSaveRoutine(routineName, days, target, esPlantilla)
                 onBack()
             },
             modifier = Modifier
@@ -312,6 +371,27 @@ fun CreateRoutineScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
         } // cierra Column con padding
+    }
+}
+
+@Composable
+private fun ModoChip(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Surface(
+        modifier = modifier
+            .height(44.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(10.dp),
+        color = if (selected) VerdeTN else NegroFondo,
+        border = androidx.compose.foundation.BorderStroke(1.dp, TextoPrincipal.copy(alpha = 0.5f))
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                text = text,
+                color = if (selected) Color.Black else Color.White,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp
+            )
+        }
     }
 }
 
@@ -367,6 +447,6 @@ private fun OutlinedTextFieldTN(
 private fun PreviewCreateRoutineScreen() {
     CreateRoutineScreen(
         onBack = { },
-        onSaveRoutine = { _: String, _: List<DayRoutineInput> -> }
+        onSaveRoutine = { _: String, _: List<DayRoutineInput>, _: String?, _: Boolean -> }
     )
 }

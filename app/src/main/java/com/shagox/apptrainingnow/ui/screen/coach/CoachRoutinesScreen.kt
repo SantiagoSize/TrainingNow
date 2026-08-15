@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -15,6 +16,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +35,8 @@ import com.shagox.apptrainingnow.ui.theme.VerdeTN
 import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
 import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 import com.shagox.apptrainingnow.ui.viewmodel.CoachViewModel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -45,17 +49,23 @@ import java.util.*
 fun CoachRoutinesScreen(
     viewModel: CoachViewModel,
     onCreateRoutine: () -> Unit,
-    onRoutineClick: (Int) -> Unit
+    onRoutineClick: (Int) -> Unit,
+    routineRepository: com.shagox.apptrainingnow.data.repository.RoutineRepository? = null,
+    userRepository: com.shagox.apptrainingnow.data.repository.IUserRepository? = null,
+    trainerId: Int = 0
 ) {
     val myRoutines by viewModel.myRoutines.collectAsState()
     var showDeleteDialog by remember { mutableStateOf<RoutineEntity?>(null) }
+    var shareDialogFor by remember { mutableStateOf<RoutineEntity?>(null) }
     var selectedFilter by remember { mutableStateOf(RoutineFilter.ALL) }
+    val scope = rememberCoroutineScope()
 
     val filteredRoutines = remember(myRoutines, selectedFilter) {
         when (selectedFilter) {
-            RoutineFilter.ALL -> myRoutines
-            RoutineFilter.GLOBAL -> myRoutines.filter { it.ownerId == null }
+            RoutineFilter.ALL -> myRoutines.filter { !it.isTemplate }
+            RoutineFilter.GLOBAL -> myRoutines.filter { it.ownerId == null && !it.isTemplate }
             RoutineFilter.ASSIGNED -> myRoutines.filter { it.ownerId != null }
+            RoutineFilter.TEMPLATE -> myRoutines.filter { it.isTemplate }
         }
     }
 
@@ -133,11 +143,77 @@ fun CoachRoutinesScreen(
                     RoutineCard(
                         routine = routine,
                         onClick = { onRoutineClick(routine.id) },
-                        onDelete = { showDeleteDialog = routine }
+                        onDelete = { showDeleteDialog = routine },
+                        onShare = if (routine.isTemplate) { { shareDialogFor = routine } } else null
                     )
                 }
             }
         }
+    }
+
+    shareDialogFor?.let { plantilla ->
+        var input by remember(plantilla) { mutableStateOf("") }
+        var enviando by remember { mutableStateOf(false) }
+        var error by remember { mutableStateOf<String?>(null) }
+        AlertDialog(
+            onDismissRequest = { if (!enviando) shareDialogFor = null },
+            containerColor = GrisFondo,
+            title = { Text("Compartir \"${plantilla.name}\"", color = TextoPrincipal) },
+            text = {
+                Column {
+                    Text(
+                        "El usuario recibirá una notificación para aceptar o rechazar esta rutina.",
+                        color = GrisTexto,
+                        fontSize = 13.sp
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    androidx.compose.material3.OutlinedTextField(
+                        value = input,
+                        onValueChange = { input = it; error = null },
+                        singleLine = true,
+                        label = { Text("Correo o ID del usuario") },
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextoPrincipal,
+                            unfocusedTextColor = TextoPrincipal,
+                            focusedBorderColor = VerdeTN,
+                            unfocusedBorderColor = GrisTexto,
+                            cursorColor = VerdeTN
+                        )
+                    )
+                    error?.let {
+                        Spacer(Modifier.height(6.dp))
+                        Text(it, color = Color(0xFFE57373), fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !enviando,
+                    onClick = {
+                        if (input.isBlank()) { error = "Ingresa el correo o ID del usuario"; return@TextButton }
+                        enviando = true
+                        scope.launch {
+                            val targetId = input.trim().toIntOrNull()
+                                ?: userRepository?.getAllUsers()?.first()
+                                    ?.firstOrNull { it.email.equals(input.trim(), ignoreCase = true) }?.id
+                            if (targetId == null || targetId <= 0) {
+                                error = "No se encontró un usuario con ese correo o ID"
+                                enviando = false
+                            } else {
+                                routineRepository?.shareTemplateWithUser(plantilla.id, trainerId, targetId)
+                                enviando = false
+                                shareDialogFor = null
+                            }
+                        }
+                    }
+                ) { Text("Compartir", color = VerdeTN) }
+            },
+            dismissButton = {
+                TextButton(onClick = { if (!enviando) shareDialogFor = null }) {
+                    Text("Cancelar", color = GrisTexto)
+                }
+            }
+        )
     }
 
     showDeleteDialog?.let { routine ->
@@ -239,7 +315,8 @@ private fun StatItem(
 private fun RoutineCard(
     routine: RoutineEntity,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onShare: (() -> Unit)? = null
 ) {
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
     val isGlobal = routine.ownerId == null
@@ -274,19 +351,35 @@ private fun RoutineCard(
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            text = if (isGlobal) "GLOBAL" else "ASIGNADA",
+                            text = when {
+                                routine.isTemplate -> "PLANTILLA"
+                                routine.pendingShare -> "PENDIENTE DE ACEPTAR"
+                                isGlobal -> "GLOBAL"
+                                else -> "ASIGNADA"
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Medium,
                             color = VerdeTN
                         )
                     }
                 }
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Eliminar",
-                        tint = Color(0xFFE57373)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (onShare != null) {
+                        IconButton(onClick = onShare) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Compartir",
+                                tint = VerdeTN
+                            )
+                        }
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Eliminar",
+                            tint = Color(0xFFE57373)
+                        )
+                    }
                 }
             }
 
@@ -366,6 +459,7 @@ private fun EmptyRoutinesState(filter: RoutineFilter, onCreateRoutine: () -> Uni
                     RoutineFilter.ALL -> "No has creado rutinas"
                     RoutineFilter.GLOBAL -> "No tienes rutinas globales"
                     RoutineFilter.ASSIGNED -> "No tienes rutinas asignadas"
+                    RoutineFilter.TEMPLATE -> "No tienes plantillas. Crea una rutina y elige \"Plantilla\" para reutilizarla."
                 },
                 style = MaterialTheme.typography.bodyLarge,
                 color = GrisTexto
@@ -386,5 +480,6 @@ private fun EmptyRoutinesState(filter: RoutineFilter, onCreateRoutine: () -> Uni
 enum class RoutineFilter(val label: String) {
     ALL("Todas"),
     GLOBAL("Globales"),
-    ASSIGNED("Asignadas")
+    ASSIGNED("Asignadas"),
+    TEMPLATE("Plantillas")
 }

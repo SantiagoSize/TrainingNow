@@ -39,8 +39,12 @@ enum class SanctionAction { SUSPEND, BAN, DELETE, LIFT }
 fun AdminSanctionScreen(
     userRepository: com.shagox.apptrainingnow.data.repository.IUserRepository,
     onBack: () -> Unit,
-    onSuccess: () -> Unit
+    onSuccess: () -> Unit,
+    actorId: Int = 0,
+    actorName: String = "",
+    actorRole: String = "ADMIN"
 ) {
+    val auditLogRepository = remember { com.shagox.apptrainingnow.data.repository.AuditLogRepository() }
     var searchId by remember { mutableStateOf("") }
     var selectedUser by remember { mutableStateOf<UserEntity?>(null) }
     var searchError by remember { mutableStateOf<String?>(null) }
@@ -205,6 +209,10 @@ fun AdminSanctionScreen(
                         SanctionAction.DELETE -> showConfirmDelete = true
                         else -> applySanction(
                             userRepository = userRepository,
+                            auditLogRepository = auditLogRepository,
+                            actorId = actorId,
+                            actorName = actorName,
+                            actorRole = actorRole,
                             user = selectedUser!!,
                             action = action!!,
                             reason = reason.trim(),
@@ -242,6 +250,12 @@ fun AdminSanctionScreen(
                             withContext(Dispatchers.IO) {
                                 try {
                                     userRepository.deleteUserById(userToDelete.id)
+                                    auditLogRepository.log(
+                                        actorId = actorId, actorName = actorName, actorRole = actorRole,
+                                        action = "USER_DELETED", targetType = "USER",
+                                        targetId = userToDelete.id, targetName = "${userToDelete.name} ${userToDelete.lastName}",
+                                        details = "Motivo: $reason"
+                                    )
                                     withContext(Dispatchers.Main) {
                                         showConfirmDelete = false
                                         message = "Usuario eliminado"
@@ -271,6 +285,10 @@ fun AdminSanctionScreen(
 
 private fun applySanction(
     userRepository: com.shagox.apptrainingnow.data.repository.IUserRepository,
+    auditLogRepository: com.shagox.apptrainingnow.data.repository.AuditLogRepository,
+    actorId: Int,
+    actorName: String,
+    actorRole: String,
     user: UserEntity,
     action: SanctionAction,
     reason: String,
@@ -281,6 +299,7 @@ private fun applySanction(
     isLoading: (Boolean) -> Unit
 ) {
     isLoading(true)
+    val nombreObjetivo = "${user.name} ${user.lastName}"
     scope.launch {
         withContext(Dispatchers.IO) {
             try {
@@ -288,13 +307,40 @@ private fun applySanction(
                     SanctionAction.SUSPEND -> {
                         val until = System.currentTimeMillis() + suspendDays * 24L * 60 * 60 * 1000
                         userRepository.suspendUser(user.id, until, reason)
+                        auditLogRepository.log(
+                            actorId = actorId, actorName = actorName, actorRole = actorRole,
+                            action = "USER_SUSPENDED", targetType = "USER",
+                            targetId = user.id, targetName = nombreObjetivo,
+                            details = "Motivo: $reason · $suspendDays día(s)"
+                        )
                     }
-                    SanctionAction.BAN -> userRepository.banUser(user.id, reason)
-                    SanctionAction.DELETE -> userRepository.deleteUserById(user.id)
+                    SanctionAction.BAN -> {
+                        userRepository.banUser(user.id, reason)
+                        auditLogRepository.log(
+                            actorId = actorId, actorName = actorName, actorRole = actorRole,
+                            action = "USER_BANNED", targetType = "USER",
+                            targetId = user.id, targetName = nombreObjetivo,
+                            details = "Motivo: $reason"
+                        )
+                    }
+                    SanctionAction.DELETE -> {
+                        userRepository.deleteUserById(user.id)
+                        auditLogRepository.log(
+                            actorId = actorId, actorName = actorName, actorRole = actorRole,
+                            action = "USER_DELETED", targetType = "USER",
+                            targetId = user.id, targetName = nombreObjetivo,
+                            details = "Motivo: $reason"
+                        )
+                    }
                     SanctionAction.LIFT -> {
                         // Levanta ambas restricciones: baneo y suspensión
                         userRepository.unbanUser(user.id)
                         userRepository.clearSuspension(user.id)
+                        auditLogRepository.log(
+                            actorId = actorId, actorName = actorName, actorRole = actorRole,
+                            action = "USER_RESTRICTION_LIFTED", targetType = "USER",
+                            targetId = user.id, targetName = nombreObjetivo
+                        )
                     }
                 }
                 withContext(Dispatchers.Main) { onSuccess() }

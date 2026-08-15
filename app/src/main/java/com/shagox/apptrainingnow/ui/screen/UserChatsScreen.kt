@@ -19,12 +19,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -55,6 +55,10 @@ fun UserChatsScreen(
     var trainers by remember { mutableStateOf<List<UserEntity>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var trainerDetailDialog by remember { mutableStateOf<UserEntity?>(null) }
+    // "Mis chats" del usuario solo muestra entrenadores + un contacto de soporte (un admin
+    // real, mostrado como "Soporte TrainingNow!"). El id real es el de ese admin, así que
+    // los mensajes le llegan igual que a cualquier otro contacto.
+    var soporte by remember { mutableStateOf<UserEntity?>(null) }
     val scope = rememberCoroutineScope()
 
     // Cargar todos los entrenadores al inicio
@@ -68,6 +72,24 @@ fun UserChatsScreen(
         } catch (e: Exception) {
             android.util.Log.e("UserChatsScreen", "Error al cargar entrenadores", e)
             trainers = emptyList()
+        }
+    }
+
+    // Contacto de soporte: el admin de menor id representa a "Soporte TrainingNow!".
+    LaunchedEffect(Unit) {
+        try {
+            userRepository.getAllUsers().collect { all ->
+                val admin = all.filter { it.role == "ADMIN" }.minByOrNull { it.id }
+                soporte = admin?.copy(
+                    name = "Soporte",
+                    lastName = "TrainingNow!",
+                    specializations = "Ayuda con cualquier duda de la app"
+                )
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("UserChatsScreen", "Error al cargar soporte", e)
         }
     }
 
@@ -136,7 +158,7 @@ fun UserChatsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Lista de entrenadores
+        // Lista: Soporte TrainingNow! (solo sin búsqueda activa) + entrenadores
         if (isLoading) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -144,7 +166,7 @@ fun UserChatsScreen(
             ) {
                 CircularProgressIndicator(color = VerdeTN)
             }
-        } else if (trainers.isEmpty()) {
+        } else if (trainers.isEmpty() && (searchQuery.isNotBlank() || soporte == null)) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -159,6 +181,17 @@ fun UserChatsScreen(
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                if (searchQuery.isBlank()) {
+                    soporte?.let { admin ->
+                        item(key = "soporte") {
+                            TrainerCard(
+                                trainer = admin,
+                                onMessageClick = { onNavigateToChat(admin.id) },
+                                onLongPress = { trainerDetailDialog = admin }
+                            )
+                        }
+                    }
+                }
                 items(trainers) { trainer ->
                     TrainerCard(
                         trainer = trainer,
@@ -191,6 +224,12 @@ fun UserChatsScreen(
     }
 }
 
+/**
+ * Tarjeta de entrenador (o soporte) en "Mis chats": arriba el nombre, debajo su imagen
+ * promocional (o la foto de perfil si no ha subido una) y debajo una descripción corta.
+ * Mantener presionado 1,5 s abre la vista completa (imagen, descripción larga, teléfono
+ * y correo); un toque corto abre el chat.
+ */
 @Composable
 fun TrainerCard(
     trainer: UserEntity,
@@ -210,7 +249,7 @@ fun TrainerCard(
                     onPress = {
                         didLongPress = false
                         val job = scope.launch {
-                            delay(3000)
+                            delay(1500)
                             didLongPress = true
                             onLongPress()
                         }
@@ -223,74 +262,81 @@ fun TrainerCard(
                     }
                 )
             }
-            .padding(18.dp)
+            .padding(16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            // Foto de perfil
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "${trainer.name} ${trainer.lastName}",
+                    color = TextoPrincipal,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(VerdeTN),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Enviar mensaje",
+                        tint = TextoSobreVerde,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            val imagenPromo = trainer.promoImageUrl?.takeIf { it.isNotBlank() }
+                ?: trainer.profilePhotoUrl?.takeIf { it.isNotBlank() }
             Box(
                 modifier = Modifier
-                    .size(56.dp)
-                    .shadow(elevation = 4.dp, shape = CircleShape)
-                    .clip(CircleShape)
-                    .background(GrisTexto.copy(alpha = 0.3f)),
+                    .fillMaxWidth()
+                    .height(110.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(GrisTexto.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
-                if (trainer.profilePhotoUrl != null && trainer.profilePhotoUrl.isNotBlank()) {
+                if (imagenPromo != null) {
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(trainer.profilePhotoUrl)
-                            .build(),
-                        contentDescription = "Foto de ${trainer.name}",
+                        model = ImageRequest.Builder(LocalContext.current).data(imagenPromo).build(),
+                        contentDescription = "Imagen de ${trainer.name}",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
                 } else {
                     Text(
-                        text = "${trainer.name.firstOrNull() ?: 'U'}",
+                        text = trainer.name.firstOrNull()?.toString() ?: "U",
                         color = TextoPrincipal,
-                        fontSize = 22.sp,
+                        fontSize = 32.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
 
-            // Información del entrenador
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "${trainer.name} ${trainer.lastName}",
-                    color = TextoPrincipal,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                if (trainer.specializations != null && trainer.specializations.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = trainer.specializations,
-                        color = VerdeTN,
-                        fontSize = 13.sp
-                    )
-                }
-            }
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Botón de mensaje (círculo verde, icono avión)
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(VerdeTN),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Enviar mensaje",
-                    tint = TextoSobreVerde,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+            val descripcionCorta = trainer.bio?.takeIf { it.isNotBlank() }
+                ?: trainer.specializations?.takeIf { it.isNotBlank() }
+                ?: "Toca para escribirle"
+            Text(
+                text = descripcionCorta,
+                color = if (trainer.bio.isNullOrBlank()) GrisTexto else TextoPrincipal,
+                fontSize = 13.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

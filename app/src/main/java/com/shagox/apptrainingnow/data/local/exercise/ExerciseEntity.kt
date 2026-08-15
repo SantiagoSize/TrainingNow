@@ -18,6 +18,8 @@ data class ExerciseEntity(
     val muscles: String? = null,
     val difficulty: String? = "PRINCIPIANTE",
     val equipment: String? = null,
+    /** Formas alternativas de hacerlo (ej. "Mancuernas, Barra, Máquina"), separadas por coma. */
+    val alternatives: String? = null,
     /** Pasos de ejecución separados por "|". */
     val instructions: String? = null,
     /** Consejos de técnica separados por "|". */

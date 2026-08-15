@@ -1,6 +1,7 @@
 package com.shagox.apptrainingnow.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Block
@@ -12,8 +13,11 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
@@ -47,11 +51,22 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
     /** Crear categoría de ejercicios (admin) */
     data object AdminCreateCategory : Route("admin_create_category", "Nueva Categoría", Icons.AutoMirrored.Filled.Label)
 
-    /** Gestión de ejercicios de la biblioteca (admin) */
+    /** Biblioteca del admin: grilla de categorías (misma vista que el usuario) + crear categoría */
     data object AdminExercises : Route("admin_exercises", "Biblioteca", Icons.Filled.FitnessCenter)
 
-    /** Enviar notificación segmentada (admin) */
-    data object AdminSendNotification : Route("admin_send_notification", "Enviar Notificación", Icons.Filled.Notifications)
+    /** Ejercicios de una categoría, vistos por el admin: crear/editar/eliminar ejercicios */
+    data object AdminLibraryCategory : Route("admin_library_category/{categoryName}", "Ejercicios", Icons.Filled.FitnessCenter) {
+        fun createRoute(categoryName: String): String = "admin_library_category/$categoryName"
+    }
+
+    /** Enviar mensajes a uno o varios usuarios por correo (admin) */
+    data object AdminMessages : Route("admin_messages", "Enviar Mensajes", Icons.AutoMirrored.Filled.Send)
+
+    /** Ver y editar las rutinas globales ya publicadas (admin) */
+    data object AdminGlobalRoutines : Route("admin_global_routines", "Rutinas Globales", Icons.AutoMirrored.Filled.List)
+
+    /** Registro de actividad administrativa: quién hizo qué y cuándo (admin) */
+    data object AdminActivityLog : Route("admin_activity_log", "Actividad", Icons.Filled.Schedule)
 
     /** Lista de todos los usuarios (admin) */
     data object AdminUserList : Route("admin_user_list", "Usuarios", Icons.Filled.People)
@@ -76,15 +91,22 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
     /** Lista de todos los usuarios normales (solo lectura, para el entrenador) */
     data object CoachUsers : Route("coach_users", "Usuarios", Icons.Filled.People)
 
+    /** Perfil público del entrenador: cómo lo ven los usuarios en "Mis chats" (imagen, bio). */
+    data object CoachPublicProfile : Route("coach_public_profile", "Mi Perfil", Icons.Filled.Campaign)
+
     /** Detalle de un cliente */
     data object ClientDetail : Route("client_detail/{clientId}", "Cliente", Icons.Filled.Person) {
         fun createRoute(clientId: Int): String = "client_detail/$clientId"
     }
     
-    /** Crear/editar rutina */
-    data object CreateRoutine : Route("create_routine?clientId={clientId}", "Nueva Rutina", Icons.Filled.Edit) {
-        fun createRoute(clientId: Int? = null): String = 
-            if (clientId != null) "create_routine?clientId=$clientId" else "create_routine"
+    /** Crear/editar rutina. isGlobal=true solo lo usa el admin desde "Entrenamiento Global". */
+    data object CreateRoutine : Route("create_routine?clientId={clientId}&global={global}", "Nueva Rutina", Icons.Filled.Edit) {
+        fun createRoute(clientId: Int? = null, isGlobal: Boolean = false): String {
+            val base = if (clientId != null) "create_routine?clientId=$clientId" else "create_routine"
+            return if (isGlobal) {
+                if (clientId != null) "$base&global=true" else "$base?global=true"
+            } else base
+        }
     }
     
     /** Crear objetivo para cliente */
@@ -161,18 +183,20 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
             CoachClients,
             CoachRoutines,
             CoachChats,
-            Notifications,
+            Settings,
             Profile
         )
 
         /**
-         * Barra admin: 1=Chat, 2=Usuarios, 3=Panel, 4=Notificaciones, 5=Perfil.
+         * Barra admin: 1=Chat, 2=Usuarios, 3=Panel, 4=Ajustes, 5=Perfil.
+         * Notificaciones no tiene tab propia: se accede desde Ajustes (evita duplicar
+         * la misma entrada dos veces en la barra).
          */
         val adminBottomNavRoutes = listOf(
             AdminChats,           // 1 - Chat
             AdminUserManagement, // 2 - Gestión usuarios
             AdminPanel,          // 3 - Panel administración (cuadrícula puntitos)
-            Notifications,       // 4 - Notificaciones
+            Settings,            // 4 - Ajustes (tema, notificaciones, cuenta)
             Profile              // 5 - Perfil
         )
 
@@ -213,7 +237,10 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
                 // ===== Panel de administración =====
                 ruta == AdminCreateCategory.path ||
                         ruta == AdminExercises.path ||
-                        ruta == AdminSendNotification.path -> listOf(AdminPanel.path)
+                        ruta.startsWith("admin_library_category") ||
+                        ruta == AdminGlobalRoutines.path ||
+                        ruta == AdminActivityLog.path ||
+                        ruta == AdminMessages.path -> listOf(AdminPanel.path)
 
                 // ===== Gestión de usuarios (admin) =====
                 ruta == AdminUserList.path ||
@@ -239,14 +266,15 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
                     AdminChats,
                     AdminUserManagement,
                     AdminPanel,
-                    Notifications,
+                    Settings,
                     Profile
                 )
                 "TRAINER", "COACH" -> listOf(
                     CoachClients,
                     CoachRoutines,
+                    CoachPublicProfile,
                     CoachChats,
-                    Notifications,
+                    Settings,
                     Profile
                 )
                 else -> listOf(

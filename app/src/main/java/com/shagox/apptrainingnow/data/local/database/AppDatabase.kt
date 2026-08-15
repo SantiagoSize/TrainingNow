@@ -84,7 +84,7 @@ import kotlinx.coroutines.launch
         GoalEntity::class,
         PersonalRecordEntity::class
     ],
-    version = 13,
+    version = 15, // +pendingShare/isTemplate en RoutineEntity
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

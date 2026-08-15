@@ -91,10 +91,19 @@ interface RoutineDao {
     fun getMyRoutines(userId: Int): Flow<List<RoutineEntity>>
 
     /**
-     * Obtiene solo las rutinas propias del usuario (sin globales).
+     * Obtiene solo las rutinas propias del usuario (sin globales). No incluye rutinas
+     * compartidas por un entrenador que todavía están pendientes de aceptación.
      */
-    @Query("SELECT * FROM routines WHERE ownerId = :userId ORDER BY scheduledTime DESC")
+    @Query("SELECT * FROM routines WHERE ownerId = :userId AND pendingShare = 0 ORDER BY scheduledTime DESC")
     fun getUserOwnRoutines(userId: Int): Flow<List<RoutineEntity>>
+
+    /** Rutinas que un entrenador compartió con el usuario y todavía no acepta ni rechaza. */
+    @Query("SELECT * FROM routines WHERE ownerId = :userId AND pendingShare = 1 ORDER BY creationDate DESC")
+    fun getPendingSharedRoutines(userId: Int): Flow<List<RoutineEntity>>
+
+    /** Plantillas reutilizables del entrenador (ownerId null, isTemplate = true). */
+    @Query("SELECT * FROM routines WHERE creatorId = :trainerId AND isTemplate = 1 ORDER BY creationDate DESC")
+    fun getTemplates(trainerId: Int): Flow<List<RoutineEntity>>
 
     /** Rutinas del usuario (consulta puntual, para sincronización con el backend). */
     @Query("SELECT * FROM routines WHERE ownerId = :userId")

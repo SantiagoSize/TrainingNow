@@ -52,7 +52,7 @@ class TrainingNowApplication : Application(), ImageLoaderFactory {
             UserRepository(database.userDao()).also { _userRepository = it }
         }
     val chatRepository: ChatRepository
-        get() = _chatRepository ?: ChatRepository(database.chatDao(), database.contactoPreferenciaDao()).also { _chatRepository = it }
+        get() = _chatRepository ?: ChatRepository(database.chatDao(), database.contactoPreferenciaDao(), database.userDao()).also { _chatRepository = it }
     val routineRepository: RoutineRepository
         get() = _routineRepository ?: RoutineRepository(database.routineDao(), database.exerciseDao()).also { _routineRepository = it }
     val trainerRepository: TrainerRepository

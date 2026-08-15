@@ -1,5 +1,6 @@
 package com.shagox.apptrainingnow.data.remote
 
+import com.shagox.apptrainingnow.data.remote.dto.CategoryDto
 import com.shagox.apptrainingnow.data.remote.dto.ExerciseDto
 import retrofit2.Response
 import retrofit2.http.Body
@@ -35,4 +36,21 @@ interface ExerciseApi {
 
     @DELETE("api/exercises/{id}")
     suspend fun deleteExercise(@Path("id") id: Int): Response<Unit>
+
+    // ==================== Categorías (entidad propia: pueden existir sin ejercicios) ====================
+
+    @GET("api/categories")
+    suspend fun getCategories(): List<CategoryDto>
+
+    /** Crear categoría (requiere token de admin, el interceptor lo agrega). */
+    @POST("api/categories")
+    suspend fun createCategory(@Body body: Map<String, String>): Response<CategoryDto>
+
+    /** Renombrar categoría: actualiza también todos los ejercicios que la usan. */
+    @PUT("api/categories/{oldName}")
+    suspend fun renameCategory(@Path("oldName") oldName: String, @Body body: Map<String, String>): Response<CategoryDto>
+
+    /** Eliminar categoría junto con todos sus ejercicios. */
+    @DELETE("api/categories/{name}")
+    suspend fun deleteCategory(@Path("name") name: String): Response<Unit>
 }

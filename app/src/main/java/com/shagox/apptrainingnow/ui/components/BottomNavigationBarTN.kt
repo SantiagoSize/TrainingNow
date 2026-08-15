@@ -58,8 +58,7 @@ private val INDICADOR_SIZE = 56.dp
 @Composable
 fun BottomNavigationBarTN(
     navController: NavController,
-    userRole: String,
-    startDestinationRoute: String
+    userRole: String
 ) {
     val role = userRole.takeIf { it.isNotBlank() } ?: "USER"
     val items = remember(role) { Route.getBottomNavRoutes(role) }
@@ -156,8 +155,12 @@ fun BottomNavigationBarTN(
                                 iconVector = route.icon,
                                 contentDescription = route.title,
                                 onClick = {
+                                    // Ancla del popUpTo: el primer tab del rol actual, NO la ruta de
+                                    // lanzamiento global de la app (que puede no pertenecer a este rol,
+                                    // ej. "user_routines" no existe en la barra del admin y dejaba la
+                                    // pila mal anclada tras el primer cambio de pestaña).
                                     navController.navigate(route.path) {
-                                        popUpTo(startDestinationRoute) { saveState = true }
+                                        popUpTo(items.first().path) { saveState = true }
                                         launchSingleTop = true
                                         restoreState = true
                                     }
@@ -216,7 +219,6 @@ private fun PreviewBottomNavigationBarTN_User() {
     val navController = rememberNavController()
     BottomNavigationBarTN(
         navController = navController,
-        userRole = "USER",
-        startDestinationRoute = Route.UserRoutines.path
+        userRole = "USER"
     )
 }

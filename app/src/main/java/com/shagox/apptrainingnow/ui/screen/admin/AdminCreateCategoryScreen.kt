@@ -1,146 +1,135 @@
 package com.shagox.apptrainingnow.ui.screen.admin
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.shagox.apptrainingnow.data.local.exercise.ExerciseEntity
-import com.shagox.apptrainingnow.ui.theme.GrisFondo
+import androidx.compose.ui.unit.sp
+import com.shagox.apptrainingnow.data.repository.IExerciseRepository
+import com.shagox.apptrainingnow.ui.components.BackButtonTN
+import com.shagox.apptrainingnow.ui.components.ScreenHeaderTN
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
-import com.shagox.apptrainingnow.ui.theme.VerdeTN
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
 import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
+import com.shagox.apptrainingnow.ui.theme.VerdeTN
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Pantalla para crear una nueva categoría de ejercicios.
- * Inserta un ejercicio placeholder con la categoría para que aparezca en la biblioteca.
+ * Crear una categoría nueva: solo pide el nombre. La categoría queda vacía (0 ejercicios);
+ * los ejercicios se agregan después desde dentro de la categoría, en Biblioteca.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminCreateCategoryScreen(
-    exerciseRepository: com.shagox.apptrainingnow.data.repository.IExerciseRepository,
+    exerciseRepository: IExerciseRepository,
     onBack: () -> Unit,
-    onSuccess: () -> Unit
+    onSuccess: () -> Unit,
+    actorId: Int = 0,
+    actorName: String = "",
+    actorRole: String = "ADMIN"
 ) {
+    val auditLogRepository = remember { com.shagox.apptrainingnow.data.repository.AuditLogRepository() }
     var categoryName by remember { mutableStateOf("") }
-    var exerciseName by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Nueva Categoría") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = VerdeTN,
-                    titleContentColor = NegroFondo,
-                    navigationIconContentColor = NegroFondo
-                )
-            )
-        },
-        containerColor = NegroFondo
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(20.dp)
-        ) {
-            OutlinedTextField(
-                value = categoryName,
-                onValueChange = { categoryName = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Nombre de la categoría") },
-                placeholder = { Text("Ej: Pectorales") },
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = androidx.compose.ui.graphics.Color.White,
-                    unfocusedTextColor = androidx.compose.ui.graphics.Color.White,
-                    focusedBorderColor = VerdeTN,
-                    unfocusedBorderColor = GrisTexto,
-                    focusedLabelColor = VerdeTN,
-                    cursorColor = VerdeTN
-                ),
-                shape = RoundedCornerShape(12.dp)
-            )
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = exerciseName,
-                onValueChange = { exerciseName = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Nombre del primer ejercicio (opcional)") },
-                placeholder = { Text("Ej: Press de banca") },
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = androidx.compose.ui.graphics.Color.White,
-                    unfocusedTextColor = androidx.compose.ui.graphics.Color.White,
-                    focusedBorderColor = VerdeTN,
-                    unfocusedBorderColor = GrisTexto
-                ),
-                shape = RoundedCornerShape(12.dp)
-            )
-            message?.let { msg ->
-                Spacer(Modifier.height(8.dp))
-                Text(msg, color = VerdeTN)
-            }
-            Spacer(Modifier.height(24.dp))
-            Button(
-                onClick = {
-                    if (categoryName.isBlank()) {
-                        message = "Indica el nombre de la categoría"
-                        return@Button
-                    }
-                    isLoading = true
-                    message = null
-                    scope.launch {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(NegroFondo)
+            .padding(horizontal = 16.dp)
+    ) {
+        BackButtonTN(text = "Panel", onClick = onBack)
+        ScreenHeaderTN(
+            subtitle = "Crear",
+            title = "NUEVA CATEGORÍA"
+        )
+
+        Text(
+            "Elige un nombre claro, ej. Pectorales, Piernas, Cardio. Podrás agregarle ejercicios apenas la crees.",
+            color = GrisTexto,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(bottom = 20.dp)
+        )
+        OutlinedTextField(
+            value = categoryName,
+            onValueChange = { categoryName = it; message = null },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Nombre de la categoría") },
+            placeholder = { Text("Ej: Pectorales") },
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = TextoPrincipal,
+                unfocusedTextColor = TextoPrincipal,
+                focusedBorderColor = VerdeTN,
+                unfocusedBorderColor = GrisTexto,
+                focusedLabelColor = VerdeTN,
+                cursorColor = VerdeTN
+            ),
+            shape = RoundedCornerShape(12.dp)
+        )
+        message?.let { msg ->
+            Spacer(Modifier.height(10.dp))
+            Text(msg, color = Color(0xFFE57373), fontSize = 13.sp)
+        }
+        Spacer(Modifier.height(24.dp))
+        Button(
+            onClick = {
+                if (categoryName.isBlank()) {
+                    message = "Indica el nombre de la categoría"
+                    return@Button
+                }
+                isLoading = true
+                message = null
+                scope.launch {
+                    try {
                         withContext(Dispatchers.IO) {
-                            try {
-                                val name = exerciseName.ifBlank { "Ejercicio en ${categoryName.trim()}" }
-                                exerciseRepository.insertExercises(
-                                    listOf(
-                                        ExerciseEntity(
-                                            name = name,
-                                            category = categoryName.trim(),
-                                            description = "",
-                                            videoUrl = "",
-                                            isSystemDefault = true
-                                        )
-                                    )
-                                )
-                                withContext(Dispatchers.Main) {
-                                    message = "Categoría creada. Añade más ejercicios en Biblioteca."
-                                    onSuccess()
-                                }
-                            } catch (e: Exception) {
-                                withContext(Dispatchers.Main) {
-                                    message = e.message ?: "Error al crear"
-                                }
-                            } finally {
-                                isLoading = false
-                            }
+                            exerciseRepository.createCategory(categoryName.trim())
+                            auditLogRepository.log(
+                                actorId = actorId,
+                                actorName = actorName,
+                                actorRole = actorRole,
+                                action = "CATEGORY_CREATED",
+                                targetType = "CATEGORY",
+                                targetName = categoryName.trim()
+                            )
                         }
+                        onSuccess()
+                    } catch (e: Exception) {
+                        message = e.message ?: "Error al crear la categoría"
+                    } finally {
+                        isLoading = false
                     }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = TextoSobreVerde)
-            ) {
-                if (isLoading) CircularProgressIndicator(Modifier.size(24.dp), color = TextoSobreVerde)
-                else Text("Crear categoría")
-            }
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = VerdeTN, contentColor = TextoSobreVerde)
+        ) {
+            if (isLoading) CircularProgressIndicator(Modifier.size(24.dp), color = TextoSobreVerde)
+            else Text("Crear categoría")
         }
     }
 }

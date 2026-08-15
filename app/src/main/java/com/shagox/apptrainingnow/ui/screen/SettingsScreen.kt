@@ -55,9 +55,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shagox.apptrainingnow.data.repository.PasswordResetRepository
+import com.shagox.apptrainingnow.ui.components.IconoOjoContrasena
 import com.shagox.apptrainingnow.ui.components.ScreenHeaderTN
 import com.shagox.apptrainingnow.ui.theme.GrisBorde
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
@@ -87,6 +89,9 @@ fun SettingsScreen(
     var mostrarComoFunciona by remember { mutableStateOf(false) }
     val loginState by authViewModel.loginState.collectAsState()
     val loggedUser = loginState.loggedUser
+    // Admin y Entrenador comparten los mismos Ajustes: ninguno entrena ni recibe rutinas
+    // propias, así que la sección "Tu progreso" no aplica a ninguno de los dos.
+    val esStaff = loggedUser?.role == "ADMIN" || loggedUser?.role == "TRAINER"
     val context = LocalContext.current
     var unidadesImperiales by remember {
         mutableStateOf(com.shagox.apptrainingnow.utils.UnitsPreference.esImperial(context))
@@ -107,21 +112,23 @@ fun SettingsScreen(
         )
 
         // ==================== TU PROGRESO ====================
-        SeccionTitulo("TU PROGRESO")
-        OpcionAjuste(
-            icono = Icons.Filled.CalendarToday,
-            titulo = "Mi avance mensual",
-            descripcion = "Días entrenados, calendario y rachas",
-            onClick = onVerAvanceMensual
-        )
-        OpcionAjuste(
-            icono = Icons.Filled.Notifications,
-            titulo = "Notificaciones",
-            descripcion = "Avisos de rutinas y mensajes",
-            onClick = onVerNotificaciones
-        )
+        if (!esStaff) {
+            SeccionTitulo("TU PROGRESO")
+            OpcionAjuste(
+                icono = Icons.Filled.CalendarToday,
+                titulo = "Mi avance mensual",
+                descripcion = "Días entrenados, calendario y rachas",
+                onClick = onVerAvanceMensual
+            )
+            OpcionAjuste(
+                icono = Icons.Filled.Notifications,
+                titulo = "Notificaciones",
+                descripcion = "Avisos de rutinas y mensajes",
+                onClick = onVerNotificaciones
+            )
 
-        Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+        }
 
         // ==================== APARIENCIA ====================
         SeccionTitulo("APARIENCIA")
@@ -264,6 +271,7 @@ private fun CuentaAcciones(authViewModel: AuthViewModel) {
     var mostrarCambiarPassword by remember { mutableStateOf(false) }
     val loginState by authViewModel.loginState.collectAsState()
     val email = loginState.loggedUser?.email.orEmpty()
+    val esCuentaDeEmpresa = loginState.loggedUser?.role in listOf("ADMIN", "TRAINER")
 
     OpcionAjuste(
         icono = Icons.Filled.Lock,
@@ -291,18 +299,39 @@ private fun CuentaAcciones(authViewModel: AuthViewModel) {
         Text("CERRAR SESIÓN", fontWeight = FontWeight.SemiBold)
     }
 
-    Button(
-        onClick = { mostrarConfirmacion1 = true },
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 10.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935), contentColor = Color.White),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Text("BORRAR CUENTA", fontWeight = FontWeight.SemiBold)
+    if (esCuentaDeEmpresa) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(GrisFondo)
+                .border(1.dp, GrisBorde, RoundedCornerShape(12.dp))
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Filled.Info, contentDescription = null, tint = GrisTexto, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                "Las cuentas de personal (admin/entrenador) no se pueden eliminar desde la app. Contacta a otro administrador si necesitas darla de baja.",
+                color = GrisTexto,
+                fontSize = 12.sp,
+                lineHeight = 16.sp
+            )
+        }
+    } else {
+        Button(
+            onClick = { mostrarConfirmacion1 = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 10.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935), contentColor = Color.White),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text("BORRAR CUENTA", fontWeight = FontWeight.SemiBold)
+        }
     }
 
-    if (mostrarConfirmacion1) {
+    if (!esCuentaDeEmpresa && mostrarConfirmacion1) {
         AlertDialog(
             onDismissRequest = { mostrarConfirmacion1 = false },
             containerColor = GrisFondo,
@@ -347,6 +376,7 @@ private fun ConfirmarBorradoCuentaDialog(
     var aceptaResponsabilidad by remember { mutableStateOf(false) }
     var enviando by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var cuentaEliminada by remember { mutableStateOf(false) }
 
     val passwordsCoinciden = password.isNotBlank() && password == confirmPassword
     val puedeEliminar = passwordsCoinciden && aceptaResponsabilidad && !enviando
@@ -366,20 +396,39 @@ private fun ConfirmarBorradoCuentaDialog(
     AlertDialog(
         onDismissRequest = { if (!enviando) onDismiss() },
         containerColor = GrisFondo,
-        title = { Text("Última confirmación", color = TextoPrincipal, fontWeight = FontWeight.Bold) },
+        title = {
+            Text(
+                if (cuentaEliminada) "Hasta pronto :,(" else "Última confirmación",
+                color = if (cuentaEliminada) VerdeTN else TextoPrincipal,
+                fontWeight = FontWeight.Bold
+            )
+        },
         text = {
+            if (cuentaEliminada) {
+                Text(
+                    "Tu cuenta fue eliminada junto con tus rutinas y tu progreso. Gracias por haber sido parte de Training Now, esperamos haberte ayudado a acercarte a tus objetivos. ¡Mucho éxito en lo que sigue! :,(",
+                    color = GrisTexto,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+            } else {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     "Para evitar eliminaciones accidentales, ingresa tu contraseña dos veces y confirma que entiendes que esta acción es irreversible.",
                     color = GrisTexto,
                     fontSize = 13.sp
                 )
+                var passwordVisible by remember { mutableStateOf(false) }
+                var confirmPasswordVisible by remember { mutableStateOf(false) }
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it; error = null },
                     label = { Text("Contraseña", color = GrisTexto) },
                     singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconoOjoContrasena(visible = passwordVisible, onToggle = { passwordVisible = !passwordVisible }, tint = GrisTexto)
+                    },
                     colors = fieldColors,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -389,7 +438,10 @@ private fun ConfirmarBorradoCuentaDialog(
                     onValueChange = { confirmPassword = it; error = null },
                     label = { Text("Confirmar contraseña", color = GrisTexto) },
                     singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
+                    visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconoOjoContrasena(visible = confirmPasswordVisible, onToggle = { confirmPasswordVisible = !confirmPasswordVisible }, tint = GrisTexto)
+                    },
                     colors = fieldColors,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -417,34 +469,43 @@ private fun ConfirmarBorradoCuentaDialog(
                     Text(error!!, color = Color(0xFFE53935), fontSize = 13.sp)
                 }
             }
+            }
         },
         confirmButton = {
-            Button(
-                onClick = {
-                    enviando = true
-                    error = null
-                    authViewModel.deleteAccount(password) { success, mensajeError ->
-                        enviando = false
-                        if (success) {
-                            onDismiss()
-                        } else {
-                            error = mensajeError
+            if (cuentaEliminada) {
+                TextButton(onClick = onDismiss) {
+                    Text("ENTENDIDO", color = VerdeTN, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                Button(
+                    onClick = {
+                        enviando = true
+                        error = null
+                        authViewModel.deleteAccount(password) { success, mensajeError ->
+                            enviando = false
+                            if (success) {
+                                cuentaEliminada = true
+                            } else {
+                                error = mensajeError
+                            }
                         }
+                    },
+                    enabled = puedeEliminar,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935), contentColor = Color.White)
+                ) {
+                    if (enviando) {
+                        CircularProgressIndicator(modifier = Modifier.height(18.dp), color = Color.White)
+                    } else {
+                        Text("ELIMINAR CUENTA", fontWeight = FontWeight.SemiBold)
                     }
-                },
-                enabled = puedeEliminar,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935), contentColor = Color.White)
-            ) {
-                if (enviando) {
-                    CircularProgressIndicator(modifier = Modifier.height(18.dp), color = Color.White)
-                } else {
-                    Text("ELIMINAR CUENTA", fontWeight = FontWeight.SemiBold)
                 }
             }
         },
         dismissButton = {
-            TextButton(onClick = { if (!enviando) onDismiss() }) {
-                Text("Cancelar", color = TextoPrincipal)
+            if (!cuentaEliminada) {
+                TextButton(onClick = { if (!enviando) onDismiss() }) {
+                    Text("Cancelar", color = TextoPrincipal)
+                }
             }
         }
     )
@@ -545,16 +606,24 @@ private fun ChangePasswordDialog(
                         }
                     }
                     else -> {
+                        var newPassVisible by remember { mutableStateOf(false) }
+                        var confirmPassVisible by remember { mutableStateOf(false) }
                         OutlinedTextField(
                             value = newPass, onValueChange = { newPass = it },
                             label = { Text("Nueva contraseña") }, singleLine = true,
-                            visualTransformation = PasswordVisualTransformation(),
+                            visualTransformation = if (newPassVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconoOjoContrasena(visible = newPassVisible, onToggle = { newPassVisible = !newPassVisible }, tint = GrisTexto)
+                            },
                             colors = fieldColors, modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = confirmPass, onValueChange = { confirmPass = it },
                             label = { Text("Confirmar contraseña") }, singleLine = true,
-                            visualTransformation = PasswordVisualTransformation(),
+                            visualTransformation = if (confirmPassVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconoOjoContrasena(visible = confirmPassVisible, onToggle = { confirmPassVisible = !confirmPassVisible }, tint = GrisTexto)
+                            },
                             colors = fieldColors, modifier = Modifier.fillMaxWidth()
                         )
                         if (confirmPass.isNotEmpty() && newPass != confirmPass) {

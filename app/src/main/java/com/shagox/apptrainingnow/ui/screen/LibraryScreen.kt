@@ -2,7 +2,9 @@ package com.shagox.apptrainingnow.ui.screen
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,7 +69,8 @@ data class LibraryCategory(
     val icon: ImageVector
 )
 
-private val categoryIconMap = mapOf(
+/** internal: reutilizado por las pantallas de biblioteca del admin para mantener la misma estética. */
+internal val categoryIconMap = mapOf(
     "Pectorales" to Icons.Filled.FitnessCenter,
     "Espalda" to Icons.Filled.FitnessCenter,
     "Piernas" to Icons.AutoMirrored.Filled.DirectionsRun,
@@ -81,7 +84,7 @@ private val categoryIconMap = mapOf(
     "Personalizado" to Icons.Filled.Accessibility
 )
 
-private fun iconForCategory(category: String): ImageVector =
+internal fun iconForCategory(category: String): ImageVector =
     categoryIconMap[category] ?: Icons.Filled.FitnessCenter
 
 /**
@@ -282,13 +285,17 @@ fun LibraryScreen(
 
 /**
  * Tarjeta de categoría: degradado verde, ícono grande e indicador de cantidad.
+ * internal: la reutiliza la biblioteca del admin para verse idéntica a la del usuario.
+ * [onLongClick] es solo para el admin (editar/borrar categoría); un usuario normal no lo recibe.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun CategoryCard(
+internal fun CategoryCard(
     name: String,
     exerciseCount: Int,
     icon: ImageVector,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null
 ) {
     Box(
         modifier = Modifier
@@ -301,7 +308,7 @@ private fun CategoryCard(
                 )
             )
             .border(1.dp, VerdeTN.copy(alpha = 0.45f), RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(16.dp)
     ) {
         Column(

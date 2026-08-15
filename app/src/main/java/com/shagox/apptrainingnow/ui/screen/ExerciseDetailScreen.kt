@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,7 +44,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,6 +51,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.shagox.apptrainingnow.data.local.exercise.ExerciseEntity
 import com.shagox.apptrainingnow.data.repository.IExerciseRepository
+import com.shagox.apptrainingnow.ui.components.VideoPlayerDialog
 import com.shagox.apptrainingnow.ui.theme.GrisBorde
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
@@ -68,7 +72,7 @@ fun ExerciseDetailScreen(
     modifier: Modifier = Modifier
 ) {
     val exercise by exerciseRepository.observeExercise(exerciseId).collectAsState(initial = null)
-    val uriHandler = LocalUriHandler.current
+    var mostrarVideo by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -262,6 +266,21 @@ fun ExerciseDetailScreen(
                 Spacer(modifier = Modifier.height(20.dp))
             }
 
+            // ===== Formas alternativas =====
+            if (!ejercicio.alternatives.isNullOrBlank()) {
+                SectionTitle("FORMAS ALTERNATIVAS")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ejercicio.alternatives.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                        .forEach { alternativa -> InfoChip(texto = alternativa) }
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
             // ===== Ejecución paso a paso =====
             if (!ejercicio.instructions.isNullOrBlank()) {
                 SectionTitle("EJECUCIÓN PASO A PASO")
@@ -328,7 +347,7 @@ fun ExerciseDetailScreen(
             // ===== Video =====
             if (!ejercicio.videoUrl.isBlank()) {
                 Button(
-                    onClick = { runCatching { uriHandler.openUri(ejercicio.videoUrl) } },
+                    onClick = { mostrarVideo = true },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
@@ -362,6 +381,10 @@ fun ExerciseDetailScreen(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
+        }
+
+        if (mostrarVideo && !ejercicio.videoUrl.isBlank()) {
+            VideoPlayerDialog(videoUrl = ejercicio.videoUrl, onDismiss = { mostrarVideo = false })
         }
     }
 }

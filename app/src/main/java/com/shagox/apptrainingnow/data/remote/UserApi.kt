@@ -100,4 +100,12 @@ interface UserApi {
 
     @POST("api/users/password-reset/confirm")
     suspend fun confirmPasswordReset(@Body body: Map<String, String>): Response<Map<String, String>>
+
+    // ==================== Registro de actividad (token de admin vía interceptor) ====================
+
+    @POST("api/audit-logs")
+    suspend fun recordAuditLog(@Body body: com.shagox.apptrainingnow.data.remote.dto.AuditLogDto): Response<com.shagox.apptrainingnow.data.remote.dto.AuditLogDto>
+
+    @GET("api/audit-logs")
+    suspend fun getAuditLogs(@Query("targetType") targetType: String? = null): List<com.shagox.apptrainingnow.data.remote.dto.AuditLogDto>
 }

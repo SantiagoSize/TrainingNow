@@ -11,6 +11,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,15 +29,19 @@ import com.shagox.apptrainingnow.ui.theme.VerdeTN
 import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
 
 /**
- * Gestión de usuarios: Ver todos, Crear usuario, Suspender/Banear/Eliminar.
+ * Gestión de usuarios: resumen rápido + Ver todos, Crear usuario, Suspender/Banear/Eliminar.
  */
 @Composable
 fun AdminUserManagementScreen(
     onBack: () -> Unit,
     onVerUsuarios: () -> Unit,
     onCrearUsuario: () -> Unit,
-    onSuspenderBanearEliminar: () -> Unit
+    onSuspenderBanearEliminar: () -> Unit,
+    userRepository: com.shagox.apptrainingnow.data.repository.IUserRepository? = null
 ) {
+    val users by (userRepository?.getAllUsers() ?: kotlinx.coroutines.flow.flowOf(emptyList()))
+        .collectAsState(initial = emptyList())
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -52,6 +58,27 @@ fun AdminUserManagementScreen(
         )
 
         Spacer(Modifier.height(12.dp))
+
+        if (userRepository != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                EstadisticaUsuarios(valor = users.size, etiqueta = "Total", modifier = Modifier.weight(1f))
+                EstadisticaUsuarios(
+                    valor = users.count { it.role == "TRAINER" },
+                    etiqueta = "Entrenadores",
+                    modifier = Modifier.weight(1f)
+                )
+                EstadisticaUsuarios(
+                    valor = users.count { it.isBanned || (it.suspendedUntil != null && it.suspendedUntil > System.currentTimeMillis()) },
+                    etiqueta = "Sancionados",
+                    modifier = Modifier.weight(1f),
+                    destacar = true
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+        }
 
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -122,5 +149,31 @@ private fun AdminUserCard(
             }
             Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = GrisTexto, modifier = Modifier.size(24.dp))
         }
+    }
+}
+
+/** Tarjeta compacta de resumen (Total / Entrenadores / Sancionados) en la cabecera. */
+@Composable
+private fun EstadisticaUsuarios(
+    valor: Int,
+    etiqueta: String,
+    modifier: Modifier = Modifier,
+    destacar: Boolean = false
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(GrisFondo)
+            .border(1.dp, if (destacar && valor > 0) Color(0xFFE57373) else VerdeTN, RoundedCornerShape(14.dp))
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = valor.toString(),
+            color = if (destacar && valor > 0) Color(0xFFE57373) else VerdeTN,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Text(text = etiqueta, color = GrisTexto, fontSize = 11.sp)
     }
 }

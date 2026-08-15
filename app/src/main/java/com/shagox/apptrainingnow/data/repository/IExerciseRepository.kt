@@ -19,4 +19,13 @@ interface IExerciseRepository {
 
     /** Eliminar ejercicio (solo admin). */
     suspend fun deleteExercise(exerciseId: Int) { }
+
+    /** Crear una categoría nueva, vacía (sin ejercicios todavía). Solo admin. */
+    suspend fun createCategory(name: String) { }
+
+    /** Renombrar una categoría: actualiza también todos los ejercicios que la usan. Solo admin. */
+    suspend fun renameCategory(oldName: String, newName: String) { }
+
+    /** Eliminar una categoría junto con todos sus ejercicios. Solo admin. */
+    suspend fun deleteCategory(name: String) { }
 }

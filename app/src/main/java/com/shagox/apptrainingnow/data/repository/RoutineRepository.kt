@@ -174,6 +174,16 @@ class RoutineRepository(
         return routineDao.getUserOwnRoutines(userId)
     }
 
+    /** Rutinas que un entrenador compartió con el usuario, pendientes de aceptar/rechazar. */
+    fun getPendingSharedRoutines(userId: Int): Flow<List<RoutineEntity>> {
+        return routineDao.getPendingSharedRoutines(userId)
+    }
+
+    /** Plantillas reutilizables del entrenador. */
+    fun getTemplates(trainerId: Int): Flow<List<RoutineEntity>> {
+        return routineDao.getTemplates(trainerId)
+    }
+
     override fun observeRoutine(routineId: Int): Flow<RoutineEntity?> {
         return routineDao.observeRoutine(routineId)
     }
@@ -252,6 +262,33 @@ class RoutineRepository(
     }
 
     /**
+     * Guarda una rutina global/recomendada (ownerId = null), publicada por un admin.
+     * Visible para todos los usuarios en "Rutinas recomendadas".
+     */
+    suspend fun saveGlobalRoutine(
+        adminId: Int,
+        routineName: String,
+        days: List<DayRoutineInput>
+    ): Long {
+        require(days.size == 7) { "Se requieren exactamente 7 días" }
+        val now = System.currentTimeMillis()
+
+        val routineId = routineDao.insertRoutine(
+            RoutineEntity(
+                ownerId = null,
+                creatorId = adminId,
+                name = routineName,
+                dayInfo = resumenDeDias(days),
+                creationDate = now,
+                scheduledTime = now
+            )
+        ).toInt()
+
+        guardarDias(routineId, days)
+        return routineId.toLong()
+    }
+
+    /**
      * Guarda una rutina creada por el entrenador para un cliente.
      * ownerId = clientId (la ve el usuario como "su" rutina), creatorId = trainerId.
      * @return ID del primer día de la rutina (para notificación / abrir detalle).
@@ -304,10 +341,12 @@ class RoutineRepository(
     /** Publica cada día de la rutina en TrainNow-Rutinas, resolviendo ejercicios por nombre. */
     private suspend fun pushRoutineDaysToBackend(
         trainerId: Int,
-        clientId: Int,
+        clientId: Int?,
         routineName: String,
         days: List<DayRoutineInput>,
-        creationDate: Long
+        creationDate: Long,
+        pendingShare: Boolean = false,
+        isTemplate: Boolean = false
     ) {
         val routineApi = RemoteModule.routineApi()
         val exerciseApi = RemoteModule.exerciseApi()
@@ -323,7 +362,9 @@ class RoutineRepository(
                     name = routineName,
                     dayInfo = dayInfo,
                     creationDate = creationDate,
-                    scheduledTime = creationDate
+                    scheduledTime = creationDate,
+                    pendingShare = pendingShare,
+                    isTemplate = isTemplate
                 )
             ).body() ?: continue
 
@@ -422,5 +463,169 @@ class RoutineRepository(
         } catch (_: Exception) {
             // Offline o backend caído: se reintenta la próxima vez que se abra la pantalla.
         }
+    }
+
+    // ==================== COMPARTIR RUTINAS (entrenador → usuario, con aceptación) ====================
+
+    /**
+     * El entrenador comparte una rutina recién creada con un usuario específico (id ya
+     * resuelto por la UI a partir del correo o id que escribió). Queda pendiente de
+     * aceptación: no aparece en "Mis rutinas" del usuario hasta que la acepte.
+     */
+    suspend fun shareRoutineWithUser(
+        trainerId: Int,
+        targetUserId: Int,
+        routineName: String,
+        days: List<DayRoutineInput>
+    ): Long {
+        require(days.size == 7) { "Se requieren exactamente 7 días" }
+        val now = System.currentTimeMillis()
+
+        val routineId = routineDao.insertRoutine(
+            RoutineEntity(
+                ownerId = targetUserId,
+                creatorId = trainerId,
+                name = routineName,
+                dayInfo = resumenDeDias(days),
+                creationDate = now,
+                scheduledTime = now,
+                pendingShare = true
+            )
+        ).toInt()
+        guardarDias(routineId, days)
+
+        try {
+            pushRoutineDaysToBackend(trainerId, targetUserId, routineName, days, now, pendingShare = true)
+        } catch (_: Exception) {
+            // Sin conexión: queda local; se reintenta al reabrir la pantalla.
+        }
+        return routineId.toLong()
+    }
+
+    /**
+     * Guarda una plantilla reutilizable del entrenador (sin dueño todavía). Se comparte
+     * después con distintos usuarios vía [shareTemplateWithUser], sin volver a crearla.
+     */
+    suspend fun saveAsTemplate(trainerId: Int, routineName: String, days: List<DayRoutineInput>): Long {
+        require(days.size == 7) { "Se requieren exactamente 7 días" }
+        val now = System.currentTimeMillis()
+
+        val routineId = routineDao.insertRoutine(
+            RoutineEntity(
+                ownerId = null,
+                creatorId = trainerId,
+                name = routineName,
+                dayInfo = resumenDeDias(days),
+                creationDate = now,
+                scheduledTime = now,
+                isTemplate = true
+            )
+        ).toInt()
+        guardarDias(routineId, days)
+
+        try {
+            pushRoutineDaysToBackend(trainerId, null, routineName, days, now, isTemplate = true)
+        } catch (_: Exception) {
+            // Sin conexión: la plantilla queda guardada localmente.
+        }
+        return routineId.toLong()
+    }
+
+    /** Comparte una plantilla ya guardada con un usuario nuevo (duplica sus días/ejercicios). */
+    suspend fun shareTemplateWithUser(templateRoutineId: Int, trainerId: Int, targetUserId: Int): Long {
+        val template = routineDao.getRoutineById(templateRoutineId) ?: return -1
+        val templateDays = routineDao.getDaysOfRoutine(templateRoutineId)
+        if (templateDays.size != 7) return -1
+        val dayInputs = templateDays.map { day ->
+            val exercises = routineDao.getExercisesForDaySync(day.id)
+            DayRoutineInput(
+                dayLabel = day.dayLabel,
+                activityName = day.activityName,
+                exerciseNames = exercises.map { it.name }
+            )
+        }
+        return shareRoutineWithUser(trainerId, targetUserId, template.name, dayInputs)
+    }
+
+    /**
+     * El usuario acepta una rutina compartida: si todavía no está sincronizada localmente
+     * la trae del backend (agrupando sus días, igual que [syncRoutinesFromBackend]), y marca
+     * pendingShare = false en ambos lados para que ya aparezca en "Mis rutinas".
+     */
+    suspend fun acceptSharedRoutine(userId: Int, routineName: String) {
+        try {
+            val routineApi = RemoteModule.routineApi()
+            val remotas = routineApi.getRoutinesByOwner(userId)
+                .filter { it.name == routineName && it.pendingShare == true }
+            if (remotas.isEmpty()) return
+            val primero = remotas.first()
+
+            val yaLocal = routineDao.getRoutinesByOwnerOnce(userId)
+                .firstOrNull { it.name == routineName && it.pendingShare }
+
+            val routineId = yaLocal?.id ?: run {
+                val exerciseApi = RemoteModule.exerciseApi()
+                val catalogo = exerciseApi.getExercises().associateBy { it.id }
+                val nuevoId = routineDao.insertRoutine(
+                    RoutineEntity(
+                        ownerId = userId,
+                        creatorId = primero.creatorId,
+                        name = primero.name,
+                        dayInfo = remotas.mapNotNull { it.dayInfo?.substringBefore(" - ") }
+                            .distinct().joinToString(", "),
+                        creationDate = primero.creationDate ?: System.currentTimeMillis(),
+                        scheduledTime = primero.scheduledTime ?: System.currentTimeMillis(),
+                        pendingShare = true
+                    )
+                ).toInt()
+                remotas.forEachIndexed { indice, remota ->
+                    val info = remota.dayInfo.orEmpty()
+                    val etiqueta = info.substringBefore(" - ").ifBlank { "Día ${indice + 1}" }
+                    val actividad = if (info.contains(" - ")) info.substringAfter(" - ") else ""
+                    val dayId = routineDao.insertDay(
+                        RoutineDayEntity(routineId = nuevoId, dayLabel = etiqueta, activityName = actividad, dayOrder = indice)
+                    ).toInt()
+                    val refs = routineApi.getRoutineExercises(remota.id)
+                    val crossRefs = refs.mapNotNull { ref ->
+                        val nombre = catalogo[ref.exerciseId]?.name ?: return@mapNotNull null
+                        val local = exerciseDao.getExerciseByName(nombre) ?: run {
+                            exerciseDao.insertExercise(
+                                ExerciseEntity(
+                                    name = nombre,
+                                    category = catalogo[ref.exerciseId]?.category ?: "Personalizado",
+                                    description = catalogo[ref.exerciseId]?.description.orEmpty(),
+                                    videoUrl = catalogo[ref.exerciseId]?.videoUrl.orEmpty(),
+                                    isSystemDefault = false
+                                )
+                            )
+                            exerciseDao.getExerciseByName(nombre)
+                        } ?: return@mapNotNull null
+                        RoutineExerciseEntity(dayId = dayId, exerciseId = local.id, order = ref.order)
+                    }
+                    if (crossRefs.isNotEmpty()) routineDao.insertRoutineExercises(crossRefs)
+                }
+                nuevoId
+            }
+
+            routineDao.getRoutineById(routineId)?.let { routineDao.updateRoutine(it.copy(pendingShare = false)) }
+            remotas.forEach { row -> routineApi.updateRoutine(row.id, row.copy(pendingShare = false)) }
+        } catch (_: Exception) {
+            // Sin conexión: se puede reintentar aceptar más tarde.
+        }
+    }
+
+    /** El usuario rechaza una rutina compartida: se borra en el backend y localmente si llegó a bajarse. */
+    suspend fun declineSharedRoutine(userId: Int, routineName: String) {
+        try {
+            val routineApi = RemoteModule.routineApi()
+            routineApi.getRoutinesByOwner(userId)
+                .filter { it.name == routineName && it.pendingShare == true }
+                .forEach { row -> routineApi.deleteRoutine(row.id) }
+        } catch (_: Exception) {
+            // Sin conexión: nada que borrar remotamente todavía.
+        }
+        routineDao.getRoutinesByOwnerOnce(userId)
+            .filter { it.name == routineName && it.pendingShare }
+            .forEach { routineDao.deleteRoutine(it) }
     }
 }

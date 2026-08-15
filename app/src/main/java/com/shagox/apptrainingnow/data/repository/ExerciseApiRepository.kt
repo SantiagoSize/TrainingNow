@@ -18,11 +18,38 @@ class ExerciseApiRepository(
         emit(api.getExercises().map { it.toEntity() })
     }.catch { emit(emptyList()) }
 
+    /**
+     * Categorías reales (GET /api/categories): incluye categorías recién creadas sin
+     * ejercicios todavía. Antes esto se calculaba agrupando los ejercicios existentes, por lo
+     * que una categoría vacía era imposible de representar.
+     */
     override fun getCategoryStats(): Flow<List<CategoryCount>> = flow {
-        val exercises = api.getExercises()
-        val byCategory = exercises.groupBy { it.category }
-        emit(byCategory.map { (category, list) -> CategoryCount(category, list.size) }.sortedByDescending { it.count })
+        val categories = api.getCategories()
+        emit(categories.map { CategoryCount(it.name, it.exerciseCount) }.sortedBy { it.category })
     }.catch { emit(emptyList()) }
+
+    /** Crear categoría vacía: POST /api/categories (requiere token de admin). */
+    override suspend fun createCategory(name: String) {
+        val response = api.createCategory(mapOf("name" to name))
+        if (!response.isSuccessful) throw Exception(categoryError(response.errorBody()?.string(), response.code()))
+    }
+
+    /** Renombrar categoría: PUT /api/categories/{oldName} (requiere token de admin). */
+    override suspend fun renameCategory(oldName: String, newName: String) {
+        val response = api.renameCategory(oldName, mapOf("name" to newName))
+        if (!response.isSuccessful) throw Exception(categoryError(response.errorBody()?.string(), response.code()))
+    }
+
+    /** Eliminar categoría (y sus ejercicios): DELETE /api/categories/{name} (requiere token de admin). */
+    override suspend fun deleteCategory(name: String) {
+        val response = api.deleteCategory(name)
+        if (!response.isSuccessful) throw Exception(categoryError(response.errorBody()?.string(), response.code()))
+    }
+
+    private fun categoryError(cuerpoError: String?, code: Int): String {
+        val mensaje = Regex("\"error\":\"([^\"]*)\"").find(cuerpoError.orEmpty())?.groupValues?.get(1)
+        return mensaje ?: adminError(code)
+    }
 
     override fun getExercisesByCategory(category: String): Flow<List<ExerciseEntity>> = flow {
         emit(api.getExercisesByCategory(category).map { it.toEntity() })
@@ -77,6 +104,7 @@ class ExerciseApiRepository(
         muscles = muscles,
         difficulty = difficulty,
         equipment = equipment,
+        alternatives = alternatives,
         instructions = instructions,
         tips = tips,
         commonMistakes = commonMistakes,
@@ -96,6 +124,7 @@ class ExerciseApiRepository(
         muscles = muscles,
         difficulty = difficulty,
         equipment = equipment,
+        alternatives = alternatives,
         instructions = instructions,
         tips = tips,
         commonMistakes = commonMistakes,

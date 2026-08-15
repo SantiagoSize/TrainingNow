@@ -121,5 +121,8 @@ enum class NotificationAction {
     OPEN_WORKOUT,
     OPEN_CLIENT_LIST,
     OPEN_URL,
+    /** Rutina compartida por un entrenador: actionData = nombre de la rutina.
+     *  La notificación muestra botones Aceptar/Rechazar en vez de solo abrir algo. */
+    ACCEPT_DECLINE_ROUTINE,
     NONE
 }

@@ -7,7 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -29,14 +30,18 @@ import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
 
 /**
  * Panel principal de administración.
- * Opciones: Biblioteca, Nueva Categoría, Entrenamiento Global, Enviar Notificación, Gestión de Usuarios.
+ * Opciones: Biblioteca, Entrenamiento Global, Rutinas Globales, Enviar Mensajes,
+ * Actividad, Gestión de Usuarios. Crear/editar categorías ahora se hace desde
+ * dentro de Biblioteca, no tiene entrada propia aquí.
+ * Ajustes ya no vive aquí: se accede desde su propia pestaña en la barra inferior.
  */
 @Composable
 fun AdminPanelScreen(
     onBiblioteca: () -> Unit,
-    onNuevaCategoria: () -> Unit,
     onEntrenamientoGlobal: () -> Unit,
-    onEnviarNotificacion: () -> Unit,
+    onRutinasGlobales: () -> Unit,
+    onEnviarMensajes: () -> Unit,
+    onVerActividad: () -> Unit,
     onGestionUsuarios: () -> Unit
 ) {
     Column(
@@ -64,32 +69,40 @@ fun AdminPanelScreen(
                 AdminPanelCard(
                     icon = Icons.Filled.FitnessCenter,
                     title = "Biblioteca",
-                    subtitle = "Crear ejercicios",
+                    subtitle = "Categorías y ejercicios",
                     onClick = onBiblioteca
-                )
-            }
-            item {
-                AdminPanelCard(
-                    icon = Icons.AutoMirrored.Filled.Label,
-                    title = "Nueva Categoría",
-                    subtitle = "Crear categoría de ejercicios",
-                    onClick = onNuevaCategoria
                 )
             }
             item {
                 AdminPanelCard(
                     icon = Icons.Filled.FitnessCenter,
                     title = "Entrenamiento Global",
-                    subtitle = "Rutina recomendada para todos",
+                    subtitle = "Publicar una rutina recomendada para todos",
                     onClick = onEntrenamientoGlobal
                 )
             }
             item {
                 AdminPanelCard(
-                    icon = Icons.Filled.Notifications,
-                    title = "Enviar Notificación",
-                    subtitle = "A usuarios, entrenadores o todos",
-                    onClick = onEnviarNotificacion
+                    icon = Icons.AutoMirrored.Filled.List,
+                    title = "Rutinas Globales",
+                    subtitle = "Ver y editar las rutinas ya publicadas",
+                    onClick = onRutinasGlobales
+                )
+            }
+            item {
+                AdminPanelCard(
+                    icon = Icons.AutoMirrored.Filled.Send,
+                    title = "Enviar Mensajes",
+                    subtitle = "A uno o varios usuarios por su correo",
+                    onClick = onEnviarMensajes
+                )
+            }
+            item {
+                AdminPanelCard(
+                    icon = Icons.Filled.Schedule,
+                    title = "Actividad",
+                    subtitle = "Registro de lo que hace el personal",
+                    onClick = onVerActividad
                 )
             }
         }

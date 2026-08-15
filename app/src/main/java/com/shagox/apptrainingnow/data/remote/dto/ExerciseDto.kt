@@ -14,6 +14,7 @@ data class ExerciseDto(
     val muscles: String? = null,
     val difficulty: String? = "PRINCIPIANTE",
     val equipment: String? = null,
+    val alternatives: String? = null,
     val instructions: String? = null,
     val tips: String? = null,
     @SerializedName("commonMistakes") val commonMistakes: String? = null,

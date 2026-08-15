@@ -66,11 +66,13 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shagox.apptrainingnow.R
 import com.shagox.apptrainingnow.data.repository.PasswordResetRepository
 import kotlinx.coroutines.launch
+import com.shagox.apptrainingnow.ui.components.IconoOjoContrasena
 import com.shagox.apptrainingnow.ui.components.ScreenHeaderTN
 import com.shagox.apptrainingnow.ui.theme.GrisBorde
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
@@ -330,6 +332,7 @@ private fun formatGender(gender: String?): String {
         "F" -> "Femenino"
         "MALE" -> "Masculino"
         "FEMALE" -> "Femenino"
+        "N" -> "No especificar"
         else -> gender
     }
 }
@@ -706,16 +709,18 @@ private fun detectarBanderaTelefono(telefono: String): String {
 }
 
 /**
- * Selector de género con dos cuadrados (Mujer / Hombre). Al elegir uno se resalta en
- * verde y el otro se ve atenuado en gris. [seleccionado] usa "F" o "M" (mismo formato
- * que ya entendía [formatGender]); null = todavía no eligió ninguno (ambos normales).
+ * Selector de género con tres cuadrados (Mujer / Hombre / No especificar). Al elegir uno se
+ * resalta en verde y los demás se ven atenuados en gris. [seleccionado] usa "F", "M" o "N"
+ * (mismo formato que ya entiende [formatGender]); null = todavía no eligió ninguno (todos
+ * normales). "No especificar" existe para respetar a quienes no se identifican como hombre
+ * o mujer: mejor tener la opción disponible desde el inicio que no tenerla.
  */
 @Composable
 private fun GenderSelector(
     seleccionado: String?,
     onSeleccionar: (String) -> Unit
 ) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         GenderOption(
             emoji = "👩",
             label = "Mujer",
@@ -731,6 +736,14 @@ private fun GenderSelector(
             haySeleccion = seleccionado != null,
             modifier = Modifier.weight(1f),
             onClick = { onSeleccionar("M") }
+        )
+        GenderOption(
+            emoji = "✳️",
+            label = "No especificar",
+            isSelected = seleccionado == "N",
+            haySeleccion = seleccionado != null,
+            modifier = Modifier.weight(1f),
+            onClick = { onSeleccionar("N") }
         )
     }
 }
@@ -841,7 +854,7 @@ private fun EditProfileDialog(
     var birthDateStr by remember(user) {
         mutableStateOf(user.birthDate?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(it)) } ?: "")
     }
-    var gender by remember(user) { mutableStateOf(user.gender?.uppercase()?.takeIf { it == "M" || it == "F" }) }
+    var gender by remember(user) { mutableStateOf(user.gender?.uppercase()?.takeIf { it == "M" || it == "F" || it == "N" }) }
     val context = LocalContext.current
     // La altura/peso se guardan siempre en cm/kg; acá solo se muestran/editan convertidos a
     // la unidad elegida por el usuario (ver Ajustes), y se reconvierten a cm/kg al guardar.
@@ -892,7 +905,34 @@ private fun EditProfileDialog(
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(value = lastName, onValueChange = { lastName = it }, label = { Text("Apellido", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
             Spacer(modifier = Modifier.height(12.dp))
-            OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email", color = GrisTexto) }, modifier = Modifier.fillMaxWidth(), colors = textFieldColors, shape = RoundedCornerShape(12.dp))
+            OutlinedTextField(
+                value = email,
+                onValueChange = {},
+                readOnly = true,
+                enabled = false,
+                label = { Text("Email", color = GrisTexto) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    disabledTextColor = GrisTexto,
+                    disabledBorderColor = GrisTexto.copy(alpha = 0.4f),
+                    disabledLabelColor = GrisTexto,
+                    focusedTextColor = TextoPrincipal,
+                    unfocusedTextColor = TextoPrincipal,
+                    focusedBorderColor = VerdeTN,
+                    unfocusedBorderColor = GrisTexto,
+                    cursorColor = VerdeTN,
+                    focusedLabelColor = VerdeTN,
+                    unfocusedLabelColor = GrisTexto,
+                    focusedContainerColor = GrisFondo,
+                    unfocusedContainerColor = GrisFondo
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
+            Text(
+                "El correo no se puede cambiar. Contacta a un administrador si necesitas actualizarlo.",
+                color = GrisTexto,
+                fontSize = 11.sp
+            )
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
                 value = phone,
@@ -1025,13 +1065,17 @@ private fun LoginTabContent(
         }
         Spacer(modifier = Modifier.height(16.dp))
 
+        var loginPassVisible by remember { mutableStateOf(false) }
         OutlinedTextField(
             value = loginState.pass,
             onValueChange = onPassChange,
             label = { Text("Contraseña", color = GrisTexto) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
+            visualTransformation = if (loginPassVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconoOjoContrasena(visible = loginPassVisible, onToggle = { loginPassVisible = !loginPassVisible }, tint = GrisTexto)
+            },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = TextoPrincipal,
                 unfocusedTextColor = TextoPrincipal,
@@ -1169,26 +1213,34 @@ private fun RegisterTabContent(
         )
         Spacer(modifier = Modifier.height(12.dp))
 
+        var registerPassVisible by remember { mutableStateOf(false) }
         OutlinedTextField(
             value = registerState.pass,
             onValueChange = onPassChange,
             label = { Text("Contraseña", color = GrisTexto) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
+            visualTransformation = if (registerPassVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconoOjoContrasena(visible = registerPassVisible, onToggle = { registerPassVisible = !registerPassVisible }, tint = GrisTexto)
+            },
             colors = textFieldColors,
             shape = RoundedCornerShape(12.dp)
         )
         if (registerState.passError != null) Text(registerState.passError, color = androidx.compose.ui.graphics.Color(0xFFE53935), fontSize = 12.sp)
         Spacer(modifier = Modifier.height(12.dp))
 
+        var registerConfirmVisible by remember { mutableStateOf(false) }
         OutlinedTextField(
             value = registerState.confirm,
             onValueChange = onConfirmChange,
             label = { Text("Confirmar contraseña", color = GrisTexto) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
+            visualTransformation = if (registerConfirmVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconoOjoContrasena(visible = registerConfirmVisible, onToggle = { registerConfirmVisible = !registerConfirmVisible }, tint = GrisTexto)
+            },
             colors = textFieldColors,
             shape = RoundedCornerShape(12.dp)
         )
@@ -1276,7 +1328,7 @@ private fun RegisterTabContent(
 }
 
 /** Términos y condiciones de uso de TrainingNow (contenido de referencia para el proyecto académico). */
-private const val TERMINOS_Y_CONDICIONES_TN = """
+internal const val TERMINOS_Y_CONDICIONES_TN = """
 1. ACEPTACIÓN DE LOS TÉRMINOS
 Al registrarte en TrainingNow aceptas estos Términos y Condiciones y nuestra Política de Privacidad. Si no estás de acuerdo, no debes utilizar la aplicación.
 
@@ -1836,16 +1888,24 @@ private fun ForgotPasswordDialog(
                         }
                     }
                     else -> {
+                        var newPassVisible by remember { mutableStateOf(false) }
+                        var confirmPassVisible by remember { mutableStateOf(false) }
                         OutlinedTextField(
                             value = newPass, onValueChange = { newPass = it },
                             label = { Text("Nueva contraseña") }, singleLine = true,
-                            visualTransformation = PasswordVisualTransformation(),
+                            visualTransformation = if (newPassVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconoOjoContrasena(visible = newPassVisible, onToggle = { newPassVisible = !newPassVisible }, tint = GrisTexto)
+                            },
                             colors = fieldColors, modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = confirmPass, onValueChange = { confirmPass = it },
                             label = { Text("Confirmar contraseña") }, singleLine = true,
-                            visualTransformation = PasswordVisualTransformation(),
+                            visualTransformation = if (confirmPassVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconoOjoContrasena(visible = confirmPassVisible, onToggle = { confirmPassVisible = !confirmPassVisible }, tint = GrisTexto)
+                            },
                             colors = fieldColors, modifier = Modifier.fillMaxWidth()
                         )
                         if (confirmPass.isNotEmpty() && newPass != confirmPass) {

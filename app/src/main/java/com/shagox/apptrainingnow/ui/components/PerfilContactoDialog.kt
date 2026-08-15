@@ -66,7 +66,7 @@ fun PerfilContactoDialog(
                         .background(GrisTexto.copy(alpha = 0.3f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    val foto = usuario.profilePhotoUrl
+                    val foto = usuario.promoImageUrl?.takeIf { it.isNotBlank() } ?: usuario.profilePhotoUrl
                     if (foto != null && foto.isNotBlank()) {
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current).data(foto).build(),
@@ -96,6 +96,9 @@ fun PerfilContactoDialog(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (usuario.role == "TRAINER" && !usuario.specializations.isNullOrBlank()) {
                     Text(usuario.specializations, color = VerdeTN, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+                if (usuario.phone.isNotBlank()) {
+                    Text(usuario.phone, color = GrisTexto, fontSize = 13.sp)
                 }
                 Text(usuario.email, color = GrisTexto, fontSize = 13.sp)
                 Spacer(modifier = Modifier.height(2.dp))

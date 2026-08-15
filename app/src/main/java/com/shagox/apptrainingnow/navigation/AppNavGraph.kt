@@ -55,6 +55,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.shagox.apptrainingnow.data.local.notification.NotificationAction
@@ -81,9 +82,10 @@ import com.shagox.apptrainingnow.ui.screen.UserRoutinesScreen
 import com.shagox.apptrainingnow.ui.screen.admin.AdminChatsScreen
 import com.shagox.apptrainingnow.ui.screen.admin.AdminCreateCategoryScreen
 import com.shagox.apptrainingnow.ui.screen.admin.AdminCreateUserScreen
+import com.shagox.apptrainingnow.ui.screen.admin.AdminGlobalRoutinesScreen
 import com.shagox.apptrainingnow.ui.screen.admin.AdminPanelScreen
 import com.shagox.apptrainingnow.ui.screen.admin.AdminSanctionScreen
-import com.shagox.apptrainingnow.ui.screen.admin.AdminSendNotificationScreen
+import com.shagox.apptrainingnow.ui.screen.admin.AdminSendMessagesScreen
 import com.shagox.apptrainingnow.ui.screen.admin.AdminUserListScreen
 import com.shagox.apptrainingnow.ui.screen.admin.AdminUserManagementScreen
 import com.shagox.apptrainingnow.ui.screen.coach.ClientDetailScreen
@@ -124,6 +126,8 @@ fun AppNavGraph(
     val loggedUser = loginState.loggedUser
     val userRole = loggedUser?.role ?: "USER"
     val currentUserId = loggedUser?.id ?: 0
+    // Nombre a mostrar del actor logueado, usado para el registro de actividad (auditoría).
+    val actorDisplayName = "${loggedUser?.name.orEmpty()} ${loggedUser?.lastName.orEmpty()}".trim()
 
     val context = LocalContext.current
     val safeStartDestination = startDestination.ifBlank { Route.Welcome.path }
@@ -158,7 +162,9 @@ fun AppNavGraph(
     val hideBottomBarRoutes = listOf(
         Route.Welcome.path,
         Route.AdminCreateCategory.path,
-        Route.AdminSendNotification.path,
+        Route.AdminMessages.path,
+        Route.AdminGlobalRoutines.path,
+        Route.AdminActivityLog.path,
         Route.AdminUserList.path,
         Route.AdminCreateUser.path,
         Route.AdminSanctions.path,
@@ -167,7 +173,8 @@ fun AppNavGraph(
     val shouldHideBottomBar = currentRoute in hideBottomBarRoutes ||
             currentRoute?.startsWith("chat_detail") == true ||
             currentRoute?.startsWith("client_detail") == true ||
-            currentRoute?.startsWith("create_goal") == true
+            currentRoute?.startsWith("create_goal") == true ||
+            currentRoute?.startsWith("admin_library_category") == true
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -178,8 +185,7 @@ fun AppNavGraph(
             } else {
                 BottomNavigationBarTN(
                     navController = navController,
-                    userRole = userRole,
-                    startDestinationRoute = safeStartDestination
+                    userRole = userRole
                 )
             }
         }
@@ -313,6 +319,7 @@ fun AppNavGraph(
                 UserRoutinesScreen(
                     routineRepository = routineRepository,
                     userId = effectiveUserId,
+                    userRepository = userRepository,
                     isLoggedIn = currentUserId > 0,
                     onCrearCuenta = {
                         // Mismo comportamiento que la barra inferior: se puede volver a Rutinas
@@ -407,6 +414,14 @@ fun AppNavGraph(
                 }
             }
 
+            composable(Route.CoachPublicProfile.path) {
+                com.shagox.apptrainingnow.ui.screen.coach.CoachPublicProfileScreen(
+                    userRepository = userRepository,
+                    currentUserId = currentUserId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
             composable(Route.CoachRoutines.path) {
                 if (trainerRepository != null && progressRepository != null) {
                     val coachViewModel: CoachViewModel = viewModel(
@@ -426,7 +441,10 @@ fun AppNavGraph(
                         },
                         onRoutineClick = { routineId ->
                             navController.navigate(Route.RoutineActive.createRoute(routineId))
-                        }
+                        },
+                        routineRepository = routineRepository,
+                        userRepository = userRepository,
+                        trainerId = currentUserId
                     )
                 } else {
                     LoadingScreen()
@@ -465,10 +483,27 @@ fun AppNavGraph(
             composable(Route.AdminPanel.path) {
                 AdminPanelScreen(
                     onBiblioteca = { navController.navigate(Route.AdminExercises.path) },
-                    onNuevaCategoria = { navController.navigate(Route.AdminCreateCategory.path) },
-                    onEntrenamientoGlobal = { navController.navigate(Route.CreateRoutine.createRoute()) },
-                    onEnviarNotificacion = { navController.navigate(Route.AdminSendNotification.path) },
+                    onEntrenamientoGlobal = { navController.navigate(Route.CreateRoutine.createRoute(isGlobal = true)) },
+                    onRutinasGlobales = { navController.navigate(Route.AdminGlobalRoutines.path) },
+                    onEnviarMensajes = { navController.navigate(Route.AdminMessages.path) },
+                    onVerActividad = { navController.navigate(Route.AdminActivityLog.path) },
                     onGestionUsuarios = { navController.navigate(Route.AdminUserManagement.path) }
+                )
+            }
+
+            composable(Route.AdminActivityLog.path) {
+                com.shagox.apptrainingnow.ui.screen.admin.AdminActivityLogScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Route.AdminGlobalRoutines.path) {
+                AdminGlobalRoutinesScreen(
+                    routineRepository = routineRepository,
+                    onBack = { navController.popBackStack() },
+                    actorId = currentUserId,
+                    actorName = actorDisplayName,
+                    actorRole = userRole
                 )
             }
 
@@ -477,7 +512,8 @@ fun AppNavGraph(
                     onBack = { navController.popBackStack() },
                     onVerUsuarios = { navController.navigate(Route.AdminUserList.path) },
                     onCrearUsuario = { navController.navigate(Route.AdminCreateUser.path) },
-                    onSuspenderBanearEliminar = { navController.navigate(Route.AdminSanctions.path) }
+                    onSuspenderBanearEliminar = { navController.navigate(Route.AdminSanctions.path) },
+                    userRepository = userRepository
                 )
             }
 
@@ -486,31 +522,33 @@ fun AppNavGraph(
                     AdminCreateCategoryScreen(
                         exerciseRepository = exerciseRepository,
                         onBack = { navController.popBackStack() },
-                        onSuccess = { navController.popBackStack() }
+                        onSuccess = { navController.popBackStack() },
+                        actorId = currentUserId,
+                        actorName = actorDisplayName,
+                        actorRole = userRole
                     )
                 } else {
                     Text("Biblioteca no disponible", color = Color.White, modifier = Modifier.padding(16.dp))
                 }
             }
 
-            composable(Route.AdminSendNotification.path) {
-                if (notificationRepository != null) {
-                    AdminSendNotificationScreen(
-                        userRepository = userRepository,
-                        notificationRepository = notificationRepository,
-                        adminId = currentUserId,
-                        onBack = { navController.popBackStack() },
-                        onSuccess = { navController.popBackStack() }
-                    )
-                } else {
-                    Text("Notificaciones no disponibles", color = Color.White, modifier = Modifier.padding(16.dp))
-                }
+            composable(Route.AdminMessages.path) {
+                AdminSendMessagesScreen(
+                    userRepository = userRepository,
+                    chatRepository = chatRepository,
+                    adminId = currentUserId,
+                    onBack = { navController.popBackStack() },
+                    onSuccess = { navController.popBackStack() }
+                )
             }
 
             composable(Route.AdminUserList.path) {
                 AdminUserListScreen(
                     userRepository = userRepository,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    actorId = currentUserId,
+                    actorName = actorDisplayName,
+                    actorRole = userRole
                 )
             }
 
@@ -549,9 +587,33 @@ fun AppNavGraph(
 
             composable(Route.AdminExercises.path) {
                 if (exerciseRepository != null) {
-                    com.shagox.apptrainingnow.ui.screen.admin.AdminExerciseManagerScreen(
+                    com.shagox.apptrainingnow.ui.screen.admin.AdminLibraryScreen(
                         exerciseRepository = exerciseRepository,
-                        onBack = { navController.popBackStack() }
+                        onBack = { navController.popBackStack() },
+                        onCategoryClick = { categoryName ->
+                            navController.navigate(Route.AdminLibraryCategory.createRoute(categoryName))
+                        },
+                        onCreateCategory = { navController.navigate(Route.AdminCreateCategory.path) },
+                        actorId = currentUserId,
+                        actorName = actorDisplayName,
+                        actorRole = userRole
+                    )
+                }
+            }
+
+            composable(
+                route = Route.AdminLibraryCategory.path,
+                arguments = listOf(navArgument("categoryName") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val categoryName = backStackEntry.arguments?.getString("categoryName") ?: ""
+                if (exerciseRepository != null) {
+                    com.shagox.apptrainingnow.ui.screen.admin.AdminLibraryCategoryScreen(
+                        categoryName = categoryName,
+                        exerciseRepository = exerciseRepository,
+                        onBack = { navController.popBackStack() },
+                        actorId = currentUserId,
+                        actorName = actorDisplayName,
+                        actorRole = userRole
                     )
                 }
             }
@@ -569,7 +631,10 @@ fun AppNavGraph(
                 AdminSanctionScreen(
                     userRepository = userRepository,
                     onBack = { navController.popBackStack() },
-                    onSuccess = { navController.popBackStack() }
+                    onSuccess = { navController.popBackStack() },
+                    actorId = currentUserId,
+                    actorName = actorDisplayName,
+                    actorRole = userRole
                 )
             }
 
@@ -629,6 +694,7 @@ fun AppNavGraph(
                     NotificationsScreen(
                         notificationRepository = notificationRepository,
                         userId = currentUserId,
+                        routineRepository = routineRepository,
                         onBack = if (navController.previousBackStackEntry != null) {
                             { navController.popBackStack() }
                         } else null
@@ -657,11 +723,17 @@ fun AppNavGraph(
                         type = NavType.StringType
                         nullable = true
                         defaultValue = null
+                    },
+                    navArgument("global") {
+                        type = NavType.BoolType
+                        defaultValue = false
                     }
                 )
             ) { backStackEntry ->
                 val clientIdStr = backStackEntry.arguments?.getString("clientId")
                 val clientId = clientIdStr?.toIntOrNull()
+                val esGlobal = backStackEntry.arguments?.getBoolean("global") ?: false
+                val esEntrenadorSinCliente = (userRole == "TRAINER" || userRole == "COACH") && clientId == null && !esGlobal
                 var clientDisplayName by remember { mutableStateOf<String?>(null) }
                 LaunchedEffect(clientId) {
                     if (clientId != null) {
@@ -672,7 +744,7 @@ fun AppNavGraph(
                 }
                 CreateRoutineScreen(
                     onBack = { navController.popBackStack() },
-                    onSaveRoutine = { name, days ->
+                    onSaveRoutine = { name, days, targetEmailOrId, esPlantilla ->
                         CoroutineScope(Dispatchers.IO).launch {
                             if (clientId != null) {
                                 val trainerId = currentUserId
@@ -690,13 +762,53 @@ fun AppNavGraph(
                                         actionData = firstRoutineId.toInt().toString()
                                     )
                                 )
+                            } else if (esGlobal) {
+                                routineRepository.saveGlobalRoutine(currentUserId, name, days)
+                                com.shagox.apptrainingnow.data.repository.AuditLogRepository().log(
+                                    actorId = currentUserId,
+                                    actorName = actorDisplayName,
+                                    actorRole = userRole,
+                                    action = "ROUTINE_GLOBAL_CREATED",
+                                    targetType = "ROUTINE",
+                                    targetName = name
+                                )
+                            } else if (esEntrenadorSinCliente && esPlantilla) {
+                                routineRepository.saveAsTemplate(currentUserId, name, days)
+                            } else if (esEntrenadorSinCliente && targetEmailOrId != null) {
+                                val trainerId = currentUserId
+                                val targetUserId = targetEmailOrId.toIntOrNull()
+                                    ?: userRepository.getAllUsers().first()
+                                        .firstOrNull { it.email.equals(targetEmailOrId, ignoreCase = true) }?.id
+                                if (targetUserId == null || targetUserId <= 0) {
+                                    withContext(Dispatchers.Main) {
+                                        android.widget.Toast.makeText(
+                                            context, "No se encontró un usuario con ese correo o ID", android.widget.Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                } else {
+                                    routineRepository.shareRoutineWithUser(trainerId, targetUserId, name, days)
+                                    val trainer = userRepository.getUserById(trainerId)
+                                    val trainerName = trainer?.name ?: "Tu entrenador"
+                                    notificationRepository?.saveNotification(
+                                        NotificationEntity(
+                                            userId = targetUserId,
+                                            title = "$trainerName te compartió una rutina",
+                                            message = "\"$name\": ¿quieres aceptarla y empezar a entrenarla?",
+                                            type = NotificationType.ROUTINE_ASSIGNED.name,
+                                            senderId = trainerId,
+                                            actionType = NotificationAction.ACCEPT_DECLINE_ROUTINE.name,
+                                            actionData = name
+                                        )
+                                    )
+                                }
                             } else {
                                 routineRepository.savePersonalRoutine(effectiveUserId, name, days)
                             }
                             withContext(Dispatchers.Main) { navController.popBackStack() }
                         }
                     },
-                    clientDisplayName = clientDisplayName
+                    clientDisplayName = clientDisplayName,
+                    esEntrenadorSinCliente = esEntrenadorSinCliente
                 )
             }
 

@@ -25,6 +25,8 @@ data class UserDto(
     val specializations: String? = null,
     /** Descripción/bio libre que el entrenador puede escribir para su perfil público. */
     val bio: String? = null,
+    /** Imagen promocional (distinta de profilePhotoUrl) que se ve en la tarjeta de "Mis chats". */
+    @SerializedName("promoImageUrl") val promoImageUrl: String? = null,
     @SerializedName("suspendedUntil") val suspendedUntil: Long? = null,
     @SerializedName("suspendReason") val suspendReason: String? = null,
     @SerializedName("isBanned") val isBanned: Boolean = false,
@@ -52,6 +54,7 @@ data class UserDto(
         gender = gender,
         specializations = specializations,
         bio = bio,
+        promoImageUrl = promoImageUrl,
         suspendedUntil = suspendedUntil,
         suspendReason = suspendReason,
         isBanned = isBanned,

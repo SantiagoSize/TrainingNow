@@ -4,6 +4,8 @@ import com.shagox.apptrainingnow.data.local.chat.ChatDao
 import com.shagox.apptrainingnow.data.local.chat.ContactoPreferenciaDao
 import com.shagox.apptrainingnow.data.local.chat.ContactoPreferenciaEntity
 import com.shagox.apptrainingnow.data.local.chat.MessageEntity
+import com.shagox.apptrainingnow.data.local.user.UserDao
+import com.shagox.apptrainingnow.data.local.user.UserEntity
 import com.shagox.apptrainingnow.data.remote.RemoteModule
 import com.shagox.apptrainingnow.data.remote.dto.ConversationSummaryDto
 import com.shagox.apptrainingnow.data.remote.dto.MessageDto
@@ -21,8 +23,21 @@ import okhttp3.RequestBody.Companion.toRequestBody
  */
 class ChatRepository(
     private val chatDao: ChatDao,
-    private val contactoPreferenciaDao: ContactoPreferenciaDao
+    private val contactoPreferenciaDao: ContactoPreferenciaDao,
+    private val userDao: UserDao
 ) {
+
+    /**
+     * Garantiza que [usuario] exista como fila local en Room antes de intercambiar mensajes
+     * con él. MessageEntity tiene FK estrictas a la tabla "users" (senderId/receiverId), pero
+     * como el login real viene del backend (UserApiRepository), esos usuarios nunca quedaban
+     * cacheados en Room: el primer mensaje entre dos cuentas nuevas reventaba con
+     * "FOREIGN KEY constraint failed" y crasheaba la app. Se llama con el usuario actual y con
+     * el contacto apenas se abre un chat, antes de poder escribir.
+     */
+    suspend fun asegurarUsuarioLocal(usuario: UserEntity) {
+        userDao.insertUser(usuario)
+    }
 
     // ==================== BLOQUEAR / SILENCIAR / ELIMINAR (preferencias locales) ====================
 
@@ -71,7 +86,13 @@ class ChatRepository(
     }
 
     suspend fun sendMessage(message: MessageEntity) {
-        chatDao.insertMessage(message)
+        try {
+            chatDao.insertMessage(message)
+        } catch (e: Exception) {
+            // Defensa adicional: si por algún motivo el usuario aún no está sincronizado
+            // localmente (ver asegurarUsuarioLocal), esto ya no debe crashear la app.
+            android.util.Log.e("ChatRepository", "No se pudo guardar el mensaje localmente", e)
+        }
         // Publicar en el backend; si no hay conexión, el mensaje queda local.
         try {
             RemoteModule.chatApi().sendMessage(

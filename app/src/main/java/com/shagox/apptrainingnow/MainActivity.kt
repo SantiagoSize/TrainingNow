@@ -37,10 +37,23 @@ class MainActivity : ComponentActivity() {
                 .apply()
         }
 
-        val startDestination = sharedPreferences.getString("active_routine_route", null)
-            ?: sharedPreferences.getBoolean("has_seen_welcome", false).let { seen ->
-                if (seen) Route.UserRoutines.path else Route.Welcome.path
-            }
+        // La pantalla de inicio depende del rol de la sesión guardada: un admin o entrenador
+        // no tiene rutinas propias, así que "active_routine_route" (guardado cada vez que
+        // CUALQUIER usuario entra a una rutina, para restaurarla si Android mata el proceso)
+        // NO debe usarse si la sesión actual es de personal — si no, un admin podía quedar
+        // atrapado para siempre en la última rutina que haya quedado guardada en el teléfono.
+        // Se lee la sesión guardada de forma síncrona (SessionManager, SharedPreferences)
+        // porque en este punto el AuthViewModel todavía no existe.
+        val sesionGuardada = com.shagox.apptrainingnow.data.local.user.SessionManager.cargarUsuario(this)
+        val hasSeenWelcome = sharedPreferences.getBoolean("has_seen_welcome", false)
+        val startDestination = when {
+            // Notificación de recordatorio tocada en este instante: siempre tiene prioridad.
+            routineIdDesdeNotificacion > 0 -> Route.RoutineActive.createRoute(routineIdDesdeNotificacion)
+            !hasSeenWelcome -> Route.Welcome.path
+            sesionGuardada?.role == "ADMIN" -> Route.AdminChats.path
+            sesionGuardada?.role == "TRAINER" || sesionGuardada?.role == "COACH" -> Route.CoachClients.path
+            else -> sharedPreferences.getString("active_routine_route", null) ?: Route.UserRoutines.path
+        }
         setContent {
             // Tema elegido por el usuario (Ajustes); se aplica a toda la app
             var temaClaro by remember {

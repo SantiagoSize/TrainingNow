@@ -21,6 +21,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -195,11 +197,16 @@ fun LibraryCategoryScreen(
 /**
  * Tarjeta de ejercicio: miniatura (imagen o ícono), nombre,
  * nivel + equipamiento, músculos y flecha de acceso.
+ *
+ * internal: la reutiliza la biblioteca del admin. Si se pasan [onEdit] y/o [onDelete]
+ * (solo admin), se muestran el lápiz y la X en lugar de la flecha.
  */
 @Composable
-private fun ExerciseListItem(
+internal fun ExerciseListItem(
     exercise: ExerciseEntity,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onEdit: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -280,11 +287,36 @@ private fun ExerciseListItem(
             }
         }
 
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-            contentDescription = null,
-            tint = VerdeTN,
-            modifier = Modifier.size(20.dp)
-        )
+        if (onEdit != null || onDelete != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                if (onEdit != null) {
+                    Icon(
+                        imageVector = Icons.Filled.Edit,
+                        contentDescription = "Editar",
+                        tint = VerdeTN,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clickable(onClick = onEdit)
+                    )
+                }
+                if (onDelete != null) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Eliminar",
+                        tint = Color(0xFFE53935),
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clickable(onClick = onDelete)
+                    )
+                }
+            }
+        } else {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = VerdeTN,
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }

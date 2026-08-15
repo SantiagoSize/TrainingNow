@@ -219,6 +219,10 @@ class AuthViewModel(
             onResult(false, "No hay una sesión activa")
             return
         }
+        if (user.role == "ADMIN" || user.role == "TRAINER") {
+            onResult(false, "Las cuentas de personal no se pueden eliminar desde la app")
+            return
+        }
         viewModelScope.launch {
             val verificacion = repository.login(user.email, password.trim())
             if (verificacion.isFailure) {

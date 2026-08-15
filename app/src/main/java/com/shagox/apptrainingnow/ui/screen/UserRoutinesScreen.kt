@@ -17,11 +17,15 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
@@ -31,10 +35,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -53,6 +60,7 @@ import com.shagox.apptrainingnow.ui.theme.NegroFondo
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
 import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
 import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
+import kotlinx.coroutines.launch
 
 
 /**
@@ -70,11 +78,23 @@ fun UserRoutinesScreen(
     onAvisoMostrado: () -> Unit = {},
     onCrearCuenta: () -> Unit = {},
     onCreateRoutine: () -> Unit,
-    onRoutineClick: (routineId: Int) -> Unit
+    onRoutineClick: (routineId: Int) -> Unit,
+    userRepository: com.shagox.apptrainingnow.data.repository.IUserRepository? = null
 ) {
     val globalRoutines by routineRepository.getGlobalRoutines().collectAsState(initial = emptyList())
     val myRoutines by routineRepository.getUserOwnRoutines(userId).collectAsState(initial = emptyList())
 
+    // Nombre de cada entrenador que compartió (y le aceptaron) una rutina, para agruparlas
+    // bajo "Hechas por el entrenador X" en vez de mezclarlas con lo que el usuario creó.
+    var trainerNames by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
+    androidx.compose.runtime.LaunchedEffect(myRoutines) {
+        val trainerIds = myRoutines.filter { it.creatorId != userId }.map { it.creatorId }.distinct()
+        if (trainerIds.isNotEmpty() && userRepository != null) {
+            trainerNames = trainerIds.associateWith { id ->
+                userRepository.getUserById(id)?.let { "${it.name} ${it.lastName}".trim() } ?: "tu entrenador"
+            }
+        }
+    }
 
     UserRoutinesScreenContent(
         globalRoutines = globalRoutines,
@@ -84,7 +104,9 @@ fun UserRoutinesScreen(
         onAvisoMostrado = onAvisoMostrado,
         onCrearCuenta = onCrearCuenta,
         onCreateRoutine = onCreateRoutine,
-        onRoutineClick = onRoutineClick
+        onRoutineClick = onRoutineClick,
+        currentUserId = userId,
+        trainerNames = trainerNames
     )
 }
 
@@ -98,7 +120,9 @@ private fun UserRoutinesScreenContent(
     onAvisoMostrado: () -> Unit = {},
     onCrearCuenta: () -> Unit = {},
     onCreateRoutine: () -> Unit,
-    onRoutineClick: (routineId: Int) -> Unit
+    onRoutineClick: (routineId: Int) -> Unit,
+    currentUserId: Int = 0,
+    trainerNames: Map<Int, String> = emptyMap()
 ) {
     var mostrarAvisoCuenta by remember { mutableStateOf(false) }
 
@@ -180,23 +204,55 @@ private fun UserRoutinesScreenContent(
             modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
         )
 
+        if (globalRoutines.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(GrisFondo)
+                    .padding(18.dp)
+            ) {
+                Text("Aún no hay rutinas recomendadas publicadas", color = GrisTexto, fontSize = 13.sp)
+            }
+        } else {
+            RoutinesCarousel(
+                routines = globalRoutines,
+                onRoutineClick = onRoutineClick
+            )
+        }
+
+        val propias = myRoutines.filter { it.creatorId == currentUserId }
+        val porEntrenador = myRoutines.filter { it.creatorId != currentUserId }.groupBy { it.creatorId }
+
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            items(globalRoutines) { routine ->
-                RoutineCard(
-                    title = routine.name,
-                    subtitle = routine.dayInfo,
-                    icon = Icons.Filled.FitnessCenter,
-                    onClick = { onRoutineClick(routine.id) }
-                )
+            porEntrenador.forEach { (trainerId, rutinas) ->
+                item(key = "trainer_header_$trainerId") {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text(
+                        text = "HECHAS POR EL ENTRENADOR ${(trainerNames[trainerId] ?: "tu entrenador").uppercase()}",
+                        color = VerdeTN,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                }
+                items(rutinas, key = { "trainer_${trainerId}_${it.id}" }) { routine ->
+                    RoutineCard(
+                        title = routine.name,
+                        subtitle = routine.dayInfo,
+                        icon = Icons.Filled.FitnessCenter,
+                        onClick = { onRoutineClick(routine.id) }
+                    )
+                }
             }
 
             item {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(20.dp))
                 Text(
-                    text = "MIS RUTINAS",
+                    text = "CREADOS POR TI",
                     color = VerdeTN,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -204,7 +260,7 @@ private fun UserRoutinesScreenContent(
                 )
             }
 
-            items(myRoutines) { routine ->
+            items(propias, key = { "own_${it.id}" }) { routine ->
                 RoutineCard(
                     title = routine.name,
                     subtitle = routine.dayInfo,
@@ -213,7 +269,7 @@ private fun UserRoutinesScreenContent(
                 )
             }
 
-            if (myRoutines.isEmpty()) {
+            if (propias.isEmpty()) {
                 item {
                     Box(
                         modifier = Modifier
@@ -273,16 +329,113 @@ private fun UserRoutinesScreenContent(
     }
 }
 
+/** Milisegundos dentro de los cuales una rutina global se marca como "Nuevo entrenamiento". */
+private const val VENTANA_NUEVO_ENTRENAMIENTO_MS = 7L * 24 * 60 * 60 * 1000
+
+/**
+ * Carrusel horizontal de rutinas recomendadas: se desliza con el dedo y también
+ * con flechas a los costados. Cada tarjeta muestra "Nuevo entrenamiento" si el
+ * admin la publicó hace menos de 7 días.
+ */
+@Composable
+private fun RoutinesCarousel(
+    routines: List<RoutineEntity>,
+    onRoutineClick: (Int) -> Unit
+) {
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val ahora = remember { System.currentTimeMillis() }
+
+    // Las flechas van SUPERPUESTAS sobre el carrusel (Box + Alignment), no en celdas propias
+    // al costado: así no dejan un cuadrado de fondo separado junto a las tarjetas.
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+    ) {
+        LazyRow(
+            state = listState,
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 36.dp)
+        ) {
+            items(routines, key = { it.id }) { routine ->
+                val esNuevo = routine.ownerId == null &&
+                        (ahora - routine.creationDate) in 0..VENTANA_NUEVO_ENTRENAMIENTO_MS
+                RoutineCard(
+                    title = routine.name,
+                    subtitle = routine.dayInfo,
+                    icon = Icons.Filled.FitnessCenter,
+                    badge = if (esNuevo) "Nuevo entrenamiento" else null,
+                    modifier = Modifier.width(220.dp).height(112.dp),
+                    onClick = { onRoutineClick(routine.id) }
+                )
+            }
+        }
+
+        CarouselArrow(
+            icon = Icons.Filled.ChevronLeft,
+            contentDescription = "Anterior",
+            modifier = Modifier.align(Alignment.CenterStart),
+            onClick = {
+                scope.launch {
+                    val destino = (listState.firstVisibleItemIndex - 1).coerceAtLeast(0)
+                    listState.animateScrollToItem(destino)
+                }
+            }
+        )
+
+        CarouselArrow(
+            icon = Icons.Filled.ChevronRight,
+            contentDescription = "Siguiente",
+            modifier = Modifier.align(Alignment.CenterEnd),
+            onClick = {
+                scope.launch {
+                    val destino = (listState.firstVisibleItemIndex + 1).coerceAtMost((routines.size - 1).coerceAtLeast(0))
+                    listState.animateScrollToItem(destino)
+                }
+            }
+        )
+    }
+}
+
+/**
+ * Flecha flotante sobre el carrusel: círculo semitransparente con sombra, sin fondo
+ * cuadrado detrás (antes cada flecha vivía en su propia celda del Row, dejando un
+ * cuadrado GrisFondo feo junto a las tarjetas).
+ */
+@Composable
+private fun CarouselArrow(
+    icon: ImageVector,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .size(32.dp)
+            .shadow(elevation = 3.dp, shape = CircleShape)
+            .clip(CircleShape)
+            .background(GrisFondo.copy(alpha = 0.92f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = contentDescription, tint = VerdeTN, modifier = Modifier.size(20.dp))
+    }
+}
+
 /** Tarjeta de rutina: mismo estilo que categorías/ejercicios (GrisFondo, borde VerdeTN, icono verde). */
 @Composable
 private fun RoutineCard(
     title: String,
     subtitle: String?,
     icon: ImageVector,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    badge: String? = null
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(GrisFondo)
@@ -290,6 +443,23 @@ private fun RoutineCard(
             .clickable(onClick = onClick)
             .padding(18.dp)
     ) {
+        Column {
+            if (badge != null) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(VerdeTN)
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = badge.uppercase(),
+                        color = TextoSobreVerde,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -314,17 +484,22 @@ private fun RoutineCard(
                     text = title,
                     color = TextoPrincipal,
                     fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 if (subtitle != null && subtitle.isNotBlank()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = subtitle,
                         color = GrisTexto,
-                        fontSize = 13.sp
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
+        }
         }
     }
 }

@@ -28,6 +28,8 @@ data class UserEntity(
     val specializations: String? = null,
     /** Descripción/bio libre que el entrenador puede escribir para su perfil público. */
     val bio: String? = null,
+    /** Imagen promocional (distinta de profilePhotoUrl) que se ve en la tarjeta de "Mis chats". */
+    val promoImageUrl: String? = null,
 
     // Sanciones (admin): motivo y tiempo de suspensión / baneo
     val suspendedUntil: Long? = null,
