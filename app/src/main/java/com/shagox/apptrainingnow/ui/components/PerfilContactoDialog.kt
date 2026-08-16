@@ -51,7 +51,8 @@ fun PerfilContactoDialog(
     onDesbloquear: (() -> Unit)? = null,
     onSilenciar: (() -> Unit)? = null,
     onDesilenciar: (() -> Unit)? = null,
-    onEliminarConversacion: (() -> Unit)? = null
+    onEliminarConversacion: (() -> Unit)? = null,
+    onReportar: (() -> Unit)? = null
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -130,7 +131,8 @@ fun PerfilContactoDialog(
                         onEliminarConversacion = {
                             onEliminarConversacion()
                             onDismiss()
-                        }
+                        },
+                        onReportar = onReportar?.let { { onDismiss(); it() } }
                     )
                 }
             }

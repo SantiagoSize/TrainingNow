@@ -108,4 +108,17 @@ interface UserApi {
 
     @GET("api/audit-logs")
     suspend fun getAuditLogs(@Query("targetType") targetType: String? = null): List<com.shagox.apptrainingnow.data.remote.dto.AuditLogDto>
+
+    // ==================== Reportes de usuarios ====================
+
+    /** Crear un reporte no requiere ser admin: cualquier usuario logueado puede reportar. */
+    @POST("api/reports")
+    suspend fun createReport(@Body body: com.shagox.apptrainingnow.data.remote.dto.ReportDto): Response<com.shagox.apptrainingnow.data.remote.dto.ReportDto>
+
+    /** Listar y resolver reportes sí requiere token de admin (interceptor lo agrega). */
+    @GET("api/reports")
+    suspend fun getReports(@Query("status") status: String? = null): List<com.shagox.apptrainingnow.data.remote.dto.ReportDto>
+
+    @PATCH("api/reports/{id}/resolve")
+    suspend fun resolveReport(@Path("id") id: Long, @Body body: Map<String, String>): Response<com.shagox.apptrainingnow.data.remote.dto.ReportDto>
 }

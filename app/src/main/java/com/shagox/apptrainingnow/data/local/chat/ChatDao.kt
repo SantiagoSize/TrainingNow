@@ -48,6 +48,12 @@ interface ChatDao {
     @Query("DELETE FROM messages WHERE id = :messageId")
     suspend fun deleteMessageById(messageId: Int)
 
+    /**
+     * Borra mensajes con timestamp anterior a [cutoff] (limpieza de historial antiguo).
+     */
+    @Query("DELETE FROM messages WHERE timestamp < :cutoff")
+    suspend fun deleteMessagesOlderThan(cutoff: Long)
+
     // ==================== MENSAJES - QUERIES GENERALES ====================
 
     /**

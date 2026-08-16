@@ -68,6 +68,7 @@ import com.shagox.apptrainingnow.data.repository.ProgressRepository
 import com.shagox.apptrainingnow.data.repository.RoutineRepository
 import com.shagox.apptrainingnow.data.repository.TrainerRepository
 import com.shagox.apptrainingnow.data.repository.IUserRepository
+import com.shagox.apptrainingnow.utils.NotificationHelper
 import com.shagox.apptrainingnow.ui.components.BottomNavigationBarTN
 import com.shagox.apptrainingnow.ui.screen.ChatScreen
 import com.shagox.apptrainingnow.ui.screen.CreateRoutineScreen
@@ -147,10 +148,91 @@ fun AppNavGraph(
     // "Heartbeat" de presencia: mientras haya una cuenta logueada y la app esté en primer
     // plano (esta pantalla compuesta viva), se avisa cada 20s al backend "sigo conectado".
     // Así el chat puede mostrar "Conectado"/"Desconectado" del otro usuario.
+    // Estado de sanción del usuario logueado (baneo/suspensión), refrescado junto al
+    // heartbeat: si el admin sanciona a alguien mientras usa la app, en máximo 20s se le
+    // bloquea la pantalla sin esperar a que vuelva a iniciar sesión.
+    var sancionActiva by remember { mutableStateOf<com.shagox.apptrainingnow.data.local.user.UserEntity?>(null) }
+
     LaunchedEffect(currentUserId) {
-        if (currentUserId <= 0) return@LaunchedEffect
+        if (currentUserId <= 0) {
+            sancionActiva = null
+            return@LaunchedEffect
+        }
         while (true) {
             userRepository.heartbeat(currentUserId)
+            try {
+                val u = userRepository.getUserById(currentUserId)
+                val suspendido = u?.suspendedUntil != null && u.suspendedUntil > System.currentTimeMillis()
+                sancionActiva = if (u != null && (u.isBanned || suspendido)) u else null
+            } catch (e: Exception) {
+                // Sin conexión: no se toca el estado de sanción ya conocido.
+            }
+            kotlinx.coroutines.delay(20_000L)
+        }
+    }
+
+    // Push local real (barra de estado) para notificaciones (rutina asignada, etc.) y
+    // mensajes de chat nuevos. No hay servidor de push (FCM): se sondea cada 20s mientras
+    // la app está abierta y logueada. La primera vuelta solo establece la línea base (no
+    // dispara push de cosas viejas); desde la segunda vuelta, todo lo nuevo sí notifica.
+    LaunchedEffect(currentUserId) {
+        if (currentUserId <= 0) return@LaunchedEffect
+        val prefs = context.getSharedPreferences("push_notify_prefs", android.content.Context.MODE_PRIVATE)
+        var primeraVuelta = true
+        while (true) {
+            try {
+                // --- Notificaciones (rutina asignada, sistema, etc.) ---
+                val notifKey = "notif_seen_ids_$currentUserId"
+                val vistos = prefs.getStringSet(notifKey, emptySet())
+                    ?.mapNotNull { it.toIntOrNull() }?.toMutableSet() ?: mutableSetOf()
+                val notifs = notificationRepository?.getUserNotifications(currentUserId)?.first() ?: emptyList()
+                if (primeraVuelta) {
+                    vistos.addAll(notifs.map { it.id })
+                } else {
+                    for (n in notifs) {
+                        if (n.id !in vistos) {
+                            vistos.add(n.id)
+                            NotificationHelper.showPush(
+                                context,
+                                title = n.title,
+                                message = n.message,
+                                notificationId = NotificationHelper.uniqueId("notif_${n.id}", n.title)
+                            )
+                        }
+                    }
+                }
+                prefs.edit().putStringSet(notifKey, vistos.map { it.toString() }.toSet()).apply()
+
+                // --- Mensajes de chat nuevos ---
+                val resumen = chatRepository.obtenerResumenConversaciones(currentUserId)
+                val chatAbiertoConId = navController.currentBackStackEntry
+                    ?.takeIf { it.destination.route == Route.ChatDetail.path }
+                    ?.arguments?.getInt("otherId")
+                for (r in resumen) {
+                    val ts = r.lastTimestamp ?: continue
+                    if (r.unreadCount <= 0 || r.contactId == chatAbiertoConId) continue
+                    val key = "chat_seen_ts_${currentUserId}_${r.contactId}"
+                    if (primeraVuelta) {
+                        prefs.edit().putLong(key, ts).apply()
+                        continue
+                    }
+                    val visto = prefs.getLong(key, 0L)
+                    if (ts > visto) {
+                        prefs.edit().putLong(key, ts).apply()
+                        val contacto = try { userRepository.getUserById(r.contactId) } catch (e: Exception) { null }
+                        val nombre = contacto?.let { "${it.name} ${it.lastName}".trim() } ?: "Nuevo mensaje"
+                        NotificationHelper.showPush(
+                            context,
+                            title = nombre,
+                            message = r.lastMessage ?: "Te envió un mensaje",
+                            notificationId = NotificationHelper.uniqueId("chat_${r.contactId}", ts.toString())
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AppNavGraph", "Error en sondeo de notificaciones push", e)
+            }
+            primeraVuelta = false
             kotlinx.coroutines.delay(20_000L)
         }
     }
@@ -165,6 +247,7 @@ fun AppNavGraph(
         Route.AdminMessages.path,
         Route.AdminGlobalRoutines.path,
         Route.AdminActivityLog.path,
+        Route.AdminReports.path,
         Route.AdminUserList.path,
         Route.AdminCreateUser.path,
         Route.AdminSanctions.path,
@@ -487,6 +570,7 @@ fun AppNavGraph(
                     onRutinasGlobales = { navController.navigate(Route.AdminGlobalRoutines.path) },
                     onEnviarMensajes = { navController.navigate(Route.AdminMessages.path) },
                     onVerActividad = { navController.navigate(Route.AdminActivityLog.path) },
+                    onVerReportes = { navController.navigate(Route.AdminReports.path) },
                     onGestionUsuarios = { navController.navigate(Route.AdminUserManagement.path) }
                 )
             }
@@ -494,6 +578,15 @@ fun AppNavGraph(
             composable(Route.AdminActivityLog.path) {
                 com.shagox.apptrainingnow.ui.screen.admin.AdminActivityLogScreen(
                     onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Route.AdminReports.path) {
+                com.shagox.apptrainingnow.ui.screen.admin.AdminReportsScreen(
+                    onBack = { navController.popBackStack() },
+                    onIrASancionar = { userId ->
+                        navController.navigate(Route.AdminSanctions.path)
+                    }
                 )
             }
 
@@ -845,6 +938,81 @@ fun AppNavGraph(
                 },
                 onDismiss = { mostrarAvisoAvance = false }
             )
+        }
+
+        // Bloqueo total: cuenta baneada o suspendida. Se muestra en un Dialog sin botón de
+        // cerrar ni click-outside para que sea imposible seguir usando la app; la única
+        // acción disponible es cerrar sesión. El motivo es obligatorio al banear/suspender
+        // (ver AdminSanctionsScreen), así que siempre hay algo que mostrar acá.
+        val sancion = sancionActiva
+        if (sancion != null) {
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { },
+                properties = androidx.compose.ui.window.DialogProperties(
+                    dismissOnBackPress = false,
+                    dismissOnClickOutside = false,
+                    usePlatformDefaultWidth = false
+                )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(NegroFondo)
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = null,
+                            tint = Color(0xFFE53935),
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = if (sancion.isBanned) "Cuenta baneada" else "Cuenta suspendida",
+                            color = TextoPrincipal,
+                            fontSize = 22.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        if (!sancion.isBanned && sancion.suspendedUntil != null) {
+                            Text(
+                                text = "Hasta el " + java.text.SimpleDateFormat(
+                                    "dd-MM-yyyy HH:mm",
+                                    java.util.Locale.getDefault()
+                                ).format(java.util.Date(sancion.suspendedUntil)),
+                                color = GrisTexto,
+                                fontSize = 14.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                        }
+                        Text(
+                            text = "Motivo: " + ((if (sancion.isBanned) sancion.banReason else sancion.suspendReason)
+                                ?.takeIf { it.isNotBlank() } ?: "No especificado"),
+                            color = TextoPrincipal,
+                            fontSize = 16.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Text(
+                            text = "Si crees que esto es un error, contacta a soporte de TrainingNow.",
+                            color = GrisTexto,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(28.dp))
+                        Button(
+                            onClick = { authViewModel.logout() },
+                            colors = ButtonDefaults.buttonColors(containerColor = VerdeTN)
+                        ) {
+                            Text("Cerrar sesión", color = TextoSobreVerde)
+                        }
+                    }
+                }
+            }
         }
     }
 }

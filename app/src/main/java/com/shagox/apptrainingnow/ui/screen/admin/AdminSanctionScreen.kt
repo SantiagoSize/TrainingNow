@@ -31,10 +31,21 @@ import java.util.*
 /** Acción de sanción. */
 enum class SanctionAction { SUSPEND, BAN, DELETE, LIFT }
 
+/** Motivos típicos para agilizar la sanción (el campo de texto sigue siendo editable). */
+private val MOTIVOS_FRECUENTES = listOf(
+    "Acoso o lenguaje ofensivo en el chat",
+    "Cuenta bot / registro automatizado",
+    "Suplantación de otro usuario o entrenador",
+    "Publicidad o venta no autorizada",
+    "Contenido inapropiado en foto o publicación",
+    "Cuenta creada para evadir un baneo anterior",
+    "Incumplimiento reiterado de los Términos y Condiciones"
+)
+
 /**
  * Suspender / Banear / Eliminar: obligatorio motivo y tiempo de suspensión.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun AdminSanctionScreen(
     userRepository: com.shagox.apptrainingnow.data.repository.IUserRepository,
@@ -158,6 +169,26 @@ fun AdminSanctionScreen(
                             selectedLabelColor = TextoSobreVerde
                         )
                     )
+                }
+            }
+            if (action == SanctionAction.SUSPEND || action == SanctionAction.BAN) {
+                Spacer(Modifier.height(16.dp))
+                Text("Motivos frecuentes", color = GrisTexto, fontSize = 12.sp)
+                Spacer(Modifier.height(6.dp))
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    MOTIVOS_FRECUENTES.forEach { motivo ->
+                        AssistChip(
+                            onClick = { reason = motivo },
+                            label = { Text(motivo, fontSize = 12.sp) },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = GrisFondo,
+                                labelColor = TextoPrincipal
+                            )
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(16.dp))

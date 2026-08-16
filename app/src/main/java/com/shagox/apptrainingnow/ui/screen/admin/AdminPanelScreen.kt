@@ -42,6 +42,7 @@ fun AdminPanelScreen(
     onRutinasGlobales: () -> Unit,
     onEnviarMensajes: () -> Unit,
     onVerActividad: () -> Unit,
+    onVerReportes: () -> Unit,
     onGestionUsuarios: () -> Unit
 ) {
     Column(
@@ -103,6 +104,14 @@ fun AdminPanelScreen(
                     title = "Actividad",
                     subtitle = "Registro de lo que hace el personal",
                     onClick = onVerActividad
+                )
+            }
+            item {
+                AdminPanelCard(
+                    icon = Icons.Filled.Flag,
+                    title = "Reportes",
+                    subtitle = "Usuarios reportados pendientes de revisión",
+                    onClick = onVerReportes
                 )
             }
         }

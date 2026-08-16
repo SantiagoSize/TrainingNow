@@ -777,11 +777,14 @@ private fun FilaEjercicio(
         if (sid >= 0) workoutRepository?.agregarSerie(sid, ex.id, reps = 0, cargaKg = null)
     }
 
+    // Sin marcar: tarjeta gris. Terminado (checkbox marcado): se pone verde y ya no se pueden
+    // sumar más series (se oculta el "+"). Al desmarcar vuelve a gris y el "+" reaparece.
+    val colorAcento = if (checked) VerdeTN else Color.Gray
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = VerdeTN.copy(alpha = 0.15f)),
+        colors = CardDefaults.cardColors(containerColor = colorAcento.copy(alpha = 0.15f)),
         shape = RoundedCornerShape(12.dp),
-        border = androidx.compose.foundation.BorderStroke(1.5.dp, VerdeTN)
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, colorAcento)
     ) {
         Row(
             modifier = Modifier
@@ -796,20 +799,34 @@ private fun FilaEjercicio(
                     fontSize = 15.sp
                 )
                 if (series.isNotEmpty()) {
-                    Text(
-                        text = if (series.size == 1) "1 serie registrada" else "${series.size} series registradas",
-                        color = VerdeTN,
-                        fontSize = 11.sp
-                    )
+                    val etiquetaUnidad = if (unidadesImperiales) "lb" else "kg"
+                    series.forEachIndexed { i, log ->
+                        val reps = log.actualReps?.toIntOrNull() ?: 0
+                        val carga = log.weightKg?.let { kg ->
+                            val valor = if (unidadesImperiales) com.shagox.apptrainingnow.utils.UnitsPreference.kgALibras(kg) else kg
+                            if (valor == valor.toInt().toDouble()) valor.toInt().toString()
+                            else String.format(Locale.US, "%.1f", valor)
+                        }
+                        Text(
+                            text = if (carga != null) "Serie ${i + 1}  |  $reps reps x $carga $etiquetaUnidad"
+                            else "Serie ${i + 1}  |  $reps reps",
+                            color = colorAcento,
+                            fontSize = 11.sp
+                        )
+                    }
                 }
             }
-            IconButton(onClick = {
-                scope.launch {
-                    if (series.isEmpty()) agregarSerieNueva()
-                    mostrarDialogoSeries = true
+            if (checked) {
+                Spacer(modifier = Modifier.width(48.dp))
+            } else {
+                IconButton(onClick = {
+                    scope.launch {
+                        if (series.isEmpty()) agregarSerieNueva()
+                        mostrarDialogoSeries = true
+                    }
+                }) {
+                    Icon(Icons.Filled.Add, contentDescription = "Registrar serie", tint = VerdeTN)
                 }
-            }) {
-                Icon(Icons.Filled.Add, contentDescription = "Registrar serie", tint = VerdeTN)
             }
             Checkbox(
                 checked = checked,

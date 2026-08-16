@@ -39,6 +39,12 @@ class ChatRepository(
         userDao.insertUser(usuario)
     }
 
+    /** Borra del historial local los mensajes con más de 7 días de antigüedad. */
+    suspend fun limpiarMensajesAntiguos() {
+        val cutoff = System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000
+        chatDao.deleteMessagesOlderThan(cutoff)
+    }
+
     // ==================== BLOQUEAR / SILENCIAR / ELIMINAR (preferencias locales) ====================
 
     /** Preferencia (bloqueado/silenciado) de un contacto, reactiva. Null = valores por defecto (false/false). */
@@ -79,6 +85,27 @@ class ChatRepository(
 
     /** IDs de contactos bloqueados por este usuario. */
     fun observarBloqueados(ownerId: Int): Flow<List<Int>> = contactoPreferenciaDao.observarBloqueados(ownerId)
+
+    /**
+     * IDs de contactos "guardados" (chat abierto al menos una vez, con o sin mensajes) por
+     * este usuario. Vive en Room, no se borra al cerrar sesión.
+     */
+    fun observarContactosGuardados(ownerId: Int): Flow<List<Int>> =
+        contactoPreferenciaDao.observarContactosGuardados(ownerId)
+
+    /**
+     * Marca que el usuario abrió el chat con [contactId] (por ejemplo desde el Foro), aunque
+     * todavía no le haya escrito ningún mensaje. A partir de ahora ese contacto aparece en
+     * "Mis chats". No pisa una preferencia de bloqueo/silencio ya existente.
+     */
+    suspend fun marcarChatAbierto(ownerId: Int, contactId: Int) {
+        if (contactoPreferenciaDao.getPreferencia(ownerId, contactId) == null) {
+            contactoPreferenciaDao.upsert(ContactoPreferenciaEntity(ownerId, contactId))
+        }
+    }
+
+    /** IDs de contactos con los que ya existe al menos un mensaje intercambiado (local). */
+    suspend fun obtenerContactosConMensajes(userId: Int): List<Int> = chatDao.getContactIds(userId)
 
     /** Borra todo el historial local de la conversación (no afecta al backend). */
     suspend fun eliminarConversacion(myId: Int, otherId: Int) {

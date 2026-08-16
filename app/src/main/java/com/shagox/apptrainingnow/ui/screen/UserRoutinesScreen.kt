@@ -367,7 +367,7 @@ private fun RoutinesCarousel(
                     subtitle = routine.dayInfo,
                     icon = Icons.Filled.FitnessCenter,
                     badge = if (esNuevo) "Nuevo entrenamiento" else null,
-                    modifier = Modifier.width(220.dp).height(112.dp),
+                    modifier = Modifier.width(230.dp).height(158.dp),
                     onClick = { onRoutineClick(routine.id) }
                 )
             }
@@ -424,6 +424,13 @@ private fun CarouselArrow(
     }
 }
 
+/** Límite de caracteres para que el título/subtítulo nunca desborde la tarjeta de tamaño fijo. */
+private const val LIMITE_TITULO = 42
+private const val LIMITE_SUBTITULO = 34
+
+private fun String.limitado(max: Int): String =
+    if (length > max) trim().take(max).trimEnd() + "…" else this
+
 /** Tarjeta de rutina: mismo estilo que categorías/ejercicios (GrisFondo, borde VerdeTN, icono verde). */
 @Composable
 private fun RoutineCard(
@@ -441,9 +448,9 @@ private fun RoutineCard(
             .background(GrisFondo)
             .border(1.dp, VerdeTN, RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(18.dp)
+            .padding(16.dp)
     ) {
-        Column {
+        Column(modifier = Modifier.fillMaxSize()) {
             if (badge != null) {
                 Box(
                     modifier = Modifier
@@ -455,51 +462,54 @@ private fun RoutineCard(
                         text = badge.uppercase(),
                         color = TextoSobreVerde,
                         fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(VerdeTN.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = VerdeTN,
-                    modifier = Modifier.size(26.dp)
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    color = TextoPrincipal,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (subtitle != null && subtitle.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = subtitle,
-                        color = GrisTexto,
-                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+                Spacer(modifier = Modifier.height(10.dp))
             }
-        }
+            Row(
+                modifier = Modifier.weight(1f, fill = false),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(VerdeTN.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = VerdeTN,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title.limitado(LIMITE_TITULO),
+                        color = TextoPrincipal,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 18.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (subtitle != null && subtitle.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = subtitle.limitado(LIMITE_SUBTITULO),
+                            color = GrisTexto,
+                            fontSize = 12.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
         }
     }
 }

@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -53,6 +54,7 @@ import com.shagox.apptrainingnow.data.repository.IUserRepository
 import com.shagox.apptrainingnow.ui.components.MenuOpcionesContactoDialog
 import com.shagox.apptrainingnow.ui.components.PerfilContactoDialog
 import com.shagox.apptrainingnow.ui.components.VideoPlayerDialog
+import com.shagox.apptrainingnow.ui.theme.GrisBorde
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.LocalTemaClaro
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
@@ -78,6 +80,8 @@ fun ChatScreen(
     var messageText by remember { mutableStateOf("") }
     var mostrarPerfilContacto by remember { mutableStateOf(false) }
     var mostrarMenuOpciones by remember { mutableStateOf(false) }
+    var mostrarReportar by remember { mutableStateOf(false) }
+    var miNombre by remember { mutableStateOf("Un usuario") }
     var bloqueado by remember { mutableStateOf(false) }
     var silenciado by remember { mutableStateOf(false) }
     var lastCameraUri by remember { mutableStateOf<Uri?>(null) }
@@ -259,22 +263,35 @@ fun ChatScreen(
 
     LaunchedEffect(currentUserId) {
         try {
-            userRepository.getUserById(currentUserId)?.let { chatRepository.asegurarUsuarioLocal(it) }
+            userRepository.getUserById(currentUserId)?.let {
+                chatRepository.asegurarUsuarioLocal(it)
+                miNombre = "${it.name} ${it.lastName}".trim().ifBlank { "Un usuario" }
+            }
         } catch (e: Exception) {
             android.util.Log.e("ChatScreen", "Error al sincronizar mi usuario local", e)
         }
     }
 
-    // Cargar mensajes
+    // Borra mensajes con más de 7 días de antigüedad (historial no se acumula indefinidamente).
+    LaunchedEffect(Unit) {
+        try {
+            chatRepository.limpiarMensajesAntiguos()
+        } catch (e: Exception) {
+            android.util.Log.e("ChatScreen", "Error al limpiar mensajes antiguos", e)
+        }
+    }
+
+    // Cargar mensajes. La lista se pinta en LazyColumn con reverseLayout = true (más nuevo
+    // abajo, pegado al input, como cualquier chat), por eso acá se ordena de más nuevo a más
+    // viejo: el índice 0 es el mensaje más reciente y queda anclado al fondo automáticamente.
     LaunchedEffect(currentUserId, trainerId) {
         try {
             chatRepository.getConversation(currentUserId, trainerId).collect { messageList ->
-                messages = messageList
-                // Scroll al final cuando hay nuevos mensajes
-                if (messageList.isNotEmpty()) {
+                messages = messageList.asReversed()
+                if (messages.isNotEmpty()) {
                     scope.launch {
                         try {
-                            listState.animateScrollToItem(messageList.size - 1)
+                            listState.animateScrollToItem(0)
                         } catch (e: Exception) {
                             // Ignorar errores de scroll
                         }
@@ -410,6 +427,7 @@ fun ChatScreen(
         // Lista de mensajes
         LazyColumn(
             state = listState,
+            reverseLayout = true,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
@@ -583,7 +601,8 @@ fun ChatScreen(
                 onEliminarConversacion = {
                     scope.launch { chatRepository.eliminarConversacion(currentUserId, trainerId) }
                     onBack()
-                }
+                },
+                onReportar = { mostrarReportar = true }
             )
         }
     }
@@ -601,6 +620,22 @@ fun ChatScreen(
             onEliminarConversacion = {
                 scope.launch { chatRepository.eliminarConversacion(currentUserId, trainerId) }
                 onBack()
+            },
+            onReportar = { mostrarReportar = true }
+        )
+    }
+
+    if (mostrarReportar) {
+        val currentTrainer = trainer
+        com.shagox.apptrainingnow.ui.components.ReportUserDialog(
+            reporterId = currentUserId,
+            reporterName = miNombre,
+            reportedId = trainerId,
+            reportedName = "${currentTrainer?.name ?: "Entrenador"} ${currentTrainer?.lastName ?: ""}".trim(),
+            onDismiss = { mostrarReportar = false },
+            onEnviado = {
+                mostrarReportar = false
+                android.widget.Toast.makeText(context, "Reporte enviado. Gracias por avisarnos.", android.widget.Toast.LENGTH_LONG).show()
             }
         )
     }
@@ -690,7 +725,11 @@ fun MessageBubble(
                 ),
                 colors = CardDefaults.cardColors(
                     containerColor = if (isFromCurrentUser) VerdeTN else GrisFondo
-                )
+                ),
+                // En tema claro GrisFondo es casi blanco puro, igual que el fondo de la
+                // pantalla: sin borde, la burbuja del otro usuario se volvía invisible entera
+                // (no solo el texto). El borde la hace visible siempre, en los dos temas.
+                border = if (isFromCurrentUser) null else BorderStroke(1.dp, GrisBorde)
             ) {
                 when {
                     message.attachmentType == "IMAGE" && urlAdjunto != null -> {
@@ -743,7 +782,11 @@ fun MessageBubble(
                     else -> {
                         Text(
                             text = message.content,
-                            color = if (isFromCurrentUser) NegroFondo else Color.White,
+                            // La burbuja del otro usuario usa GrisFondo, que en tema claro es
+                            // blanco puro (0xFFFFFFFF): con Color.White fijo el texto quedaba
+                            // invisible (blanco sobre blanco), como si el mensaje se hubiera
+                            // borrado. TextoPrincipal se adapta al tema activo.
+                            color = if (isFromCurrentUser) NegroFondo else TextoPrincipal,
                             fontSize = 14.sp,
                             modifier = Modifier.padding(12.dp)
                         )

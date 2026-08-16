@@ -28,4 +28,13 @@ interface ContactoPreferenciaDao {
     /** IDs de contactos silenciados por este usuario (para no resaltar no leídos). */
     @Query("SELECT contactId FROM contacto_preferencias WHERE ownerId = :ownerId AND silenciado = 1")
     fun observarSilenciados(ownerId: Int): Flow<List<Int>>
+
+    /**
+     * IDs de todos los contactos "guardados" por este usuario: cualquier fila en esta tabla
+     * (aunque sea bloqueado=false/silenciado=false) significa que el usuario ya abrió el chat
+     * con ese contacto al menos una vez, por ejemplo desde el Foro. Se usa junto con los
+     * contactos que ya tienen mensajes para decidir quién aparece en "Mis chats".
+     */
+    @Query("SELECT contactId FROM contacto_preferencias WHERE ownerId = :ownerId")
+    fun observarContactosGuardados(ownerId: Int): Flow<List<Int>>
 }

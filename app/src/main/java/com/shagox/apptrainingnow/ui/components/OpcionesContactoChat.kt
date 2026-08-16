@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Person
@@ -51,7 +52,8 @@ fun OpcionesContactoContenido(
     onDesbloquear: () -> Unit,
     onSilenciar: () -> Unit,
     onDesilenciar: () -> Unit,
-    onEliminarConversacion: () -> Unit
+    onEliminarConversacion: () -> Unit,
+    onReportar: (() -> Unit)? = null
 ) {
     var confirmandoEliminar by remember { mutableStateOf(false) }
 
@@ -76,6 +78,14 @@ fun OpcionesContactoContenido(
             tint = if (bloqueado) TextoPrincipal else RojoEliminar,
             onClick = { if (bloqueado) onDesbloquear() else onBloquear() }
         )
+        if (onReportar != null) {
+            OpcionContacto(
+                icono = Icons.Default.Flag,
+                texto = "Reportar",
+                tint = RojoEliminar,
+                onClick = onReportar
+            )
+        }
 
         if (!confirmandoEliminar) {
             OpcionContacto(
@@ -148,7 +158,8 @@ fun MenuOpcionesContactoDialog(
     onDesbloquear: () -> Unit,
     onSilenciar: () -> Unit,
     onDesilenciar: () -> Unit,
-    onEliminarConversacion: () -> Unit
+    onEliminarConversacion: () -> Unit,
+    onReportar: (() -> Unit)? = null
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -166,7 +177,8 @@ fun MenuOpcionesContactoDialog(
                 onDesbloquear = { onDesbloquear(); onDismiss() },
                 onSilenciar = { onSilenciar(); onDismiss() },
                 onDesilenciar = { onDesilenciar(); onDismiss() },
-                onEliminarConversacion = { onEliminarConversacion(); onDismiss() }
+                onEliminarConversacion = { onEliminarConversacion(); onDismiss() },
+                onReportar = onReportar?.let { { onDismiss(); it() } }
             )
         },
         confirmButton = {
