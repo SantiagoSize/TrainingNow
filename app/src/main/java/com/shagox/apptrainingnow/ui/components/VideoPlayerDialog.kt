@@ -125,8 +125,13 @@ fun VideoPlayerDialog(videoUrl: String, onDismiss: () -> Unit) {
                                         frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
                                     </body></html>
                                 """.trimIndent()
+                                // baseURL = null (no "https://www.youtube.com"): con ese baseURL
+                                // la petición se veía como si YouTube intentara embeberse a sí
+                                // mismo, y el player la rechazaba (error 152-4 "video unavailable").
+                                // Con null es un embed de tercero real -> exactamente lo que
+                                // habilita el toggle "Permitir inserción" del video.
                                 loadDataWithBaseURL(
-                                    "https://www.youtube.com",
+                                    null,
                                     html,
                                     "text/html",
                                     "utf-8",
