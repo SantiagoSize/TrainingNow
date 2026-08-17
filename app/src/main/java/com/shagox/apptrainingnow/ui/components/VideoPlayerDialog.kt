@@ -3,6 +3,7 @@ package com.shagox.apptrainingnow.ui.components
 import android.annotation.SuppressLint
 import android.net.Uri
 import android.view.ViewGroup
+import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -77,13 +78,26 @@ fun VideoPlayerDialog(videoUrl: String, onDismiss: () -> Unit) {
                     AndroidView(
                         modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
                         factory = { ctx ->
-                            WebView(ctx).apply {
+                            val webView = WebView(ctx)
+                            webView.apply {
                                 layoutParams = ViewGroup.LayoutParams(
                                     ViewGroup.LayoutParams.MATCH_PARENT,
                                     ViewGroup.LayoutParams.MATCH_PARENT
                                 )
                                 settings.javaScriptEnabled = true
                                 settings.mediaPlaybackRequiresUserGesture = false
+                                // El error 153 casi siempre es por cookies de terceros bloqueadas:
+                                // el WebView de Android las bloquea por defecto desde API 21, y el
+                                // player embebido de YouTube las necesita para validar la sesión.
+                                // Antes navegábamos directo a youtube.com/embed/... como documento
+                                // top-level (sin nunca activar cookies de terceros); ahora se carga
+                                // un <iframe> desde un wrapper local, que es el caso real para el
+                                // que existen esas cookies.
+                                settings.domStorageEnabled = true
+                                CookieManager.getInstance().apply {
+                                    setAcceptCookie(true)
+                                    setAcceptThirdPartyCookies(webView, true)
+                                }
                                 webChromeClient = WebChromeClient()
                                 webViewClient = object : WebViewClient() {
                                     override fun onPageFinished(view: WebView?, url: String?) {
@@ -104,7 +118,20 @@ fun VideoPlayerDialog(videoUrl: String, onDismiss: () -> Unit) {
                                         error = true
                                     }
                                 }
-                                loadUrl("https://www.youtube.com/embed/$idYoutube?autoplay=1&playsinline=1")
+                                val html = """
+                                    <html><body style="margin:0;padding:0;background:#000;">
+                                    <iframe width="100%" height="100%"
+                                        src="https://www.youtube.com/embed/$idYoutube?autoplay=1&playsinline=1"
+                                        frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+                                    </body></html>
+                                """.trimIndent()
+                                loadDataWithBaseURL(
+                                    "https://www.youtube.com",
+                                    html,
+                                    "text/html",
+                                    "utf-8",
+                                    null
+                                )
                             }
                         }
                     )
