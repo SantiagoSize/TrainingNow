@@ -1,6 +1,7 @@
 package com.shagox.apptrainingnow.data.repository
 
 import com.shagox.apptrainingnow.data.remote.ExerciseApi
+import com.shagox.apptrainingnow.data.remote.dto.CategoryDto
 import com.shagox.apptrainingnow.data.remote.dto.ExerciseDto
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -20,12 +21,12 @@ class ExerciseApiRepositoryTest {
     @Test
     fun getCategoryStats_returnsCategoriesFromApi() {
         runBlocking {
-            val apiExercises = listOf(
-                ExerciseDto(1, "Press Banca", "Fuerza", "Desc", null, true),
-                ExerciseDto(2, "Press Inclinado", "Fuerza", "Desc", null, true),
-                ExerciseDto(3, "Sentadilla", "Piernas", "Desc", null, true)
+            // getCategoryStats() usa /api/categories (entidad propia), no agrupa /api/exercises.
+            val apiCategories = listOf(
+                CategoryDto(id = 1, name = "Fuerza", exerciseCount = 2),
+                CategoryDto(id = 2, name = "Piernas", exerciseCount = 1)
             )
-            coEvery { mockApi.getExercises() } returns apiExercises
+            coEvery { mockApi.getCategories() } returns apiCategories
 
             val repo = ExerciseApiRepository(api = mockApi)
             val stats = repo.getCategoryStats().first()
@@ -42,7 +43,7 @@ class ExerciseApiRepositoryTest {
     fun getExercisesByCategory_returnsMappedEntities() {
         runBlocking {
             val apiExercises = listOf(
-                ExerciseDto(1, "Press Banca", "Fuerza", "Desc", null, true)
+                ExerciseDto(1, "Press Banca", "Fuerza", "Desc", null, "http://img.com/1.jpg")
             )
             coEvery { mockApi.getExercisesByCategory("Fuerza") } returns apiExercises
 
@@ -59,7 +60,7 @@ class ExerciseApiRepositoryTest {
     @Test
     fun observeExercise_returnsEntityWhenFound() {
         runBlocking {
-            val dto = ExerciseDto(1, "Press Banca", "Fuerza", "Desc", "http://video.com", true)
+            val dto = ExerciseDto(1, "Press Banca", "Fuerza", "Desc", "http://video.com", "http://img.com/1.jpg")
             coEvery { mockApi.getExerciseById(1) } returns dto
 
             val repo = ExerciseApiRepository(api = mockApi)

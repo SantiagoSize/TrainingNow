@@ -23,6 +23,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
@@ -46,7 +47,7 @@ class AuthViewModelTest {
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         repository = mockk(relaxed = true)
-        viewModel = AuthViewModel(repository)
+        viewModel = AuthViewModel(repository, RuntimeEnvironment.getApplication())
     }
 
     @After
@@ -109,6 +110,7 @@ class AuthViewModelTest {
         assertTrue(viewModel.isLoggedIn())
 
         viewModel.logout()
+        advanceUntilIdle()
 
         assertFalse(viewModel.isLoggedIn())
         assertNull(viewModel.loginState.value.loggedUser)
@@ -118,10 +120,12 @@ class AuthViewModelTest {
 
     private fun completarRegistro(email: String) {
         viewModel.onNameChange("Santiago")
+        viewModel.onLastNameChange("Usuario")
         viewModel.onRegisterEmailChange(email)
-        viewModel.onPhoneChange("912345678")
+        viewModel.onPhoneChange("56912345678")
         viewModel.onRegisterPassChange("Entrena2026")
         viewModel.onConfirmChange("Entrena2026")
+        viewModel.onTermsAcceptedChange(true)
     }
 
     @Test

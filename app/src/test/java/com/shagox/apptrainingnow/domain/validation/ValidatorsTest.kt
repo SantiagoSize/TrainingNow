@@ -51,7 +51,7 @@ class ValidatorsTest {
     // ---------- Teléfono ----------
     @Test
     fun telefonoValido_pasa() {
-        assertNull(validatePhoneDigitsOnly("912345678"))
+        assertNull(validatePhoneDigitsOnly("56912345678"))
     }
 
     @Test
