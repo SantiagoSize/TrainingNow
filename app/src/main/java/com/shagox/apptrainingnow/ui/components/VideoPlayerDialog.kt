@@ -73,7 +73,7 @@ fun VideoPlayerDialog(videoUrl: String, onDismiss: () -> Unit) {
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
-                if (idYoutube != null) {
+                if (idYoutube != null && !error) {
                     AndroidView(
                         modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
                         factory = { ctx ->
@@ -89,12 +89,26 @@ fun VideoPlayerDialog(videoUrl: String, onDismiss: () -> Unit) {
                                     override fun onPageFinished(view: WebView?, url: String?) {
                                         cargando = false
                                     }
+                                    override fun onReceivedError(
+                                        view: WebView?,
+                                        errorCode: Int,
+                                        description: String?,
+                                        failingUrl: String?
+                                    ) {
+                                        // WebView propio (no HTTP): YouTube puede mostrar su propia
+                                        // tarjeta de error nativa (ej. error 153), la cual bloquea el
+                                        // touch del botón "✕" superpuesto en Compose. Por eso sacamos
+                                        // el WebView del árbol y mostramos un error 100% nativo, para
+                                        // que el diálogo SIEMPRE se pueda cerrar.
+                                        cargando = false
+                                        error = true
+                                    }
                                 }
                                 loadUrl("https://www.youtube.com/embed/$idYoutube?autoplay=1&playsinline=1")
                             }
                         }
                     )
-                } else {
+                } else if (idYoutube == null) {
                     AndroidView(
                         modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
                         factory = { ctx ->
