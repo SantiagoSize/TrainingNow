@@ -60,6 +60,7 @@ fun BottomNavigationBarTN(
     navController: NavController,
     userRole: String
 ) {
+    val navContext = androidx.compose.ui.platform.LocalContext.current
     val role = userRole.takeIf { it.isNotBlank() } ?: "USER"
     val items = remember(role) { Route.getBottomNavRoutes(role) }
 
@@ -155,21 +156,27 @@ fun BottomNavigationBarTN(
                                 iconVector = route.icon,
                                 contentDescription = route.title,
                                 onClick = {
+                                    // Si el tab tocado es el de "Rutina" y hay una rutina activa
+                                    // guardada (mismo mecanismo que usa MainActivity para retomarla
+                                    // al reabrir la app), se vuelve DIRECTO a esa rutina en vez de a
+                                    // la lista "Mis rutinas". Así "solo se elige una": cambiar de tab
+                                    // no la descarta, solo la flecha del header (RoutineActiveScreen)
+                                    // la abandona de verdad.
+                                    val destino = if (route.path == com.shagox.apptrainingnow.navigation.Route.UserRoutines.path) {
+                                        val prefs = navContext.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+                                        prefs.getString("active_routine_route", null) ?: route.path
+                                    } else {
+                                        route.path
+                                    }
                                     // Ancla del popUpTo: el primer tab del rol actual, NO la ruta de
                                     // lanzamiento global de la app (que puede no pertenecer a este rol,
                                     // ej. "user_routines" no existe en la barra del admin y dejaba la
                                     // pila mal anclada tras el primer cambio de pestaña).
-                                    val navegar = {
-                                        navController.navigate(route.path) {
-                                            popUpTo(items.first().path) { saveState = true }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
+                                    navController.navigate(destino) {
+                                        popUpTo(items.first().path) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
                                     }
-                                    // Si hay una pantalla protegida activa (ej. rutina en curso),
-                                    // le cede el control para que confirme antes de descartarla.
-                                    val guard = com.shagox.apptrainingnow.navigation.RoutineExitGuard.interceptor
-                                    if (guard != null) guard(navegar) else navegar()
                                 }
                             )
                         }

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.shagox.apptrainingnow.data.local.user.UserEntity
+import com.shagox.apptrainingnow.domain.validation.validateConfirm
 import com.shagox.apptrainingnow.ui.components.BackButtonTN
 import com.shagox.apptrainingnow.ui.components.IconoOjoContrasena
 import com.shagox.apptrainingnow.ui.components.ScreenHeaderTN
@@ -64,6 +65,7 @@ fun AdminCreateUserScreen(
     var usernameError by remember { mutableStateOf<String?>(null) }
     var phone by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("USER") }
     var specialty by remember { mutableStateOf("") }
     var gender by remember { mutableStateOf<String?>(null) }
@@ -266,6 +268,24 @@ fun AdminCreateUserScreen(
                 colors = textFieldColors,
                 shape = textFieldShape
             )
+            Spacer(Modifier.height(12.dp))
+            var confirmPasswordVisible by remember { mutableStateOf(false) }
+            val confirmError = if (confirmPassword.isNotEmpty()) validateConfirm(password, confirmPassword) else null
+            OutlinedTextField(
+                value = confirmPassword,
+                onValueChange = { confirmPassword = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Confirmar contraseña") },
+                singleLine = true,
+                isError = confirmError != null,
+                supportingText = confirmError?.let { { Text(it, color = androidx.compose.ui.graphics.Color(0xFFE57373)) } },
+                visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconoOjoContrasena(visible = confirmPasswordVisible, onToggle = { confirmPasswordVisible = !confirmPasswordVisible }, tint = GrisTexto)
+                },
+                colors = textFieldColors,
+                shape = textFieldShape
+            )
             Spacer(Modifier.height(16.dp))
             Text("Género", color = GrisTexto, fontSize = 12.sp)
             Spacer(Modifier.height(8.dp))
@@ -383,6 +403,10 @@ fun AdminCreateUserScreen(
                 onClick = {
                     if (name.isBlank() || lastName.isBlank() || email.isBlank() || password.isBlank()) {
                         message = "Nombre, apellido, email y contraseña obligatorios"
+                        return@Button
+                    }
+                    if (password != confirmPassword) {
+                        message = "Las contraseñas no coinciden"
                         return@Button
                     }
                     if (usernameError != null) {

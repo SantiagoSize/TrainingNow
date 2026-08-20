@@ -124,24 +124,12 @@ fun RoutineActiveScreen(
 ) {
     val context = LocalContext.current
     var showExitDialog by remember { mutableStateOf(false) }
-    // Si el diálogo de salida se disparó porque el usuario tocó OTRO tab de la bottom nav (ver
-    // RoutineExitGuard), esto guarda esa navegación pendiente para ejecutarla al confirmar, en
-    // vez de solo hacer el onBack() normal (que siempre vuelve a "Mis rutinas").
-    var accionPendienteAlConfirmar by remember { mutableStateOf<(() -> Unit)?>(null) }
-    // Botón físico/gesto de atrás del sistema: antes salía sin preguntar, solo la flecha del
-    // header mostraba el diálogo. Ahora ambos caminos respetan la misma confirmación.
+    // La barra de navegación inferior YA NO pasa por acá: cambiar de tab no abandona la rutina
+    // (queda guardada en "active_routine_route" y la barra vuelve directo a ella al tocar
+    // "Rutina" de nuevo — ver BottomNavigationBarTN). Solo la flecha del header o el back del
+    // sistema hacen un abandono real (onBack() abajo borra esa preferencia).
     androidx.activity.compose.BackHandler(enabled = true) {
-        accionPendienteAlConfirmar = null
         showExitDialog = true
-    }
-    // Bottom nav: si tocan otro tab estando en una rutina activa, se intercepta aquí en vez de
-    // dejar que la barra descarte esta pantalla del back stack sin confirmar (ver RoutineExitGuard).
-    androidx.compose.runtime.DisposableEffect(Unit) {
-        com.shagox.apptrainingnow.navigation.RoutineExitGuard.interceptor = { onConfirmado ->
-            accionPendienteAlConfirmar = onConfirmado
-            showExitDialog = true
-        }
-        onDispose { com.shagox.apptrainingnow.navigation.RoutineExitGuard.interceptor = null }
     }
     var notificationsEnabled by remember { mutableStateOf(ReminderHelper.isEnabled(context)) }
     // Aviso flotante breve al activar/desactivar recordatorios
@@ -587,17 +575,13 @@ fun RoutineActiveScreen(
                     onClick = {
                         showExitDialog = false
                         onBack()
-                        // Si el disparador fue un tab de la bottom nav (no la flecha del header
-                        // ni el back del sistema), completa esa navegación tras salir.
-                        accionPendienteAlConfirmar?.invoke()
-                        accionPendienteAlConfirmar = null
                     }
                 ) {
                     Text("Salir", color = VerdeTN)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showExitDialog = false; accionPendienteAlConfirmar = null }) {
+                TextButton(onClick = { showExitDialog = false }) {
                     Text("Cancelar", color = VerdeTN)
                 }
             },

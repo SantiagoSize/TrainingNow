@@ -3,6 +3,8 @@ package com.shagox.apptrainingnow.ui.screen.admin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -305,9 +307,14 @@ fun AdminSanctionScreen(
                     Spacer(Modifier.height(16.dp))
                     Text("Motivos frecuentes", color = GrisTexto, fontSize = 12.sp)
                     Spacer(Modifier.height(6.dp))
-                    androidx.compose.foundation.layout.FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    // OJO: se usa Row con scroll horizontal en vez de FlowRow. FlowRow con el
+                    // parámetro "overflow" (androidx.compose.foundation.layout.FlowRowOverflow)
+                    // depende de una versión específica de compose-foundation que causaba
+                    // NoSuchMethodError en runtime (versión resuelta en compilación != empaquetada
+                    // en el APK). Row+scroll es API estable desde siempre, cero riesgo.
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         MOTIVOS_FRECUENTES.forEach { motivo ->
                             AssistChip(

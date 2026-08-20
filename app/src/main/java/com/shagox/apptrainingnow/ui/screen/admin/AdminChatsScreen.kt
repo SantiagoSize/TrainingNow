@@ -135,7 +135,10 @@ fun AdminChatsScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             TabAdminChats.entries.forEach { opcion ->
-                val badge = if (opcion == TabAdminChats.ABIERTOS) resumenes.sumOf { it.unreadCount } else 0
+                // Se calcula sobre "abiertos" (la lista ya cruzada con usuarios) y no sobre
+                // "resumenes" en crudo, para que el número nunca contradiga lo que se ve abajo
+                // (si el cruce con la lista de usuarios todavía no cargó, ambos muestran 0).
+                val badge = if (opcion == TabAdminChats.ABIERTOS) abiertos.sumOf { it.second.unreadCount } else 0
                 TabChipAdmin(
                     text = opcion.etiqueta,
                     selected = tab == opcion,

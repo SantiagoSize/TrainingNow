@@ -1,9 +1,12 @@
 package com.shagox.apptrainingnow.ui.components
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -44,7 +47,7 @@ private val MOTIVOS_REPORTE = listOf(
  * Reporta a [reportedName] ante el equipo de TrainingNow. El motivo es obligatorio; el
  * detalle es opcional. Se usa desde el menú de opciones de un contacto en el chat.
  */
-@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportUserDialog(
     reporterId: Int,
@@ -68,9 +71,11 @@ fun ReportUserDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Motivo", color = GrisTexto, fontSize = 12.sp)
-                androidx.compose.foundation.layout.FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                // Row + scroll horizontal en vez de FlowRow (ver nota en AdminSanctionScreen.kt:
+                // FlowRow con "overflow" causaba NoSuchMethodError en runtime).
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     MOTIVOS_REPORTE.forEach { opcion ->
                         AssistChip(

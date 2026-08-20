@@ -45,8 +45,12 @@ interface UserApi {
     @PATCH("api/users/{id}/unban")
     suspend fun unbanUser(@Path("id") id: Int): Response<UserDto>
 
+    // OJO: @JvmSuppressWildcards en el tipo Any es obligatorio. Sin él, Kotlin emite el generic
+    // signature de Map<K, out V> con wildcard y Retrofit revienta en runtime con
+    // "Parameter type must not include a type variable or wildcard" (Map<String,String>
+    // no tiene el problema porque el wildcard se "resuelve" trivial con un tipo final concreto).
     @PATCH("api/users/{id}/suspend")
-    suspend fun suspendUser(@Path("id") id: Int, @Body body: Map<String, Any>): Response<UserDto>
+    suspend fun suspendUser(@Path("id") id: Int, @Body body: Map<String, @JvmSuppressWildcards Any>): Response<UserDto>
 
     @PATCH("api/users/{id}/unsuspend")
     suspend fun unsuspendUser(@Path("id") id: Int): Response<UserDto>

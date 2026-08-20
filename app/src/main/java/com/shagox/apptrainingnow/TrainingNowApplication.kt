@@ -80,9 +80,13 @@ class TrainingNowApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "Application onCreate")
+        // OJO: hay que guardar el handler original ANTES de reemplazarlo. Si se consulta
+        // Thread.getDefaultUncaughtExceptionHandler() DENTRO del lambda, para ese momento ya
+        // devuelve este mismo handler (recién instalado) -> se llama a sí mismo en bucle infinito.
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, exception ->
             Log.e(TAG, "Excepción no capturada", exception)
-            Thread.getDefaultUncaughtExceptionHandler()?.uncaughtException(thread, exception)
+            defaultHandler?.uncaughtException(thread, exception)
         }
         // Inicializar la base de datos aquí para no bloquear el primer frame en MainActivity
         _database = AppDatabase.getInstance(this)
