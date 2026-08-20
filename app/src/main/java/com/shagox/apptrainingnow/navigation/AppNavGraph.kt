@@ -247,7 +247,6 @@ fun AppNavGraph(
         Route.AdminMessages.path,
         Route.AdminGlobalRoutines.path,
         Route.AdminActivityLog.path,
-        Route.AdminReports.path,
         Route.AdminUserList.path,
         Route.AdminCreateUser.path,
         Route.AdminSanctions.path,
@@ -581,15 +580,6 @@ fun AppNavGraph(
             composable(Route.AdminActivityLog.path) {
                 com.shagox.apptrainingnow.ui.screen.admin.AdminActivityLogScreen(
                     onBack = { navController.popBackStack() }
-                )
-            }
-
-            composable(Route.AdminReports.path) {
-                com.shagox.apptrainingnow.ui.screen.admin.AdminReportsScreen(
-                    onBack = { navController.popBackStack() },
-                    onIrASancionar = { userId ->
-                        navController.navigate(Route.AdminSanctions.path)
-                    }
                 )
             }
 

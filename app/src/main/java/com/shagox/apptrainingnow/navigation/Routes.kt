@@ -78,9 +78,6 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
     /** Suspender / Banear / Eliminar cuenta (admin) */
     data object AdminSanctions : Route("admin_sanctions", "Sanciones", Icons.Filled.Block)
 
-    /** Reportes de usuarios pendientes de revisión (admin) */
-    data object AdminReports : Route("admin_reports", "Reportes", Icons.Filled.Flag)
-
     // ==================== PANTALLAS DE COACH ====================
     
     /** Lista de clientes del entrenador */
@@ -249,7 +246,6 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
                         ruta.startsWith("admin_library_category") ||
                         ruta == AdminGlobalRoutines.path ||
                         ruta == AdminActivityLog.path ||
-                        ruta == AdminReports.path ||
                         ruta == AdminMessages.path -> listOf(AdminPanel.path)
 
                 // ===== Gestión de usuarios (admin) =====
