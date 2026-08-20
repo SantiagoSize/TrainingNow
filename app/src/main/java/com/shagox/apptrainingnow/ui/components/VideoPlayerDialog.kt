@@ -118,20 +118,23 @@ fun VideoPlayerDialog(videoUrl: String, onDismiss: () -> Unit) {
                                         error = true
                                     }
                                 }
+                                // El IFrame Player API de YouTube exige un origen real (http/https)
+                                // para el postMessage de seguridad interno: con baseURL de
+                                // youtube.com se auto-bloquea (error 152-4) y con null el origen
+                                // queda "null"/opaco, que tampoco soporta (error 153, "configuration
+                                // error"). Se usa un dominio propio neutro (no tiene que resolver,
+                                // solo ser un origen https válido) y se lo pasamos también como
+                                // origin= al iframe, tal como recomienda la doc de YouTube.
+                                val origenApp = "https://apptrainingnow.cl"
                                 val html = """
                                     <html><body style="margin:0;padding:0;background:#000;">
                                     <iframe width="100%" height="100%"
-                                        src="https://www.youtube.com/embed/$idYoutube?autoplay=1&playsinline=1"
+                                        src="https://www.youtube.com/embed/$idYoutube?autoplay=1&playsinline=1&origin=$origenApp"
                                         frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
                                     </body></html>
                                 """.trimIndent()
-                                // baseURL = null (no "https://www.youtube.com"): con ese baseURL
-                                // la petición se veía como si YouTube intentara embeberse a sí
-                                // mismo, y el player la rechazaba (error 152-4 "video unavailable").
-                                // Con null es un embed de tercero real -> exactamente lo que
-                                // habilita el toggle "Permitir inserción" del video.
                                 loadDataWithBaseURL(
-                                    null,
+                                    origenApp,
                                     html,
                                     "text/html",
                                     "utf-8",
