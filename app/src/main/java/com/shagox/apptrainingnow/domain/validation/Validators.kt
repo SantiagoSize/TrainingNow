@@ -24,12 +24,33 @@ fun validateNameLettersOnly(nombre: String): String? {
 /**
  * Validación: CORREO (formato de email).
  * Qué revisa: que no esté vacío y que tenga forma de correo válido (ej. usuario@dominio.com).
- * Dónde se usa: campo "Correo" del registro y del login.
+ * Dónde se usa: campo "Correo" del login (acepta cualquier dominio, incluido
+ * @trainingnow.com del staff) y como base de [validateEmailRegistro].
  */
 fun validateEmail(email: String): String? {
     if (email.isBlank()) return "El correo es obligatorio"
     val formatoValido = Patterns.EMAIL_ADDRESS.matcher(email).matches()
     return if (!formatoValido) "Formato de correo inválido" else null
+}
+
+/** Dominios de correo aceptados en el registro público (debe coincidir con UserService.java). */
+private val DOMINIOS_PERMITIDOS = setOf("gmail.com", "hotmail.com", "outlook.com", "yahoo.com")
+
+/**
+ * Validación: CORREO PARA REGISTRO PÚBLICO (formato + dominio permitido).
+ * Qué revisa: lo mismo que [validateEmail], más que el dominio esté en la lista
+ * permitida (gmail/hotmail/outlook/yahoo) — el registro público no admite
+ * @trainingnow.com (reservado a staff, ver UserService.isStaffEmail) ni otros dominios.
+ * Dónde se usa: campo "Correo" del registro (NO del login, ese sigue usando [validateEmail]
+ * para no bloquear el acceso de cuentas @trainingnow.com ya existentes).
+ */
+fun validateEmailRegistro(email: String): String? {
+    validateEmail(email)?.let { return it }
+    val dominio = email.substringAfter('@').trim().lowercase()
+    if (dominio !in DOMINIOS_PERMITIDOS) {
+        return "Solo se aceptan correos de: ${DOMINIOS_PERMITIDOS.joinToString(", ")}"
+    }
+    return null
 }
 
 /**

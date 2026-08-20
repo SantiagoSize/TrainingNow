@@ -141,14 +141,18 @@ class AuthViewModelTest {
 
     @Test
     fun registroConDominioCorporativo_bloqueado() = runTest(dispatcher) {
+        // El dominio @trainingnow.com no está en la lista de dominios permitidos para el
+        // registro público (ver validateEmailRegistro), así que queda bloqueado como error
+        // de campo antes de poder enviar el formulario (canSubmit=false), sin llegar a
+        // invocar al repositorio ni al chequeo interno de submitRegister().
         completarRegistro("falso@trainingnow.com")
         viewModel.submitRegister()
         advanceUntilIdle()
 
         val state = viewModel.register.value
         assertFalse(state.success)
-        assertNotNull(state.errorMsg)
-        assertTrue(state.errorMsg!!.contains("trainingnow.com"))
+        assertNotNull(state.emailError)
+        assertFalse(state.canSubmit)
         coVerify(exactly = 0) { repository.insertUser(any()) }
     }
 

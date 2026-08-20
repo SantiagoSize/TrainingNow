@@ -9,6 +9,7 @@ import com.shagox.apptrainingnow.data.remote.RemoteModule
 import com.shagox.apptrainingnow.data.repository.IUserRepository
 import com.shagox.apptrainingnow.domain.validation.validateConfirm
 import com.shagox.apptrainingnow.domain.validation.validateEmail
+import com.shagox.apptrainingnow.domain.validation.validateEmailRegistro
 import com.shagox.apptrainingnow.domain.validation.validateNameLettersOnly
 import com.shagox.apptrainingnow.domain.validation.validatePhoneDigitsOnly
 import com.shagox.apptrainingnow.domain.validation.validateStringPassword
@@ -346,7 +347,7 @@ class AuthViewModel(
         _register.update {
             it.copy(
                 email = trimmedValue,
-                emailError = validateEmail(trimmedValue)
+                emailError = validateEmailRegistro(trimmedValue)
             )
         }
         recomputeRegisterCanSubmit()
