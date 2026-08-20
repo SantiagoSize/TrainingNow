@@ -84,4 +84,14 @@ data class ExerciseLogEntity(
     val tempo: String? = null, // Ej: "3-1-2-0" (excéntrico-pausa-concéntrico-arriba)
     
     val createdAt: Long = System.currentTimeMillis()
-)
+) {
+    companion object {
+        /**
+         * Valor de [notes] usado como marca cuando un ejercicio se marcó "terminado" en el
+         * checklist sin que el usuario haya registrado series (reps/carga) manualmente. Permite
+         * que el detalle del día en el reporte mensual lo muestre como completado en vez de
+         * ignorarlo (antes solo se mostraban ejercicios con series reales).
+         */
+        const val NOTA_TERMINADO_SIN_SERIE = "terminado_sin_serie"
+    }
+}

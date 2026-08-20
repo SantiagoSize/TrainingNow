@@ -143,10 +143,18 @@ class UserApiRepository(
         if (!response.isSuccessful) throw Exception(sanctionError(response.code()))
     }
 
-    /** Eliminar usuario: DELETE /api/users/{id}. */
+    /**
+     * Eliminar usuario: DELETE /api/users/{id}. A diferencia de las demás acciones de esta
+     * clase, aquí sí vale la pena leer el mensaje real del backend (extractErrorMessage): el
+     * único motivo por el que puede fallar con 403 es la regla "no puedes eliminar al último
+     * administrador", que sanctionError() no describe bien (ese mensaje es para sanciones).
+     */
     override suspend fun deleteUserById(userId: Int) {
         val response = api.deleteUser(userId)
-        if (!response.isSuccessful) throw HttpException(response)
+        if (!response.isSuccessful) {
+            val mensaje = extractErrorMessage(response.errorBody()?.string()) ?: deleteError(response.code())
+            throw Exception(mensaje)
+        }
     }
 
     /**
@@ -170,6 +178,12 @@ class UserApiRepository(
 
     private fun sanctionError(code: Int): String = when (code) {
         403 -> "Solo un administrador con sesión activa puede aplicar sanciones"
+        404 -> "Usuario no encontrado"
+        else -> "Error del servidor ($code)"
+    }
+
+    private fun deleteError(code: Int): String = when (code) {
+        403 -> "No se pudo eliminar esta cuenta"
         404 -> "Usuario no encontrado"
         else -> "Error del servidor ($code)"
     }

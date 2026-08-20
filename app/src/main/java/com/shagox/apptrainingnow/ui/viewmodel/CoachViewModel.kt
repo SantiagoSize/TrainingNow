@@ -123,9 +123,17 @@ class CoachViewModel(
     fun loadClientById(clientId: Int) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, clientNotFound = false) }
+            // Defensa extra: además de traer el usuario por ID, se confirma que sea
+            // REALMENTE cliente de este entrenador (existe relación en trainer_clients).
+            // Sin esto, si algún día un ID quedara mal referenciado (datos de prueba viejos,
+            // reinstalaciones a medias, etc.) se podía mostrar el perfil de una persona que
+            // no tiene nada que ver — pasaba silencioso porque getUserById solo valida que
+            // el ID exista en la tabla de usuarios, no que sea cliente de este entrenador.
             val client = userRepository.getUserById(clientId)
-            _selectedClient.value = client
-            if (client != null) {
+            val esClienteDeEsteEntrenador = client != null &&
+                trainerRepository.getClientRelation(trainerId, clientId) != null
+            _selectedClient.value = if (esClienteDeEsteEntrenador) client else null
+            if (esClienteDeEsteEntrenador) {
                 loadClientDetails(clientId)
             } else {
                 _uiState.update { it.copy(clientNotFound = true) }

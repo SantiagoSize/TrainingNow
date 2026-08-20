@@ -72,11 +72,27 @@ fun CreateRoutineScreen(
     onBack: () -> Unit,
     onSaveRoutine: (name: String, days: List<DayRoutineInput>, targetEmailOrId: String?, esPlantilla: Boolean) -> Unit = { _, _, _, _ -> },
     clientDisplayName: String? = null,
-    esEntrenadorSinCliente: Boolean = false
+    esEntrenadorSinCliente: Boolean = false,
+    // Modo edición: precarga nombre y días de una rutina propia existente. Se identifica por
+    // nombre de día (dayLabel), en el mismo orden Domingo→Sábado que usa DAYS acá arriba.
+    initialRoutineName: String? = null,
+    initialDays: List<DayRoutineInput>? = null
 ) {
-    var routineName by remember { mutableStateOf("") }
+    val esEdicion = initialRoutineName != null
+    var routineName by remember { mutableStateOf(initialRoutineName ?: "") }
     var selectedDayIndex by remember { mutableIntStateOf(0) }
-    var daysData by remember { mutableStateOf(List(7) { DayData("", emptyList()) }) }
+    var daysData by remember {
+        mutableStateOf(
+            if (initialDays != null) {
+                DAYS.map { (_, nombreDia) ->
+                    val dia = initialDays.firstOrNull { it.dayLabel == nombreDia }
+                    DayData(dia?.activityName ?: "", dia?.exerciseNames ?: emptyList())
+                }
+            } else {
+                List(7) { DayData("", emptyList()) }
+            }
+        )
+    }
     var exerciseName by remember { mutableStateOf("") }
     var modoEntrenador by remember { mutableStateOf("PLANTILLA") } // PLANTILLA | COMPARTIR
     var targetInput by remember { mutableStateOf("") }
@@ -103,7 +119,11 @@ fun CreateRoutineScreen(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
         ) {
             ScreenHeaderTN(
-                subtitle = if (clientDisplayName != null) "Para $clientDisplayName" else "Nueva",
+                subtitle = when {
+                    clientDisplayName != null -> "Para $clientDisplayName"
+                    esEdicion -> "Editar"
+                    else -> "Nueva"
+                },
                 title = "RUTINA",
                 actionIcon = Icons.AutoMirrored.Filled.ArrowBack,
                 onActionClick = onBack,
@@ -144,7 +164,7 @@ fun CreateRoutineScreen(
                 OutlinedTextFieldTN(
                     value = targetInput,
                     onValueChange = { targetInput = it; errorGuardado = null },
-                    placeholder = "Correo o ID del usuario"
+                    placeholder = "Correo del usuario"
                 )
             }
             errorGuardado?.let {
@@ -340,7 +360,7 @@ fun CreateRoutineScreen(
         Button(
             onClick = {
                 if (esEntrenadorSinCliente && modoEntrenador == "COMPARTIR" && targetInput.isBlank()) {
-                    errorGuardado = "Ingresa el correo o ID del usuario"
+                    errorGuardado = "Ingresa el correo del usuario"
                     return@Button
                 }
                 if (routineName.isBlank()) {
@@ -362,7 +382,7 @@ fun CreateRoutineScreen(
             shape = RoundedCornerShape(14.dp)
         ) {
             Text(
-                text = "Guardar rutina",
+                text = if (esEdicion) "Guardar cambios" else "Guardar rutina",
                 color = TextoPrincipal,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold

@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
@@ -52,7 +54,8 @@ fun PerfilContactoDialog(
     onSilenciar: (() -> Unit)? = null,
     onDesilenciar: (() -> Unit)? = null,
     onEliminarConversacion: (() -> Unit)? = null,
-    onReportar: (() -> Unit)? = null
+    onReportar: (() -> Unit)? = null,
+    onEliminarDeMisChats: (() -> Unit)? = null
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -94,7 +97,15 @@ fun PerfilContactoDialog(
             }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Con foto + datos + las opciones (silenciar/bloquear/eliminar y sus paneles de
+            // confirmación) el contenido puede pasarse de la altura del diálogo — sin scroll,
+            // los botones "Eliminar"/"Cancelar" de más abajo quedaban invisibles/cortados.
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 if (usuario.role == "TRAINER" && !usuario.specializations.isNullOrBlank()) {
                     Text(usuario.specializations, color = VerdeTN, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
@@ -132,7 +143,10 @@ fun PerfilContactoDialog(
                             onEliminarConversacion()
                             onDismiss()
                         },
-                        onReportar = onReportar?.let { { onDismiss(); it() } }
+                        onReportar = onReportar?.let { { onDismiss(); it() } },
+                        onEliminarDeMisChats = onEliminarDeMisChats?.let {
+                            { it(); onDismiss() }
+                        }
                     )
                 }
             }

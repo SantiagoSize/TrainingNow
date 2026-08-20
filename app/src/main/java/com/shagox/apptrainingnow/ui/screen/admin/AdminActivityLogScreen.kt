@@ -2,25 +2,28 @@ package com.shagox.apptrainingnow.ui.screen.admin
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -28,9 +31,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shagox.apptrainingnow.data.remote.dto.AuditLogDto
 import com.shagox.apptrainingnow.data.repository.AuditLogRepository
+import com.shagox.apptrainingnow.ui.components.BackButtonTN
+import com.shagox.apptrainingnow.ui.theme.GrisBorde
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
+import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
 import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 import com.shagox.apptrainingnow.ui.theme.VerdeTN
 import kotlinx.coroutines.Dispatchers
@@ -72,51 +78,85 @@ fun AdminActivityLogScreen(onBack: () -> Unit) {
 
     val formatoFecha = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.Builder().setLanguage("es").setRegion("CL").build()) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Actividad") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver")
+    Box(modifier = Modifier.fillMaxSize().background(NegroFondo)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+
+            // ===== Cabecera con degradado (misma estética que el resto del panel admin) =====
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Brush.verticalGradient(listOf(VerdeTN.copy(alpha = 0.20f), NegroFondo)))
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 18.dp)
+            ) {
+                Column {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        BackButtonTN(text = "Volver", onClick = onBack, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { scope.launch { cargar() } }) {
+                            Icon(Icons.Filled.Refresh, contentDescription = "Actualizar", tint = VerdeTN)
+                        }
                     }
-                },
-                actions = {
-                    IconButton(onClick = { scope.launch { cargar() } }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Actualizar", tint = NegroFondo)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(VerdeTN.copy(alpha = 0.2f))
+                                .border(1.dp, VerdeTN.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.History,
+                                contentDescription = null,
+                                tint = VerdeTN,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column {
+                            Text(
+                                text = "Actividad",
+                                color = TextoPrincipal,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                            Text(
+                                text = "Registro de acciones del panel admin",
+                                color = GrisTexto,
+                                fontSize = 13.sp
+                            )
+                        }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = VerdeTN,
-                    titleContentColor = NegroFondo,
-                    navigationIconContentColor = NegroFondo,
-                    actionIconContentColor = NegroFondo
-                )
-            )
-        },
-        containerColor = NegroFondo
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+                }
+            }
+
+            // Carrusel horizontal: con 5 filtros en una fila fija, el último ("Rutinas") se
+            // comprimía y el texto quedaba partido letra por letra en pantallas angostas.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FiltroActividad.entries.forEach { opcion ->
                     FilterChip(
                         selected = filtro == opcion,
                         onClick = { filtro = opcion },
-                        label = { Text(opcion.etiqueta, fontSize = 12.sp) },
+                        label = { Text(opcion.etiqueta, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
+                        shape = RoundedCornerShape(20.dp),
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = VerdeTN,
                             selectedLabelColor = TextoSobreVerde,
                             containerColor = GrisFondo,
-                            labelColor = Color.White
+                            labelColor = TextoPrincipal
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = filtro == opcion,
+                            borderColor = GrisBorde,
+                            selectedBorderColor = VerdeTN
                         )
                     )
                 }
@@ -215,6 +255,7 @@ private fun descripcionAccion(action: String): Triple<ImageVector, Color, String
         "USER_DELETED" -> Triple(Icons.Filled.Delete, Color(0xFFE57373), "eliminó a un usuario")
         "USER_RESTRICTION_LIFTED" -> Triple(Icons.Filled.LockOpen, VerdeTN, "levantó una restricción")
         "ROUTINE_GLOBAL_CREATED" -> Triple(Icons.Filled.CalendarMonth, VerdeTN, "publicó una rutina global")
+        "ROUTINE_GLOBAL_UPDATED" -> Triple(Icons.Filled.Edit, VerdeTN, "editó una rutina global")
         "ROUTINE_RENAMED" -> Triple(Icons.Filled.Edit, VerdeTN, "renombró una rutina global")
         "ROUTINE_DELETED" -> Triple(Icons.Filled.Delete, Color(0xFFE57373), "eliminó una rutina global")
         else -> Triple(Icons.Filled.PersonAdd, GrisTexto, action)

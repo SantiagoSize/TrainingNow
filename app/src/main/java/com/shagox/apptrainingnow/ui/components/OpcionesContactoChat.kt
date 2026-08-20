@@ -6,8 +6,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.DeleteForever
@@ -53,9 +56,11 @@ fun OpcionesContactoContenido(
     onSilenciar: () -> Unit,
     onDesilenciar: () -> Unit,
     onEliminarConversacion: () -> Unit,
-    onReportar: (() -> Unit)? = null
+    onReportar: (() -> Unit)? = null,
+    onEliminarDeMisChats: (() -> Unit)? = null
 ) {
     var confirmandoEliminar by remember { mutableStateOf(false) }
+    var confirmandoEliminarDeMisChats by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         if (onVerPerfil != null) {
@@ -121,6 +126,43 @@ fun OpcionesContactoContenido(
                 }
             }
         }
+
+        if (onEliminarDeMisChats != null) {
+            if (!confirmandoEliminarDeMisChats) {
+                OpcionContacto(
+                    icono = Icons.Default.DeleteForever,
+                    texto = "Eliminar de mis chats",
+                    tint = RojoEliminar,
+                    onClick = { confirmandoEliminarDeMisChats = true }
+                )
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = "¿Quitar este contacto de Mis chats? Se borra la conversación y deja de aparecer en la lista.",
+                        color = GrisTexto,
+                        fontSize = 13.sp
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { confirmandoEliminarDeMisChats = false }) {
+                            Text("Cancelar", color = GrisTexto)
+                        }
+                        TextButton(onClick = {
+                            confirmandoEliminarDeMisChats = false
+                            onEliminarDeMisChats()
+                        }) {
+                            Text("Eliminar", color = RojoEliminar, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -166,20 +208,26 @@ fun MenuOpcionesContactoDialog(
         containerColor = GrisFondo,
         title = { Text("Opciones del contacto", color = TextoPrincipal, fontSize = 17.sp) },
         text = {
-            OpcionesContactoContenido(
-                bloqueado = bloqueado,
-                silenciado = silenciado,
-                onVerPerfil = {
-                    onDismiss()
-                    onVerPerfil()
-                },
-                onBloquear = { onBloquear(); onDismiss() },
-                onDesbloquear = { onDesbloquear(); onDismiss() },
-                onSilenciar = { onSilenciar(); onDismiss() },
-                onDesilenciar = { onDesilenciar(); onDismiss() },
-                onEliminarConversacion = { onEliminarConversacion(); onDismiss() },
-                onReportar = onReportar?.let { { onDismiss(); it() } }
-            )
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                OpcionesContactoContenido(
+                    bloqueado = bloqueado,
+                    silenciado = silenciado,
+                    onVerPerfil = {
+                        onDismiss()
+                        onVerPerfil()
+                    },
+                    onBloquear = { onBloquear(); onDismiss() },
+                    onDesbloquear = { onDesbloquear(); onDismiss() },
+                    onSilenciar = { onSilenciar(); onDismiss() },
+                    onDesilenciar = { onDesilenciar(); onDismiss() },
+                    onEliminarConversacion = { onEliminarConversacion(); onDismiss() },
+                    onReportar = onReportar?.let { { onDismiss(); it() } }
+                )
+            }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {

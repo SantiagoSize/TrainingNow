@@ -36,7 +36,16 @@ class ChatRepository(
      * el contacto apenas se abre un chat, antes de poder escribir.
      */
     suspend fun asegurarUsuarioLocal(usuario: UserEntity) {
-        userDao.insertUser(usuario)
+        // OJO: insertUser usa OnConflictStrategy.REPLACE. SQLite implementa REPLACE como
+        // DELETE + INSERT de la fila en conflicto, y MessageEntity tiene FK onDelete=CASCADE
+        // hacia "users" (senderId/receiverId). Como este método se llama cada 15s (refresco
+        // periódico del contacto en ChatScreen), volver a insertar un usuario que YA existe
+        // disparaba ese DELETE interno y borraba en cascada TODOS sus mensajes locales cada
+        // vez que caía el refresco — se veía como si el chat "se borrara solo" al rato de
+        // escribir. Por eso ahora solo se inserta si la fila todavía no existe.
+        if (userDao.getUserById(usuario.id) == null) {
+            userDao.insertUser(usuario)
+        }
     }
 
     /** Borra del historial local los mensajes con más de 7 días de antigüedad. */
@@ -96,20 +105,54 @@ class ChatRepository(
     /**
      * Marca que el usuario abrió el chat con [contactId] (por ejemplo desde el Foro), aunque
      * todavía no le haya escrito ningún mensaje. A partir de ahora ese contacto aparece en
-     * "Mis chats". No pisa una preferencia de bloqueo/silencio ya existente.
+     * "Mis chats". No pisa una preferencia de bloqueo/silencio ya existente; si el contacto
+     * había sido quitado con "Eliminar de mis chats" (guardado = false), lo vuelve a marcar
+     * como guardado.
      */
     suspend fun marcarChatAbierto(ownerId: Int, contactId: Int) {
-        if (contactoPreferenciaDao.getPreferencia(ownerId, contactId) == null) {
-            contactoPreferenciaDao.upsert(ContactoPreferenciaEntity(ownerId, contactId))
+        val actual = contactoPreferenciaDao.getPreferencia(ownerId, contactId)
+        if (actual == null || !actual.guardado) {
+            contactoPreferenciaDao.upsert(
+                (actual ?: ContactoPreferenciaEntity(ownerId, contactId)).copy(guardado = true)
+            )
         }
     }
 
     /** IDs de contactos con los que ya existe al menos un mensaje intercambiado (local). */
     suspend fun obtenerContactosConMensajes(userId: Int): List<Int> = chatDao.getContactIds(userId)
 
-    /** Borra todo el historial local de la conversación (no afecta al backend). */
+    /**
+     * Borra todo el historial local de la conversación (no afecta al backend). Además marca
+     * "borrado hasta ahora": syncConversation() no debe volver a bajar del backend los mensajes
+     * de antes de este momento, o el borrado se revertía solo al reabrir el chat (ver
+     * ContactoPreferenciaEntity.historialBorradoHastaMs).
+     */
     suspend fun eliminarConversacion(myId: Int, otherId: Int) {
         chatDao.deleteConversation(myId, otherId)
+        val actual = contactoPreferenciaDao.getPreferencia(myId, otherId)
+        contactoPreferenciaDao.upsert(
+            (actual ?: ContactoPreferenciaEntity(myId, otherId))
+                .copy(historialBorradoHastaMs = System.currentTimeMillis())
+        )
+    }
+
+    /**
+     * Elimina el contacto de "Mis chats": borra el historial local y marca guardado = false
+     * para que deje de aparecer en la lista (a diferencia de [eliminarConversacion], que solo
+     * borra los mensajes pero mantiene el chat listado). A propósito NO borra la fila entera
+     * (como hacía antes): necesitamos conservar historialBorradoHastaMs, o si el usuario
+     * reabre el chat más tarde (marcarChatAbierto), syncConversation() no tendría con qué
+     * comparar y volvería a bajar del backend los mensajes ya borrados.
+     */
+    suspend fun eliminarDeMisChats(myId: Int, otherId: Int) {
+        chatDao.deleteConversation(myId, otherId)
+        val actual = contactoPreferenciaDao.getPreferencia(myId, otherId)
+        contactoPreferenciaDao.upsert(
+            (actual ?: ContactoPreferenciaEntity(myId, otherId)).copy(
+                guardado = false,
+                historialBorradoHastaMs = System.currentTimeMillis()
+            )
+        )
     }
 
     suspend fun sendMessage(message: MessageEntity) {
@@ -187,10 +230,13 @@ class ChatRepository(
             val existentes = locales.map {
                 Triple(it.senderId to it.receiverId, it.timestamp, it.content)
             }.toHashSet()
+            // Respeta el "Eliminar conversación": no revive mensajes de antes de ese borrado.
+            val borradoHasta = contactoPreferenciaDao.getPreferencia(myId, otherId)?.historialBorradoHastaMs ?: 0L
 
             for (m in remote) {
                 val key = Triple(m.senderId to m.receiverId, m.timestamp ?: 0L, m.content)
                 if (key in existentes) continue
+                if ((m.timestamp ?: 0L) <= borradoHasta) continue
                 try {
                     chatDao.insertMessage(
                         MessageEntity(

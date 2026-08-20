@@ -86,13 +86,6 @@ fun VideoPlayerDialog(videoUrl: String, onDismiss: () -> Unit) {
                                 )
                                 settings.javaScriptEnabled = true
                                 settings.mediaPlaybackRequiresUserGesture = false
-                                // El error 153 casi siempre es por cookies de terceros bloqueadas:
-                                // el WebView de Android las bloquea por defecto desde API 21, y el
-                                // player embebido de YouTube las necesita para validar la sesión.
-                                // Antes navegábamos directo a youtube.com/embed/... como documento
-                                // top-level (sin nunca activar cookies de terceros); ahora se carga
-                                // un <iframe> desde un wrapper local, que es el caso real para el
-                                // que existen esas cookies.
                                 settings.domStorageEnabled = true
                                 CookieManager.getInstance().apply {
                                     setAcceptCookie(true)

@@ -96,7 +96,7 @@ import java.util.Locale
 
 /**
  * Pantalla Perfil: pestaña para iniciar sesión y registrarse en la misma página.
- * Si el usuario está logueado, muestra sus datos y el botón Cerrar sesión.
+ * Si el usuario está logueado, muestra sus datos (cerrar sesión vive en Ajustes).
  */
 @Composable
 fun ProfileScreen(
@@ -136,8 +136,7 @@ fun ProfileScreen(
             ProfileLoggedContent(
                 user = loggedUser,
                 authViewModel = authViewModel,
-                onEdit = { showEditProfile = true },
-                onLogout = { authViewModel.logout() }
+                onEdit = { showEditProfile = true }
             )
 
             if (showEditProfile) {
@@ -374,8 +373,7 @@ private fun ProfileDataRow(
 private fun ProfileLoggedContent(
     user: UserEntity,
     authViewModel: AuthViewModel,
-    onEdit: () -> Unit,
-    onLogout: () -> Unit
+    onEdit: () -> Unit
 ) {
     val context = LocalContext.current
     var showPhotoOptions by remember { mutableStateOf(false) }
@@ -607,15 +605,6 @@ private fun ProfileLoggedContent(
             value = user.weight?.let { formatearPeso(context, it) } ?: "No registrado"
         )
 
-        Spacer(modifier = Modifier.height(28.dp))
-        Button(
-            onClick = onLogout,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFFE53935)),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text("CERRAR SESIÓN", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.SemiBold)
-        }
         Spacer(modifier = Modifier.height(24.dp))
     }
 
@@ -632,10 +621,26 @@ private fun ProfileLoggedContent(
 }
 
 private fun parseBirthDateToMillis(str: String?): Long? {
-    if (str.isNullOrBlank()) return null
+    if (str.isNullOrBlank() || str.trim().length != 10) return null
     return try {
-        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(str.trim())?.time
+        // isLenient = false: por defecto SimpleDateFormat "corrige" fechas imposibles en vez
+        // de rechazarlas (ej. mes 40 se convertía silenciosamente en una fecha futura años
+        // después, sin avisar). Con isLenient = false, día/mes fuera de rango lanza excepción.
+        val millis = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+            .apply { isLenient = false }
+            .parse(str.trim())?.time ?: return null
+        if (!esFechaNacimientoRazonable(millis)) return null
+        millis
     } catch (_: Exception) { null }
+}
+
+/** Rechaza fechas futuras y edades fuera de un rango humano razonable (0 a 120 años). */
+private fun esFechaNacimientoRazonable(millis: Long): Boolean {
+    val ahora = System.currentTimeMillis()
+    if (millis > ahora) return false
+    val edadMs = ahora - millis
+    val edadAnios = edadMs / (365.25 * 24 * 60 * 60 * 1000)
+    return edadAnios in 0.0..120.0
 }
 
 /**
@@ -775,13 +780,15 @@ private fun GenderOption(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(emoji, fontSize = 36.sp)
-        Spacer(modifier = Modifier.height(8.dp))
+        Text(emoji, fontSize = 28.sp)
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
             label,
             color = if (isSelected) VerdeTN else TextoPrincipal,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            lineHeight = 15.sp
         )
     }
 }
@@ -938,16 +945,12 @@ private fun EditProfileDialog(
                 value = phone,
                 onValueChange = { phone = it.filter { c -> c.isDigit() }.take(16) },
                 label = { Text("Teléfono", color = GrisTexto) },
-                placeholder = { Text("56912345678", color = GrisTexto) },
+                placeholder = { Text("Solo números", color = GrisTexto) },
                 leadingIcon = { Text(detectarBanderaTelefono(phone), fontSize = 20.sp) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
                 colors = textFieldColors,
                 shape = RoundedCornerShape(12.dp)
-            )
-            Text(
-                "Coloca el código de tu país sin el símbolo + (ej: 56 Chile, 54 Argentina, 1 EE.UU./Canadá)",
-                color = GrisTexto,
-                fontSize = 12.sp
             )
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
@@ -956,6 +959,12 @@ private fun EditProfileDialog(
                 label = { Text("Fecha nacimiento (dd/MM/yyyy)", color = GrisTexto) },
                 placeholder = { Text("Ej: 05061998", color = GrisTexto) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                isError = birthDateStr.length == 10 && parseBirthDateToMillis(birthDateStr) == null,
+                supportingText = {
+                    if (birthDateStr.length == 10 && parseBirthDateToMillis(birthDateStr) == null) {
+                        Text("Fecha inválida", color = androidx.compose.ui.graphics.Color(0xFFE53935))
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 colors = textFieldColors,
@@ -1201,15 +1210,11 @@ private fun RegisterTabContent(
             label = { Text("Teléfono", color = GrisTexto) },
             placeholder = { Text("56912345678", color = GrisTexto) },
             leadingIcon = { Text(detectarBanderaTelefono(registerState.phone), fontSize = 20.sp) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             colors = textFieldColors,
             shape = RoundedCornerShape(12.dp)
-        )
-        Text(
-            "Coloca el código de tu país sin el símbolo + (ej: 56 Chile, 54 Argentina, 1 EE.UU./Canadá)",
-            color = GrisTexto,
-            fontSize = 12.sp
         )
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -1747,6 +1752,12 @@ private fun OnboardingProfileDataPage(
         label = { Text("Fecha de nacimiento (dd/MM/yyyy)", color = GrisTexto) },
         placeholder = { Text("Ej: 05061998", color = GrisTexto) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        isError = birthDateStr.length == 10 && parseBirthDateToMillis(birthDateStr) == null,
+        supportingText = {
+            if (birthDateStr.length == 10 && parseBirthDateToMillis(birthDateStr) == null) {
+                Text("Fecha inválida", color = androidx.compose.ui.graphics.Color(0xFFE53935))
+            }
+        },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         colors = textFieldColors,

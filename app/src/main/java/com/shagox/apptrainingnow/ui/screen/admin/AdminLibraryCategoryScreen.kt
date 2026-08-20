@@ -336,6 +336,12 @@ private fun AdminExerciseFormDialog(
     var videoUrl by remember { mutableStateOf(initial?.videoUrl ?: "") }
     var muscles by remember { mutableStateOf(initial?.muscles ?: "") }
     var alternatives by remember { mutableStateOf(initial?.alternatives ?: "") }
+    var equipment by remember { mutableStateOf(initial?.equipment ?: "") }
+    var recommendedSets by remember { mutableStateOf(initial?.recommendedSets?.toString() ?: "") }
+    var recommendedReps by remember { mutableStateOf(initial?.recommendedReps ?: "") }
+    var restSeconds by remember { mutableStateOf(initial?.restSeconds?.toString() ?: "") }
+    var tips by remember { mutableStateOf(initial?.tips?.replace("|", "\n") ?: "") }
+    var commonMistakes by remember { mutableStateOf(initial?.commonMistakes?.replace("|", "\n") ?: "") }
     var difficulty by remember { mutableStateOf(initial?.difficulty ?: "PRINCIPIANTE") }
     var imageData by remember { mutableStateOf(initial?.imageUrl) }
     var comprimiendo by remember { mutableStateOf(false) }
@@ -455,9 +461,67 @@ private fun AdminExerciseFormDialog(
                     colors = fieldColors,
                     modifier = Modifier.fillMaxWidth()
                 )
+                OutlinedTextField(
+                    value = equipment,
+                    onValueChange = { equipment = it },
+                    label = { Text("Equipamiento") },
+                    placeholder = { Text("Ej: Prensa 45°, Barra y banco plano, Mancuernas") },
+                    singleLine = true,
+                    colors = fieldColors,
+                    modifier = Modifier.fillMaxWidth()
+                )
                 OutlinedTextField(value = videoUrl, onValueChange = { videoUrl = it },
                     label = { Text("URL del video") }, singleLine = true, colors = fieldColors,
                     modifier = Modifier.fillMaxWidth())
+
+                Text("Volumen recomendado", color = GrisTexto, fontSize = 12.sp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = recommendedSets,
+                        onValueChange = { recommendedSets = it.filter { c -> c.isDigit() } },
+                        label = { Text("Series") },
+                        singleLine = true,
+                        colors = fieldColors,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = recommendedReps,
+                        onValueChange = { recommendedReps = it },
+                        label = { Text("Reps") },
+                        placeholder = { Text("8-12") },
+                        singleLine = true,
+                        colors = fieldColors,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = restSeconds,
+                        onValueChange = { restSeconds = it.filter { c -> c.isDigit() } },
+                        label = { Text("Descanso (s)") },
+                        singleLine = true,
+                        colors = fieldColors,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                OutlinedTextField(
+                    value = tips,
+                    onValueChange = { tips = it },
+                    label = { Text("Consejos de técnica") },
+                    placeholder = { Text("Un consejo por línea\nOtro consejo...") },
+                    colors = fieldColors,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 70.dp)
+                )
+                OutlinedTextField(
+                    value = commonMistakes,
+                    onValueChange = { commonMistakes = it },
+                    label = { Text("Errores comunes") },
+                    placeholder = { Text("Un error por línea\nOtro error...") },
+                    colors = fieldColors,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 70.dp)
+                )
 
                 Text("Dificultad", color = GrisTexto, fontSize = 12.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -501,13 +565,14 @@ private fun AdminExerciseFormDialog(
                             difficulty = difficulty,
                             alternatives = alternatives.trim().takeIf { it.isNotBlank() },
                             instructions = pasos.takeIf { it.isNotEmpty() }?.joinToString("|"),
-                            // No editables desde este formulario: se preservan tal cual.
-                            equipment = initial?.equipment,
-                            tips = initial?.tips,
-                            commonMistakes = initial?.commonMistakes,
-                            recommendedSets = initial?.recommendedSets,
-                            recommendedReps = initial?.recommendedReps,
-                            restSeconds = initial?.restSeconds,
+                            equipment = equipment.trim().takeIf { it.isNotBlank() },
+                            recommendedSets = recommendedSets.toIntOrNull(),
+                            recommendedReps = recommendedReps.trim().takeIf { it.isNotBlank() },
+                            restSeconds = restSeconds.toIntOrNull(),
+                            tips = tips.lines().map { it.trim() }.filter { it.isNotBlank() }
+                                .takeIf { it.isNotEmpty() }?.joinToString("|"),
+                            commonMistakes = commonMistakes.lines().map { it.trim() }.filter { it.isNotBlank() }
+                                .takeIf { it.isNotEmpty() }?.joinToString("|"),
                             isSystemDefault = initial?.isSystemDefault ?: false
                         )
                     )

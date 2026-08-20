@@ -143,7 +143,9 @@ fun CoachRoutinesScreen(
                     RoutineCard(
                         routine = routine,
                         onClick = { onRoutineClick(routine.id) },
-                        onDelete = { showDeleteDialog = routine },
+                        // Las rutinas globales (ownerId=null) son del admin: el entrenador ya no
+                        // puede borrarlas desde aquí, solo sus propias rutinas/plantillas/asignadas.
+                        onDelete = if (routine.ownerId != null) { { showDeleteDialog = routine } } else null,
                         onShare = if (routine.isTemplate) { { shareDialogFor = routine } } else null
                     )
                 }
@@ -171,7 +173,7 @@ fun CoachRoutinesScreen(
                         value = input,
                         onValueChange = { input = it; error = null },
                         singleLine = true,
-                        label = { Text("Correo o ID del usuario") },
+                        label = { Text("Correo del usuario") },
                         colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextoPrincipal,
                             unfocusedTextColor = TextoPrincipal,
@@ -190,14 +192,14 @@ fun CoachRoutinesScreen(
                 TextButton(
                     enabled = !enviando,
                     onClick = {
-                        if (input.isBlank()) { error = "Ingresa el correo o ID del usuario"; return@TextButton }
+                        if (input.isBlank()) { error = "Ingresa el correo del usuario"; return@TextButton }
                         enviando = true
                         scope.launch {
                             val targetId = input.trim().toIntOrNull()
                                 ?: userRepository?.getAllUsers()?.first()
                                     ?.firstOrNull { it.email.equals(input.trim(), ignoreCase = true) }?.id
                             if (targetId == null || targetId <= 0) {
-                                error = "No se encontró un usuario con ese correo o ID"
+                                error = "No se encontró un usuario con ese correo"
                                 enviando = false
                             } else {
                                 routineRepository?.shareTemplateWithUser(plantilla.id, trainerId, targetId)
@@ -315,7 +317,7 @@ private fun StatItem(
 private fun RoutineCard(
     routine: RoutineEntity,
     onClick: () -> Unit,
-    onDelete: () -> Unit,
+    onDelete: (() -> Unit)?,
     onShare: (() -> Unit)? = null
 ) {
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
@@ -373,12 +375,14 @@ private fun RoutineCard(
                             )
                         }
                     }
-                    IconButton(onClick = onDelete) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Eliminar",
-                            tint = Color(0xFFE57373)
-                        )
+                    if (onDelete != null) {
+                        IconButton(onClick = onDelete) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Eliminar",
+                                tint = Color(0xFFE57373)
+                            )
+                        }
                     }
                 }
             }

@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.HeadsetMic
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayCircleFilled
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -63,6 +64,7 @@ import com.shagox.apptrainingnow.ui.theme.TextoPrincipal
 import com.shagox.apptrainingnow.ui.theme.TextoSobreVerde
 import com.shagox.apptrainingnow.utils.ComposeFileProvider
 import com.shagox.apptrainingnow.utils.ImageCompressor
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -252,8 +254,21 @@ fun ChatScreen(
     LaunchedEffect(trainerId) {
         while (true) {
             try {
-                trainer = userRepository.getUserById(trainerId)
-                trainer?.let { chatRepository.asegurarUsuarioLocal(it) }
+                val cargado = userRepository.getUserById(trainerId)
+                // Sincroniza el usuario REAL en Room (FK de MessageEntity); el renombre a
+                // "Soporte TrainingNow!" es solo de UI, no debe pisar el nombre real cacheado.
+                cargado?.let { chatRepository.asegurarUsuarioLocal(it) }
+                // Un ADMIN siempre se muestra como "Soporte TrainingNow!" (igual que en la
+                // lista de Mis Chats, ver UserChatsScreen). Antes solo se renombraba ahí: al
+                // entrar al chat se volvía a cargar el usuario real y mostraba "Admin
+                // TrainingNow" con su avatar de iniciales, inconsistente con la card.
+                trainer = if (cargado?.role == "ADMIN") {
+                    cargado.copy(name = "Soporte", lastName = "TrainingNow!")
+                } else {
+                    cargado
+                }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 android.util.Log.e("ChatScreen", "Error al cargar entrenador", e)
             }
@@ -267,6 +282,8 @@ fun ChatScreen(
                 chatRepository.asegurarUsuarioLocal(it)
                 miNombre = "${it.name} ${it.lastName}".trim().ifBlank { "Un usuario" }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             android.util.Log.e("ChatScreen", "Error al sincronizar mi usuario local", e)
         }
@@ -379,22 +396,33 @@ fun ChatScreen(
                         },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val currentTrainerParaAvatar = trainer
+                    val esSoporte = currentTrainerParaAvatar?.role == "ADMIN"
                     Box(
                         modifier = Modifier
                             .size(50.dp)
                             .shadow(elevation = 4.dp, shape = CircleShape)
                             .clip(CircleShape)
-                            .background(Color.Gray),
+                            .background(if (esSoporte) VerdeTN.copy(alpha = 0.2f) else Color.Gray),
                         contentAlignment = Alignment.Center
                     ) {
                         val currentTrainer = trainer
                         val photoUrl = currentTrainer?.profilePhotoUrl
-                        if (photoUrl != null && photoUrl.isNotBlank()) {
+                        if (esSoporte) {
+                            // Mismo ícono de audífonos que la card en Mis Chats (UserChatsScreen),
+                            // para que "Soporte TrainingNow!" se vea igual en la lista y al entrar.
+                            Icon(
+                                imageVector = Icons.Filled.HeadsetMic,
+                                contentDescription = "Soporte técnico",
+                                tint = VerdeTN,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        } else if (photoUrl != null && photoUrl.isNotBlank()) {
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
                                     .data(photoUrl)
                                     .build(),
-                                contentDescription = "Foto de ${currentTrainer.name}",
+                                contentDescription = "Foto de ${currentTrainer?.name}",
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
@@ -599,7 +627,14 @@ fun ChatScreen(
                 onSilenciar = { scope.launch { chatRepository.silenciarContacto(currentUserId, trainerId) } },
                 onDesilenciar = { scope.launch { chatRepository.desilenciarContacto(currentUserId, trainerId) } },
                 onEliminarConversacion = {
+                    // Solo borra los mensajes (local, no afecta al backend): el usuario se
+                    // queda en este mismo chat, ahora vacío, no vuelve al Foro/lista.
                     scope.launch { chatRepository.eliminarConversacion(currentUserId, trainerId) }
+                },
+                onEliminarDeMisChats = {
+                    // Esta sí quita al contacto de "Mis chats" por completo: ahí no tiene
+                    // sentido quedarse en la pantalla de un chat que ya no está en la lista.
+                    scope.launch { chatRepository.eliminarDeMisChats(currentUserId, trainerId) }
                     onBack()
                 },
                 onReportar = { mostrarReportar = true }
@@ -618,8 +653,8 @@ fun ChatScreen(
             onSilenciar = { scope.launch { chatRepository.silenciarContacto(currentUserId, trainerId) } },
             onDesilenciar = { scope.launch { chatRepository.desilenciarContacto(currentUserId, trainerId) } },
             onEliminarConversacion = {
+                // Igual que arriba: borra mensajes locales, se queda en el chat.
                 scope.launch { chatRepository.eliminarConversacion(currentUserId, trainerId) }
-                onBack()
             },
             onReportar = { mostrarReportar = true }
         )

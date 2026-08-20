@@ -103,13 +103,17 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
         fun createRoute(clientId: Int): String = "client_detail/$clientId"
     }
     
-    /** Crear/editar rutina. isGlobal=true solo lo usa el admin desde "Entrenamiento Global". */
-    data object CreateRoutine : Route("create_routine?clientId={clientId}&global={global}", "Nueva Rutina", Icons.Filled.Edit) {
-        fun createRoute(clientId: Int? = null, isGlobal: Boolean = false): String {
-            val base = if (clientId != null) "create_routine?clientId=$clientId" else "create_routine"
-            return if (isGlobal) {
-                if (clientId != null) "$base&global=true" else "$base?global=true"
-            } else base
+    /** Crear/editar rutina. isGlobal=true solo lo usa el admin desde "Entrenamiento Global".
+     *  editRoutineId != null: abre la pantalla precargada con esa rutina propia para editarla. */
+    data object CreateRoutine : Route("create_routine?clientId={clientId}&global={global}&editRoutineId={editRoutineId}", "Nueva Rutina", Icons.Filled.Edit) {
+        fun createRoute(clientId: Int? = null, isGlobal: Boolean = false, editRoutineId: Int? = null): String {
+            var route = "create_routine"
+            val params = mutableListOf<String>()
+            if (clientId != null) params.add("clientId=$clientId")
+            if (isGlobal) params.add("global=true")
+            if (editRoutineId != null) params.add("editRoutineId=$editRoutineId")
+            if (params.isNotEmpty()) route += "?" + params.joinToString("&")
+            return route
         }
     }
     
@@ -186,7 +190,6 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
         val coachBottomNavRoutes = listOf(
             CoachClients,
             CoachRoutines,
-            CoachChats,
             Settings,
             Profile
         )
@@ -230,8 +233,10 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
                     listOf(UserRoutines.path, CoachRoutines.path, AdminPanel.path)
 
                 // ===== Chats =====
+                // El entrenador ya no tiene tab de "Mensajes": ahora se chatea desde el ícono
+                // de chat en cada tarjeta de "Mis Clientes", así que ese chat resalta ese tab.
                 ruta.startsWith("chat_detail") ->
-                    listOf(UserChats.path, CoachChats.path, AdminChats.path)
+                    listOf(UserChats.path, CoachClients.path, AdminChats.path)
 
                 // ===== Clientes del entrenador =====
                 ruta.startsWith("client_detail") ||
@@ -278,7 +283,8 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
                     CoachClients,
                     CoachRoutines,
                     CoachPublicProfile,
-                    CoachChats,
+                    // Sin tab de "Mensajes": ahora se chatea desde el ícono de chat en cada
+                    // tarjeta de "Mis Clientes" (ver CoachClientsScreen.ClientCard).
                     Settings,
                     Profile
                 )
@@ -292,4 +298,18 @@ sealed class Route(val path: String, val title: String, val icon: ImageVector) {
             }
         }
     }
+}
+
+/**
+ * Permite que una pantalla "protegida" (por ahora, [com.shagox.apptrainingnow.ui.screen.RoutineActiveScreen])
+ * intercepte la navegación de la bottom nav bar antes de que descarte su entrada del back stack.
+ *
+ * Sin esto, tocar un tab de [com.shagox.apptrainingnow.ui.components.BottomNavigationBarTN] hace
+ * un popUpTo que saca la pantalla activa del back stack SIN pasar por ningún callback suyo — se
+ * saltaba por completo el diálogo de "¿salir de la rutina?" (solo la flecha del header lo mostraba).
+ * La pantalla protegida registra aquí un interceptor mientras está en composición; la bottom nav,
+ * si hay uno registrado, le delega la navegación en vez de ejecutarla directo.
+ */
+object RoutineExitGuard {
+    var interceptor: ((onConfirmado: () -> Unit) -> Unit)? = null
 }

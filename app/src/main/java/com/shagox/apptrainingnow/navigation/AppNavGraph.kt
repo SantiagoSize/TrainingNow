@@ -333,7 +333,16 @@ fun AppNavGraph(
                 val chatLoginState by authViewModel.loginState.collectAsState()
                 val chatUser = chatLoginState.loggedUser
                 if (chatUser == null) {
-                    ChatBlockedScreen(onGoToProfile = { navController.navigate(Route.Profile.path) })
+                    ChatBlockedScreen(onGoToProfile = {
+                        // Sin popUpTo/launchSingleTop esto apilaba Profile ENCIMA de UserChats
+                        // en el back stack (a diferencia del resto de tabs, que usan ese patrón
+                        // en BottomNavigationBarTN). Si el usuario no se registraba y volvía a
+                        // tocar "Chat", el tab quedaba con estado corrupto y no reaccionaba más.
+                        navController.navigate(Route.Profile.path) {
+                            popUpTo(Route.UserChats.path) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    })
                 } else {
                     UserChatsScreen(
                         userRepository = userRepository,
@@ -432,6 +441,14 @@ fun AppNavGraph(
                             .putString("active_routine_route", route)
                             .apply()
                         navController.navigate(route)
+                    },
+                    onEditRoutine = { routine ->
+                        navController.navigate(Route.CreateRoutine.createRoute(editRoutineId = routine.id))
+                    },
+                    onDeleteRoutine = { routine ->
+                        CoroutineScope(Dispatchers.IO).launch {
+                            routineRepository.deleteRoutine(routine)
+                        }
                     }
                 )
             }
@@ -534,21 +551,8 @@ fun AppNavGraph(
                 }
             }
 
-            composable(Route.CoachChats.path) {
-                // Chats del entrenador: SUS clientes (no la lista de otros entrenadores).
-                if (trainerRepository != null) {
-                    com.shagox.apptrainingnow.ui.screen.CoachChatsScreen(
-                        trainerRepository = trainerRepository,
-                        chatRepository = chatRepository,
-                        currentUserId = currentUserId,
-                        onNavigateToChat = { clientId ->
-                            navController.navigate(Route.ChatDetail.createRoute(clientId))
-                        }
-                    )
-                } else {
-                    LoadingScreen()
-                }
-            }
+            // Nota: se quitó el tab "Mensajes" (Route.CoachChats) del entrenador — se
+            // chatea con clientes desde el ícono de chat en cada tarjeta de "Mis Clientes".
 
             // ==================== PANTALLAS DE ADMIN ====================
 
@@ -570,7 +574,6 @@ fun AppNavGraph(
                     onRutinasGlobales = { navController.navigate(Route.AdminGlobalRoutines.path) },
                     onEnviarMensajes = { navController.navigate(Route.AdminMessages.path) },
                     onVerActividad = { navController.navigate(Route.AdminActivityLog.path) },
-                    onVerReportes = { navController.navigate(Route.AdminReports.path) },
                     onGestionUsuarios = { navController.navigate(Route.AdminUserManagement.path) }
                 )
             }
@@ -594,6 +597,9 @@ fun AppNavGraph(
                 AdminGlobalRoutinesScreen(
                     routineRepository = routineRepository,
                     onBack = { navController.popBackStack() },
+                    onEditRoutine = { routineId ->
+                        navController.navigate(Route.CreateRoutine.createRoute(isGlobal = true, editRoutineId = routineId))
+                    },
                     actorId = currentUserId,
                     actorName = actorDisplayName,
                     actorRole = userRole
@@ -630,6 +636,7 @@ fun AppNavGraph(
                     userRepository = userRepository,
                     chatRepository = chatRepository,
                     adminId = currentUserId,
+                    adminName = actorDisplayName,
                     onBack = { navController.popBackStack() },
                     onSuccess = { navController.popBackStack() }
                 )
@@ -820,12 +827,18 @@ fun AppNavGraph(
                     navArgument("global") {
                         type = NavType.BoolType
                         defaultValue = false
+                    },
+                    navArgument("editRoutineId") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
                     }
                 )
             ) { backStackEntry ->
                 val clientIdStr = backStackEntry.arguments?.getString("clientId")
                 val clientId = clientIdStr?.toIntOrNull()
                 val esGlobal = backStackEntry.arguments?.getBoolean("global") ?: false
+                val editRoutineId = backStackEntry.arguments?.getString("editRoutineId")?.toIntOrNull()
                 val esEntrenadorSinCliente = (userRole == "TRAINER" || userRole == "COACH") && clientId == null && !esGlobal
                 var clientDisplayName by remember { mutableStateOf<String?>(null) }
                 LaunchedEffect(clientId) {
@@ -835,7 +848,40 @@ fun AppNavGraph(
                         }
                     }
                 }
+                // Modo edición: precarga nombre y días de la rutina propia que se va a editar.
+                var initialRoutineName by remember(editRoutineId) { mutableStateOf<String?>(null) }
+                var initialDays by remember(editRoutineId) {
+                    mutableStateOf<List<com.shagox.apptrainingnow.data.repository.DayRoutineInput>?>(null)
+                }
+                LaunchedEffect(editRoutineId) {
+                    if (editRoutineId != null) {
+                        routineRepository.getRoutineWithDays(editRoutineId, effectiveUserId).first()?.let { conDias ->
+                            initialRoutineName = conDias.header.name
+                            initialDays = conDias.days.map { dia ->
+                                com.shagox.apptrainingnow.data.repository.DayRoutineInput(
+                                    dayLabel = dia.dayLabel,
+                                    activityName = dia.activityName,
+                                    exerciseNames = dia.exercises.map { it.name }
+                                )
+                            }
+                        }
+                    }
+                }
+                // Si es edición, espera a que carguen nombre/días antes de componer la pantalla:
+                // CreateRoutineScreen solo lee initialRoutineName/initialDays una vez (remember),
+                // así que mostrarla antes de que termine la carga async dejaría el formulario vacío.
+                if (editRoutineId != null && initialRoutineName == null) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Color.White)
+                    }
+                    return@composable
+                }
                 CreateRoutineScreen(
+                    initialRoutineName = initialRoutineName,
+                    initialDays = initialDays,
                     onBack = { navController.popBackStack() },
                     onSaveRoutine = { name, days, targetEmailOrId, esPlantilla ->
                         CoroutineScope(Dispatchers.IO).launch {
@@ -856,12 +902,23 @@ fun AppNavGraph(
                                     )
                                 )
                             } else if (esGlobal) {
+                                // Edición de una rutina global existente: se borra (cascada limpia
+                                // días/ejercicios) y se recrea con saveGlobalRoutine para que
+                                // conserve ownerId = null. Antes esta rama no distinguía edición
+                                // de creación y, si se reutilizaba el flujo de "editar rutina
+                                // propia" (savePersonalRoutine), la rutina dejaba de ser global
+                                // y pasaba a pertenecer al admin que la editó.
+                                if (editRoutineId != null) {
+                                    routineRepository.getRoutineById(editRoutineId)?.let { existente ->
+                                        routineRepository.deleteRoutine(existente)
+                                    }
+                                }
                                 routineRepository.saveGlobalRoutine(currentUserId, name, days)
                                 com.shagox.apptrainingnow.data.repository.AuditLogRepository().log(
                                     actorId = currentUserId,
                                     actorName = actorDisplayName,
                                     actorRole = userRole,
-                                    action = "ROUTINE_GLOBAL_CREATED",
+                                    action = if (editRoutineId != null) "ROUTINE_GLOBAL_UPDATED" else "ROUTINE_GLOBAL_CREATED",
                                     targetType = "ROUTINE",
                                     targetName = name
                                 )
@@ -875,7 +932,7 @@ fun AppNavGraph(
                                 if (targetUserId == null || targetUserId <= 0) {
                                     withContext(Dispatchers.Main) {
                                         android.widget.Toast.makeText(
-                                            context, "No se encontró un usuario con ese correo o ID", android.widget.Toast.LENGTH_LONG
+                                            context, "No se encontró un usuario con ese correo", android.widget.Toast.LENGTH_LONG
                                         ).show()
                                     }
                                 } else {
@@ -894,6 +951,14 @@ fun AppNavGraph(
                                         )
                                     )
                                 }
+                            } else if (editRoutineId != null) {
+                                // Edición: no existe un "update" multi-día, se borra la rutina
+                                // anterior (cascada limpia días/ejercicios) y se recrea con los
+                                // datos editados, conservando el mismo dueño.
+                                routineRepository.getRoutineById(editRoutineId)?.let { existente ->
+                                    routineRepository.deleteRoutine(existente)
+                                }
+                                routineRepository.savePersonalRoutine(effectiveUserId, name, days)
                             } else {
                                 routineRepository.savePersonalRoutine(effectiveUserId, name, days)
                             }

@@ -26,6 +26,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
@@ -54,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import com.shagox.apptrainingnow.data.local.routine.RoutineEntity
 import com.shagox.apptrainingnow.data.repository.RoutineRepository
 import com.shagox.apptrainingnow.ui.components.ScreenHeaderTN
+import com.shagox.apptrainingnow.ui.theme.GrisBorde
 import com.shagox.apptrainingnow.ui.theme.GrisFondo
 import com.shagox.apptrainingnow.ui.theme.GrisTexto
 import com.shagox.apptrainingnow.ui.theme.NegroFondo
@@ -79,6 +82,8 @@ fun UserRoutinesScreen(
     onCrearCuenta: () -> Unit = {},
     onCreateRoutine: () -> Unit,
     onRoutineClick: (routineId: Int) -> Unit,
+    onEditRoutine: (RoutineEntity) -> Unit = {},
+    onDeleteRoutine: (RoutineEntity) -> Unit = {},
     userRepository: com.shagox.apptrainingnow.data.repository.IUserRepository? = null
 ) {
     val globalRoutines by routineRepository.getGlobalRoutines().collectAsState(initial = emptyList())
@@ -105,6 +110,8 @@ fun UserRoutinesScreen(
         onCrearCuenta = onCrearCuenta,
         onCreateRoutine = onCreateRoutine,
         onRoutineClick = onRoutineClick,
+        onEditRoutine = onEditRoutine,
+        onDeleteRoutine = onDeleteRoutine,
         currentUserId = userId,
         trainerNames = trainerNames
     )
@@ -121,6 +128,8 @@ private fun UserRoutinesScreenContent(
     onCrearCuenta: () -> Unit = {},
     onCreateRoutine: () -> Unit,
     onRoutineClick: (routineId: Int) -> Unit,
+    onEditRoutine: (RoutineEntity) -> Unit = {},
+    onDeleteRoutine: (RoutineEntity) -> Unit = {},
     currentUserId: Int = 0,
     trainerNames: Map<Int, String> = emptyMap()
 ) {
@@ -261,11 +270,11 @@ private fun UserRoutinesScreenContent(
             }
 
             items(propias, key = { "own_${it.id}" }) { routine ->
-                RoutineCard(
-                    title = routine.name,
-                    subtitle = routine.dayInfo,
-                    icon = Icons.Filled.FitnessCenter,
-                    onClick = { onRoutineClick(routine.id) }
+                RutinaPropiaCard(
+                    routine = routine,
+                    onClick = { onRoutineClick(routine.id) },
+                    onEditar = { onEditRoutine(routine) },
+                    onEliminar = { onDeleteRoutine(routine) }
                 )
             }
 
@@ -431,6 +440,94 @@ private const val LIMITE_SUBTITULO = 34
 private fun String.limitado(max: Int): String =
     if (length > max) trim().take(max).trimEnd() + "…" else this
 
+/**
+ * RoutineCard de "Creados por ti" + un botón de opciones (lápiz) en la esquina superior
+ * derecha, con "Editar" y "Eliminar" dentro (a pedido: el eliminar va adentro del editar,
+ * no como botones separados). Eliminar pide confirmación porque también borra el progreso
+ * registrado en esa rutina.
+ */
+@Composable
+private fun RutinaPropiaCard(
+    routine: RoutineEntity,
+    onClick: () -> Unit,
+    onEditar: () -> Unit,
+    onEliminar: () -> Unit
+) {
+    var menuAbierto by remember { mutableStateOf(false) }
+    var confirmarEliminar by remember { mutableStateOf(false) }
+
+    Box {
+        RoutineCard(
+            title = routine.name,
+            subtitle = routine.dayInfo,
+            icon = Icons.Filled.FitnessCenter,
+            onClick = onClick
+        )
+        Box(modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)) {
+            androidx.compose.material3.IconButton(
+                onClick = { menuAbierto = true },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Filled.Edit,
+                    contentDescription = "Opciones de la rutina",
+                    tint = GrisTexto,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            androidx.compose.material3.DropdownMenu(
+                expanded = menuAbierto,
+                onDismissRequest = { menuAbierto = false }
+            ) {
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text("Editar rutina") },
+                    leadingIcon = {
+                        Icon(androidx.compose.material.icons.Icons.Filled.Edit, contentDescription = null)
+                    },
+                    onClick = { menuAbierto = false; onEditar() }
+                )
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text("Eliminar rutina", color = RojoAviso) },
+                    leadingIcon = {
+                        Icon(
+                            androidx.compose.material.icons.Icons.Filled.Delete,
+                            contentDescription = null,
+                            tint = RojoAviso
+                        )
+                    },
+                    onClick = { menuAbierto = false; confirmarEliminar = true }
+                )
+            }
+        }
+    }
+
+    if (confirmarEliminar) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmarEliminar = false },
+            containerColor = GrisFondo,
+            title = { Text("¿Eliminar \"${routine.name}\"?", color = TextoPrincipal, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Se borrará la rutina y todo el progreso registrado en ella. Esta acción no se puede deshacer.",
+                    color = GrisTexto
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.Button(
+                    onClick = { confirmarEliminar = false; onEliminar() },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = RojoAviso, contentColor = Color.White)
+                ) { Text("ELIMINAR", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                androidx.compose.material3.Button(
+                    onClick = { confirmarEliminar = false },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = GrisBorde, contentColor = Color.White)
+                ) { Text("Cancelar") }
+            }
+        )
+    }
+}
+
 /** Tarjeta de rutina: mismo estilo que categorías/ejercicios (GrisFondo, borde VerdeTN, icono verde). */
 @Composable
 private fun RoutineCard(
@@ -450,7 +547,12 @@ private fun RoutineCard(
             .clickable(onClick = onClick)
             .padding(16.dp)
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        // fillMaxWidth (no fillMaxSize): en el carrusel de recomendadas el Box padre tiene alto
+        // fijo (230x158) así que fillMaxSize funcionaba, pero en "Creados por ti" el Box va
+        // suelto dentro de un LazyColumn vertical sin alto fijo -> fillMaxSize pedía llenar una
+        // altura sin límite y la tarjeta terminaba midiendo 0 (rectángulo vacío, sin ícono ni
+        // texto). Con fillMaxWidth el alto se ajusta al contenido en los dos casos por igual.
+        Column(modifier = Modifier.fillMaxWidth()) {
             if (badge != null) {
                 Box(
                     modifier = Modifier
@@ -469,8 +571,13 @@ private fun RoutineCard(
                 }
                 Spacer(modifier = Modifier.height(10.dp))
             }
+            // Sin weight(): weight() necesita que el Column padre tenga una altura acotada
+            // para repartir el espacio. Con fillMaxSize() (alto fijo del carrusel) alcanzaba
+            // a medir bien, pero tras cambiar a fillMaxWidth() (alto "wrap content" para la
+            // lista vertical) el Column queda con alto NO acotado, y ahí weight(1f) mide 0:
+            // esto era la caja vacía sin ícono ni texto en "Creados por ti". El Row no necesita
+            // pelear por peso (es el único hijo real), así que mide su contenido normal.
             Row(
-                modifier = Modifier.weight(1f, fill = false),
                 verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {

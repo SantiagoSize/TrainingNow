@@ -132,7 +132,7 @@ fun ClientDetailScreen(
                         Spacer(Modifier.height(4.dp))
 
                         Text(
-                            text = "ID: ${client.id}",
+                            text = client.email,
                             style = MaterialTheme.typography.bodyMedium,
                             color = GrisTexto
                         )

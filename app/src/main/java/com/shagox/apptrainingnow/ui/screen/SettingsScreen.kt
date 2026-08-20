@@ -217,7 +217,8 @@ fun SettingsScreen(
                     "2. Entrena y marca" to "Al abrir tu rutina verás la semana. Marca los ejercicios que completes: el día se pone verde y queda guardado.",
                     "3. Recibe recordatorios" to "Mantén presionada la campana dentro de la rutina para elegir la hora de cada día. La notificación te lleva directo al entrenamiento.",
                     "4. Revisa tu avance" to "En Mi avance mensual verás el calendario del mes, cuántos días entrenaste y si vas bien o necesitas mejorar.",
-                    "5. Explora la biblioteca" to "Más de 50 ejercicios con pasos, consejos, errores comunes y series recomendadas."
+                    "5. Explora la biblioteca" to "Más de 50 ejercicios con foto, video explicativo, músculos trabajados, consejos y errores comunes.",
+                    "6. Habla con tu entrenador" to "Desde Mis Chats escribe a tu entrenador o a Soporte Training Now!: comparte fotos y videos de tu progreso, y recibe rutinas que te asignen directo en tu cuenta."
                 )
             )
         }
@@ -231,11 +232,11 @@ fun SettingsScreen(
         if (mostrarInfo) {
             TarjetaTexto(
                 listOf(
-                    "Training Now!" to "Aplicación de entrenamiento personal que conecta a usuarios con entrenadores. Organiza tus rutinas semanales, sigue tu progreso y recibe recordatorios en el momento justo.",
+                    "Training Now!" to "Aplicación de entrenamiento personal que conecta a usuarios con entrenadores. Organiza tus rutinas semanales, sigue tu progreso, chatea con tu entrenador o con Soporte, y explora una biblioteca de ejercicios con foto y video explicativo.",
                     "Versión" to "1.0.0",
                     "Tecnología" to "App Android en Kotlin con Jetpack Compose y arquitectura de microservicios en Spring Boot.",
                     "Privacidad" to "Tus datos de entrenamiento se guardan en tu cuenta. Sin cuenta, quedan solo en este teléfono.",
-                    "Contacto" to "contacsanser@gmail.com"
+                    "Contacto" to "soporte@trainingnow.com"
                 )
             )
         }

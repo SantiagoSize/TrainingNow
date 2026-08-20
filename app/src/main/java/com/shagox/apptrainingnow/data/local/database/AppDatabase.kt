@@ -84,7 +84,7 @@ import kotlinx.coroutines.launch
         GoalEntity::class,
         PersonalRecordEntity::class
     ],
-    version = 15, // +pendingShare/isTemplate en RoutineEntity
+    version = 17, // +guardado en ContactoPreferenciaEntity (fix: Eliminar de mis chats resucitaba mensajes)
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -144,7 +144,7 @@ abstract class AppDatabase : RoomDatabase() {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     prepopulateExercises(database.exerciseDao())
-                    prepopulateRoutines(database.routineDao())
+                    prepopulateRoutines(database.routineDao(), database.userDao())
                     // Limpieza de rutinas predeterminadas descontinuadas (ej: "Full Body Principiante").
                     // Corre siempre, a diferencia de prepopulateRoutines que solo siembra con la tabla vacía.
                     database.routineDao().deleteRutinasDescontinuadas()
@@ -195,7 +195,7 @@ abstract class AppDatabase : RoomDatabase() {
                         // Poblar en orden de dependencias
                         prepopulateUsers(database.userDao())
                         prepopulateExercises(database.exerciseDao())
-                        prepopulateRoutines(database.routineDao())
+                        prepopulateRoutines(database.routineDao(), database.userDao())
                         prepopulateTrainerClientRelations(database.trainerClientDao())
                         prepopulateGoals(database.progressDao())
                         prepopulateNotifications(database.notificationDao())
@@ -232,7 +232,7 @@ abstract class AppDatabase : RoomDatabase() {
                     lastName = "Admin",
                     email = "admin@admin.tn",
                     phone = "+56900000000",
-                    password = "admin123",
+                    password = "Admin123",
                     specializations = "Gestión del Sistema"
                 ),
                 // Entrenador 1 - Especialista en Hipertrofia
@@ -242,7 +242,7 @@ abstract class AppDatabase : RoomDatabase() {
                     lastName = "Rodríguez",
                     email = "santiago@coach.tn",
                     phone = "+56912345678",
-                    password = "coach123",
+                    password = "Coach123",
                     specializations = "Hipertrofia, Fuerza, Powerlifting",
                     gender = "M"
                 ),
@@ -253,7 +253,7 @@ abstract class AppDatabase : RoomDatabase() {
                     lastName = "González",
                     email = "maria@coach.tn",
                     phone = "+56923456789",
-                    password = "coach123",
+                    password = "Coach123",
                     specializations = "Entrenamiento Funcional, CrossFit, HIIT",
                     gender = "F"
                 ),
@@ -264,7 +264,7 @@ abstract class AppDatabase : RoomDatabase() {
                     lastName = "Pérez",
                     email = "juan@gmail.com",
                     phone = "+56987654321",
-                    password = "user123",
+                    password = "User1234",
                     height = 175f,
                     weight = 78f,
                     gender = "M",
@@ -277,7 +277,7 @@ abstract class AppDatabase : RoomDatabase() {
                     lastName = "Martínez",
                     email = "ana@gmail.com",
                     phone = "+56976543210",
-                    password = "user123",
+                    password = "User1234",
                     height = 165f,
                     weight = 62f,
                     gender = "F",
@@ -844,8 +844,14 @@ abstract class AppDatabase : RoomDatabase() {
         /**
          * Crea rutinas de ejemplo para demostración.
          */
-        private suspend fun prepopulateRoutines(dao: RoutineDao) {
+        private suspend fun prepopulateRoutines(dao: RoutineDao, userDao: com.shagox.apptrainingnow.data.local.user.UserDao) {
             if (dao.count() > 0) return
+            // Las rutinas de ejemplo referencian creatorId 1/2/3 (FK a users). En una
+            // instalación limpia, este método corre en paralelo con el callback onCreate de
+            // Room que siembra los usuarios (poblarDatosIniciales), y puede ejecutarse ANTES
+            // de que esos usuarios existan -> SQLiteConstraintException FK. Si todavía no hay
+            // usuarios, se aborta esta pasada: el propio onCreate va a sembrar rutinas también.
+            if (userDao.count() == 0) return
 
             val semana = listOf("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
 

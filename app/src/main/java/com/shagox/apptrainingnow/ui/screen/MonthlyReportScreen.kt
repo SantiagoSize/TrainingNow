@@ -282,74 +282,9 @@ private fun ReportContent(
         modifier = Modifier.padding(bottom = 10.dp)
     )
 
-    // La evaluación acompaña al detalle del mes
+    // "Detalle del mes" es solo la tarjeta de evaluación: la lista día a día de abajo
+    // (fecha + "Entrenaste"/"No entrenaste" por cada día) sobraba, ya la resume esta tarjeta.
     EvaluacionDelMes(report)
-    Spacer(modifier = Modifier.height(12.dp))
-
-    if (report.days.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(GrisFondo)
-                .padding(24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                "Todavía no registras entrenamientos este mes.\nCompleta una rutina y aparecerá aquí.",
-                color = GrisTexto,
-                fontSize = 13.sp,
-                textAlign = TextAlign.Center
-            )
-        }
-    } else {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            report.days.forEach { day ->
-                val (color, etiqueta) = when (day.status) {
-                    "TRAINED" -> VerdeTN to "Entrenaste"
-                    "MISSED" -> RojoTN to "No entrenaste"
-                    else -> GrisTexto to "Descanso"
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(GrisFondo)
-                        .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = day.date.takeLast(5).replace("-", "/"),
-                            color = TextoPrincipal,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (day.exercisesCompleted > 0) {
-                            Text(
-                                "${day.exercisesCompleted} ej.",
-                                color = GrisTexto,
-                                fontSize = 12.sp
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                        }
-                        Text(etiqueta, color = color, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-    }
 }
 
 @Composable
@@ -569,7 +504,20 @@ private fun DetalleDiaDialog(
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(4.dp))
-                            series.forEachIndexed { i, log ->
+                            // Ejercicios marcados "terminado" sin series manuales quedan como un
+                            // registro marcador (ver NOTA_TERMINADO_SIN_SERIE): se muestran
+                            // aparte, no como una "Serie 1: 0 reps" real.
+                            val seriesReales = series.filterNot {
+                                it.notes == ExerciseLogEntity.NOTA_TERMINADO_SIN_SERIE
+                            }
+                            if (seriesReales.isEmpty()) {
+                                Text(
+                                    text = "Terminado (sin series registradas)",
+                                    color = TextoPrincipal.copy(alpha = 0.6f),
+                                    fontSize = 13.sp
+                                )
+                            }
+                            seriesReales.forEachIndexed { i, log ->
                                 val reps = log.actualReps ?: "-"
                                 val carga = log.weightKg?.let { kg ->
                                     val valor = if (unidadesImperiales)

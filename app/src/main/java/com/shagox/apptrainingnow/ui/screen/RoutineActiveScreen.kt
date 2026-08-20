@@ -75,6 +75,7 @@ import androidx.compose.ui.unit.sp
 import com.shagox.apptrainingnow.data.domain.RoutineDayView
 import com.shagox.apptrainingnow.data.domain.RoutineWithDays
 import com.shagox.apptrainingnow.data.local.exercise.ExerciseEntity
+import com.shagox.apptrainingnow.data.local.workout.ExerciseLogEntity
 import com.shagox.apptrainingnow.data.repository.RoutineRepository
 import com.shagox.apptrainingnow.ui.components.ScreenHeaderTN
 import com.shagox.apptrainingnow.ui.theme.GrisBorde
@@ -123,6 +124,25 @@ fun RoutineActiveScreen(
 ) {
     val context = LocalContext.current
     var showExitDialog by remember { mutableStateOf(false) }
+    // Si el diálogo de salida se disparó porque el usuario tocó OTRO tab de la bottom nav (ver
+    // RoutineExitGuard), esto guarda esa navegación pendiente para ejecutarla al confirmar, en
+    // vez de solo hacer el onBack() normal (que siempre vuelve a "Mis rutinas").
+    var accionPendienteAlConfirmar by remember { mutableStateOf<(() -> Unit)?>(null) }
+    // Botón físico/gesto de atrás del sistema: antes salía sin preguntar, solo la flecha del
+    // header mostraba el diálogo. Ahora ambos caminos respetan la misma confirmación.
+    androidx.activity.compose.BackHandler(enabled = true) {
+        accionPendienteAlConfirmar = null
+        showExitDialog = true
+    }
+    // Bottom nav: si tocan otro tab estando en una rutina activa, se intercepta aquí en vez de
+    // dejar que la barra descarte esta pantalla del back stack sin confirmar (ver RoutineExitGuard).
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        com.shagox.apptrainingnow.navigation.RoutineExitGuard.interceptor = { onConfirmado ->
+            accionPendienteAlConfirmar = onConfirmado
+            showExitDialog = true
+        }
+        onDispose { com.shagox.apptrainingnow.navigation.RoutineExitGuard.interceptor = null }
+    }
     var notificationsEnabled by remember { mutableStateOf(ReminderHelper.isEnabled(context)) }
     // Aviso flotante breve al activar/desactivar recordatorios
     var avisoTexto by remember { mutableStateOf<String?>(null) }
@@ -567,13 +587,17 @@ fun RoutineActiveScreen(
                     onClick = {
                         showExitDialog = false
                         onBack()
+                        // Si el disparador fue un tab de la bottom nav (no la flecha del header
+                        // ni el back del sistema), completa esa navegación tras salir.
+                        accionPendienteAlConfirmar?.invoke()
+                        accionPendienteAlConfirmar = null
                     }
                 ) {
                     Text("Salir", color = VerdeTN)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showExitDialog = false }) {
+                TextButton(onClick = { showExitDialog = false; accionPendienteAlConfirmar = null }) {
                     Text("Cancelar", color = VerdeTN)
                 }
             },
@@ -777,6 +801,20 @@ private fun FilaEjercicio(
         if (sid >= 0) workoutRepository?.agregarSerie(sid, ex.id, reps = 0, cargaKg = null)
     }
 
+    // Al marcar "terminado" sin haber registrado ninguna serie, se guarda un registro marcador
+    // (sin reps/carga reales) para que el ejercicio aparezca en el detalle del día del reporte
+    // mensual, que antes solo mostraba ejercicios con series manuales. Si se desmarca, se borra
+    // ese marcador (no series reales que el usuario sí haya cargado).
+    suspend fun marcarTerminadoSinSerie() {
+        val sid = sessionId ?: obtenerSessionId().also { sessionId = it }
+        if (sid >= 0) {
+            workoutRepository?.agregarSerie(
+                sid, ex.id, reps = 0, cargaKg = null,
+                notes = ExerciseLogEntity.NOTA_TERMINADO_SIN_SERIE
+            )
+        }
+    }
+
     // Sin marcar: tarjeta gris. Terminado (checkbox marcado): se pone verde y ya no se pueden
     // sumar más series (se oculta el "+"). Al desmarcar vuelve a gris y el "+" reaparece.
     val colorAcento = if (checked) VerdeTN else Color.Gray
@@ -798,9 +836,10 @@ private fun FilaEjercicio(
                     color = TextoPrincipal,
                     fontSize = 15.sp
                 )
-                if (series.isNotEmpty()) {
+                val seriesReales = series.filterNot { it.notes == ExerciseLogEntity.NOTA_TERMINADO_SIN_SERIE }
+                if (seriesReales.isNotEmpty()) {
                     val etiquetaUnidad = if (unidadesImperiales) "lb" else "kg"
-                    series.forEachIndexed { i, log ->
+                    seriesReales.forEachIndexed { i, log ->
                         val reps = log.actualReps?.toIntOrNull() ?: 0
                         val carga = log.weightKg?.let { kg ->
                             val valor = if (unidadesImperiales) com.shagox.apptrainingnow.utils.UnitsPreference.kgALibras(kg) else kg
@@ -830,7 +869,19 @@ private fun FilaEjercicio(
             }
             Checkbox(
                 checked = checked,
-                onCheckedChange = onCheckChange,
+                onCheckedChange = { isChecked ->
+                    onCheckChange(isChecked)
+                    scope.launch {
+                        if (isChecked) {
+                            if (series.isEmpty()) marcarTerminadoSinSerie()
+                        } else {
+                            // Si lo único guardado era el marcador de "terminado sin serie" (no
+                            // series reales cargadas por el usuario), se borra al desmarcar.
+                            series.singleOrNull { it.notes == ExerciseLogEntity.NOTA_TERMINADO_SIN_SERIE }
+                                ?.let { workoutRepository?.borrarSerie(it) }
+                        }
+                    }
+                },
                 colors = CheckboxDefaults.colors(
                     checkedColor = VerdeTN,
                     uncheckedColor = Color.Gray
@@ -968,8 +1019,11 @@ private fun SeriesDialogEjercicio(
                             OutlinedTextField(
                                 value = repsTexto,
                                 onValueChange = { nuevo ->
-                                    repsTexto = nuevo
-                                    val reps = nuevo.toIntOrNull() ?: 0
+                                    // keyboardType = Number solo sugiere el teclado numérico, no
+                                    // bloquea letras/símbolos (se pueden pegar o venir de teclado
+                                    // físico). Se filtra a mano: solo dígitos.
+                                    repsTexto = nuevo.filter { it.isDigit() }
+                                    val reps = repsTexto.toIntOrNull() ?: 0
                                     val cargaKg = cargaTexto.replace(",", ".").toDoubleOrNull()?.let {
                                         if (unidadesImperiales) com.shagox.apptrainingnow.utils.UnitsPreference.librasAKg(it) else it
                                     }
@@ -985,8 +1039,21 @@ private fun SeriesDialogEjercicio(
                             OutlinedTextField(
                                 value = cargaTexto,
                                 onValueChange = { nuevo ->
-                                    cargaTexto = nuevo
-                                    val valor = nuevo.replace(",", ".").toDoubleOrNull()
+                                    // Igual que Reps: se filtra a mano. Acá se permite además UN
+                                    // separador decimal (. o ,), para poder escribir cargas como
+                                    // "12.5".
+                                    val filtrado = StringBuilder()
+                                    var yaTieneSeparador = false
+                                    for (c in nuevo) {
+                                        if (c.isDigit()) {
+                                            filtrado.append(c)
+                                        } else if ((c == '.' || c == ',') && !yaTieneSeparador) {
+                                            filtrado.append(c)
+                                            yaTieneSeparador = true
+                                        }
+                                    }
+                                    cargaTexto = filtrado.toString()
+                                    val valor = cargaTexto.replace(",", ".").toDoubleOrNull()
                                     val cargaKg = valor?.let {
                                         if (unidadesImperiales) com.shagox.apptrainingnow.utils.UnitsPreference.librasAKg(it) else it
                                     }

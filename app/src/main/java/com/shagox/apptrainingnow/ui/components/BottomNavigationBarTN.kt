@@ -159,11 +159,17 @@ fun BottomNavigationBarTN(
                                     // lanzamiento global de la app (que puede no pertenecer a este rol,
                                     // ej. "user_routines" no existe en la barra del admin y dejaba la
                                     // pila mal anclada tras el primer cambio de pestaña).
-                                    navController.navigate(route.path) {
-                                        popUpTo(items.first().path) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
+                                    val navegar = {
+                                        navController.navigate(route.path) {
+                                            popUpTo(items.first().path) { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
                                     }
+                                    // Si hay una pantalla protegida activa (ej. rutina en curso),
+                                    // le cede el control para que confirme antes de descartarla.
+                                    val guard = com.shagox.apptrainingnow.navigation.RoutineExitGuard.interceptor
+                                    if (guard != null) guard(navegar) else navegar()
                                 }
                             )
                         }

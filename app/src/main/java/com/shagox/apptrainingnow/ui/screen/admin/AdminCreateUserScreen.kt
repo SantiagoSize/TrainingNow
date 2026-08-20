@@ -242,9 +242,11 @@ fun AdminCreateUserScreen(
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = phone,
-                onValueChange = { phone = it },
+                onValueChange = { phone = it.filter { c -> c.isDigit() }.take(16) },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Teléfono") },
+                placeholder = { Text("Solo números") },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 colors = textFieldColors,
                 shape = textFieldShape
@@ -329,6 +331,12 @@ fun AdminCreateUserScreen(
                 label = { Text("Fecha de nacimiento") },
                 placeholder = { Text("dd/MM/aaaa") },
                 singleLine = true,
+                isError = birthDateStr.length == 10 && parseBirthDateAdmin(birthDateStr) == null,
+                supportingText = {
+                    if (birthDateStr.length == 10 && parseBirthDateAdmin(birthDateStr) == null) {
+                        Text("Fecha inválida", color = androidx.compose.ui.graphics.Color(0xFFE53935))
+                    }
+                },
                 colors = textFieldColors,
                 shape = textFieldShape
             )
@@ -478,7 +486,16 @@ private fun autoFormatearFechaAdmin(texto: String): String {
 private fun parseBirthDateAdmin(texto: String): Long? {
     if (texto.length != 10) return null
     return try {
-        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply { isLenient = false }.parse(texto)?.time
+        val millis = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+            .apply { isLenient = false }
+            .parse(texto)?.time ?: return null
+        // Rechaza fechas futuras y edades fuera de un rango humano razonable (0-120 años),
+        // no solo fechas calendario imposibles (isLenient ya cubre eso).
+        val ahora = System.currentTimeMillis()
+        if (millis > ahora) return null
+        val edadAnios = (ahora - millis) / (365.25 * 24 * 60 * 60 * 1000)
+        if (edadAnios !in 0.0..120.0) return null
+        millis
     } catch (_: Exception) {
         null
     }

@@ -263,6 +263,10 @@ fun UserChatsScreen(
             onEliminarConversacion = {
                 scope.launch { chatRepository.eliminarConversacion(currentUserId, trainer.id) }
                 trainerDetailDialog = null
+            },
+            onEliminarDeMisChats = {
+                scope.launch { chatRepository.eliminarDeMisChats(currentUserId, trainer.id) }
+                trainerDetailDialog = null
             }
         )
     }

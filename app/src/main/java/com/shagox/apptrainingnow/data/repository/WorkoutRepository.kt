@@ -193,7 +193,7 @@ class WorkoutRepository(private val workoutDao: WorkoutDao) {
      * @param cargaKg carga SIEMPRE en kg (formato canónico); la UI convierte antes de llamar
      * si el usuario tiene elegido libras (ver UnitsPreference).
      */
-    suspend fun agregarSerie(sessionId: Int, exerciseId: Int, reps: Int, cargaKg: Double?): Long {
+    suspend fun agregarSerie(sessionId: Int, exerciseId: Int, reps: Int, cargaKg: Double?, notes: String? = null): Long {
         val yaGuardadas = workoutDao.getLogsForSessionSync(sessionId).count { it.exerciseId == exerciseId }
         val log = ExerciseLogEntity(
             sessionId = sessionId,
@@ -201,7 +201,8 @@ class WorkoutRepository(private val workoutDao: WorkoutDao) {
             orderInSession = yaGuardadas, // reutilizado como índice de serie DENTRO de este ejercicio
             completedSets = 1,
             actualReps = reps.toString(),
-            weightKg = cargaKg
+            weightKg = cargaKg,
+            notes = notes
         )
         return workoutDao.insertExerciseLog(log)
     }
